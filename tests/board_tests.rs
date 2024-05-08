@@ -11,52 +11,52 @@ mod tests {
         let board = Board::from_fen(fen).unwrap();
 
         assert_eq!(
-            board.white_pawns,
+            board.white_pieces.pawns,
             Bitboard(0b0000000000000000000000000000000000000000000000001111111100000000)
         );
         assert_eq!(
-            board.white_knights,
+            board.white_pieces.knights,
             Bitboard(0b0000000000000000000000000000000000000000000000000000000001000010)
         );
         assert_eq!(
-            board.white_bishops,
+            board.white_pieces.bishops,
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000100100)
         );
         assert_eq!(
-            board.white_rooks,
+            board.white_pieces.rooks,
             Bitboard(0b0000000000000000000000000000000000000000000000000000000010000001)
         );
         assert_eq!(
-            board.white_queens,
+            board.white_pieces.queens,
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000001000)
         );
         assert_eq!(
-            board.white_king,
+            board.white_pieces.king,
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000010000)
         );
 
         assert_eq!(
-            board.black_pawns,
+            board.black_pieces.pawns,
             Bitboard(0b0000000011111111000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_knights,
+            board.black_pieces.knights,
             Bitboard(0b0100001000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_bishops,
+            board.black_pieces.bishops,
             Bitboard(0b0010010000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_rooks,
+            board.black_pieces.rooks,
             Bitboard(0b1000000100000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_queens,
+            board.black_pieces.queens,
             Bitboard(0b0000100000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_king,
+            board.black_pieces.king,
             Bitboard(0b0001000000000000000000000000000000000000000000000000000000000000)
         );
 

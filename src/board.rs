@@ -1,25 +1,26 @@
 use crate::bitboard::Bitboard;
 
 pub struct Board {
-    pub white_pawns: Bitboard,
-    pub white_knights: Bitboard,
-    pub white_bishops: Bitboard,
-    pub white_rooks: Bitboard,
-    pub white_queens: Bitboard,
-    pub white_king: Bitboard,
+    pub white_occupancy: Bitboard,
+    pub white_pieces: Pieces,
 
-    pub black_pawns: Bitboard,
-    pub black_knights: Bitboard,
-    pub black_bishops: Bitboard,
-    pub black_rooks: Bitboard,
-    pub black_queens: Bitboard,
-    pub black_king: Bitboard,
+    pub black_occupancy: Bitboard,
+    pub black_pieces: Pieces,
 
     pub turn: Color,
     pub castling_rights: CastlingRights,
     pub en_passant_square: Option<usize>,
     pub halfmove_clock: u8,
     pub fullmove_number: u16,
+}
+
+pub struct Pieces {
+    pub pawns: Bitboard,
+    pub knights: Bitboard,
+    pub bishops: Bitboard,
+    pub rooks: Bitboard,
+    pub queens: Bitboard,
+    pub king: Bitboard,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -49,31 +50,27 @@ pub struct CastlingRights {
 impl Board {
     /// Creates a new chessboard with default values
     pub fn new() -> Self {
-        let white_pawns =
-            Bitboard(0b0000000000000000000000000000000000000000000000001111111100000000);
-        let white_knights =
-            Bitboard(0b0000000000000000000000000000000000000000000000000000000001000010);
-        let white_bishops =
-            Bitboard(0b0000000000000000000000000000000000000000000000000000000000100100);
-        let white_rooks =
-            Bitboard(0b0000000000000000000000000000000000000000000000000000000010000001);
-        let white_queens =
-            Bitboard(0b0000000000000000000000000000000000000000000000000000000000001000);
-        let white_king =
-            Bitboard(0b0000000000000000000000000000000000000000000000000000000000010000);
+        let white_occupancy = Bitboard::new();
 
-        let black_pawns =
-            Bitboard(0b0000000011111111000000000000000000000000000000000000000000000000);
-        let black_knights =
-            Bitboard(0b0100001000000000000000000000000000000000000000000000000000000000);
-        let black_bishops =
-            Bitboard(0b0010010000000000000000000000000000000000000000000000000000000000);
-        let black_rooks =
-            Bitboard(0b1000000100000000000000000000000000000000000000000000000000000000);
-        let black_queens =
-            Bitboard(0b0000100000000000000000000000000000000000000000000000000000000000);
-        let black_king =
-            Bitboard(0b0001000000000000000000000000000000000000000000000000000000000000);
+        let white_pieces = Pieces {
+            pawns: Bitboard(0b0000000000000000000000000000000000000000000000001111111100000000),
+            knights: Bitboard(0b0000000000000000000000000000000000000000000000000000000001000010),
+            bishops: Bitboard(0b0000000000000000000000000000000000000000000000000000000000100100),
+            rooks: Bitboard(0b0000000000000000000000000000000000000000000000000000000010000001),
+            queens: Bitboard(0b0000000000000000000000000000000000000000000000000000000000001000),
+            king: Bitboard(0b0000000000000000000000000000000000000000000000000000000000010000),
+        };
+
+        let black_occupancy = Bitboard::new();
+
+        let black_pieces = Pieces {
+            pawns: Bitboard(0b0000000011111111000000000000000000000000000000000000000000000000),
+            knights: Bitboard(0b0100001000000000000000000000000000000000000000000000000000000000),
+            bishops: Bitboard(0b0010010000000000000000000000000000000000000000000000000000000000),
+            rooks: Bitboard(0b1000000100000000000000000000000000000000000000000000000000000000),
+            queens: Bitboard(0b0000100000000000000000000000000000000000000000000000000000000000),
+            king: Bitboard(0b0001000000000000000000000000000000000000000000000000000000000000),
+        };
 
         let turn = Color::White;
 
@@ -89,18 +86,10 @@ impl Board {
         let fullmove_number = 1;
 
         Board {
-            white_pawns,
-            white_knights,
-            white_bishops,
-            white_rooks,
-            white_queens,
-            white_king,
-            black_pawns,
-            black_knights,
-            black_bishops,
-            black_rooks,
-            black_queens,
-            black_king,
+            white_pieces,
+            white_occupancy,
+            black_pieces,
+            black_occupancy,
             turn,
             castling_rights,
             en_passant_square,
@@ -192,36 +181,65 @@ impl Board {
     /// Gets the bitboard for a specific piece and color
     fn get_piece_bitboard(&self, color: Color, piece: Piece) -> Bitboard {
         match (color, piece) {
-            (Color::White, Piece::Pawn) => self.white_pawns,
-            (Color::White, Piece::Knight) => self.white_knights,
-            (Color::White, Piece::Bishop) => self.white_bishops,
-            (Color::White, Piece::Rook) => self.white_rooks,
-            (Color::White, Piece::Queen) => self.white_queens,
-            (Color::White, Piece::King) => self.white_king,
-            (Color::Black, Piece::Pawn) => self.black_pawns,
-            (Color::Black, Piece::Knight) => self.black_knights,
-            (Color::Black, Piece::Bishop) => self.black_bishops,
-            (Color::Black, Piece::Rook) => self.black_rooks,
-            (Color::Black, Piece::Queen) => self.black_queens,
-            (Color::Black, Piece::King) => self.black_king,
+            (Color::White, Piece::Pawn) => self.white_pieces.pawns,
+            (Color::White, Piece::Knight) => self.white_pieces.knights,
+            (Color::White, Piece::Bishop) => self.white_pieces.bishops,
+            (Color::White, Piece::Rook) => self.white_pieces.rooks,
+            (Color::White, Piece::Queen) => self.white_pieces.queens,
+            (Color::White, Piece::King) => self.white_pieces.king,
+            (Color::Black, Piece::Pawn) => self.black_pieces.pawns,
+            (Color::Black, Piece::Knight) => self.black_pieces.knights,
+            (Color::Black, Piece::Bishop) => self.black_pieces.bishops,
+            (Color::Black, Piece::Rook) => self.black_pieces.rooks,
+            (Color::Black, Piece::Queen) => self.black_pieces.queens,
+            (Color::Black, Piece::King) => self.black_pieces.king,
         }
     }
 
     /// Places a piece on the board at the specified square index
     fn place_piece(&mut self, color: Color, piece: Piece, index: usize) {
-        match (color, piece) {
-            (Color::White, Piece::Pawn) => self.white_pawns.set_bit(index),
-            (Color::White, Piece::Knight) => self.white_knights.set_bit(index),
-            (Color::White, Piece::Bishop) => self.white_bishops.set_bit(index),
-            (Color::White, Piece::Rook) => self.white_rooks.set_bit(index),
-            (Color::White, Piece::Queen) => self.white_queens.set_bit(index),
-            (Color::White, Piece::King) => self.white_king.set_bit(index),
-            (Color::Black, Piece::Pawn) => self.black_pawns.set_bit(index),
-            (Color::Black, Piece::Knight) => self.black_knights.set_bit(index),
-            (Color::Black, Piece::Bishop) => self.black_bishops.set_bit(index),
-            (Color::Black, Piece::Rook) => self.black_rooks.set_bit(index),
-            (Color::Black, Piece::Queen) => self.black_queens.set_bit(index),
-            (Color::Black, Piece::King) => self.black_king.set_bit(index),
+        match color {
+            Color::White => self.white_occupancy.set_bit(index),
+            Color::Black => self.black_occupancy.set_bit(index),
         };
+
+        match (color, piece) {
+            (Color::White, Piece::Pawn) => self.white_pieces.pawns.set_bit(index),
+            (Color::White, Piece::Knight) => self.white_pieces.knights.set_bit(index),
+            (Color::White, Piece::Bishop) => self.white_pieces.bishops.set_bit(index),
+            (Color::White, Piece::Rook) => self.white_pieces.rooks.set_bit(index),
+            (Color::White, Piece::Queen) => self.white_pieces.queens.set_bit(index),
+            (Color::White, Piece::King) => self.white_pieces.king.set_bit(index),
+            (Color::Black, Piece::Pawn) => self.black_pieces.pawns.set_bit(index),
+            (Color::Black, Piece::Knight) => self.black_pieces.knights.set_bit(index),
+            (Color::Black, Piece::Bishop) => self.black_pieces.bishops.set_bit(index),
+            (Color::Black, Piece::Rook) => self.black_pieces.rooks.set_bit(index),
+            (Color::Black, Piece::Queen) => self.black_pieces.queens.set_bit(index),
+            (Color::Black, Piece::King) => self.black_pieces.king.set_bit(index),
+        };
+    }
+
+    /// Generate all possible moves at the specified square index
+    pub fn generate_moves(&self, index: usize) -> Vec<usize> {
+        let mut moves = Vec::new();
+
+        let occupancy = self.white_occupancy.or(&self.black_occupancy);
+
+        self.generate_pawn_moves(&mut moves, occupancy, index);
+
+        moves
+    }
+
+    /// Generate possible pawn moves at the specified square index
+    fn generate_pawn_moves(&self, moves: &mut Vec<usize>, occupancy: Bitboard, position: usize) {
+        let direction = match self.turn {
+            Color::White => 8,
+            Color::Black => -8,
+        };
+
+        let single_forward = position as i8 + direction;
+        if !occupancy.is_set(single_forward as usize) {
+            moves.push(single_forward as usize);
+        }
     }
 }
