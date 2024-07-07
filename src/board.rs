@@ -1,3 +1,5 @@
+use std::ops::RangeBounds;
+
 use crate::bitboard::Bitboard;
 
 pub struct Board {
@@ -219,6 +221,17 @@ impl Board {
         };
     }
 
+    fn is_starting_position(&self, color: Color, position: usize) -> bool {
+        match color {
+            Color::White => (8..16).contains(&position),
+            Color::Black => (48..56).contains(&position),
+        }
+    }
+
+    fn is_square_empty(&self, index: usize, occupancy: Bitboard) -> bool {
+        !occupancy.is_set(index)
+    }
+
     /// Generate all possible moves at the specified square index
     pub fn generate_moves(&self, index: usize) -> Vec<usize> {
         let mut moves = Vec::new();
@@ -240,6 +253,13 @@ impl Board {
         let single_forward = position as i8 + direction;
         if !occupancy.is_set(single_forward as usize) {
             moves.push(single_forward as usize);
+        }
+
+        if self.is_starting_position(self.turn, position) {
+            let double_forward = single_forward + direction;
+            if self.is_square_empty(double_forward as usize, occupancy) {
+                moves.push(double_forward as usize);
+            }
         }
     }
 }
