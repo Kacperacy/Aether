@@ -221,15 +221,24 @@ impl Board {
         };
     }
 
-    fn is_starting_position(&self, color: Color, position: usize) -> bool {
+    /// Check if pawn position is starting position
+    fn is_pawn_starting_position(&self, color: Color, position: usize) -> bool {
         match color {
             Color::White => (8..16).contains(&position),
             Color::Black => (48..56).contains(&position),
         }
     }
 
+    /// Check is square is empty
     fn is_square_empty(&self, index: usize, occupancy: Bitboard) -> bool {
         !occupancy.is_set(index)
+    }
+
+    fn is_square_enemy(&self, color: Color, position: usize) -> bool {
+        match color {
+            Color::White => self.black_occupancy.is_set(position),
+            Color::Black => self.white_occupancy.is_set(position),
+        }
     }
 
     /// Generate all possible moves at the specified square index
@@ -255,11 +264,20 @@ impl Board {
             moves.push(single_forward as usize);
         }
 
-        if self.is_starting_position(self.turn, position) {
+        if self.is_pawn_starting_position(self.turn, position) {
             let double_forward = single_forward + direction;
             if self.is_square_empty(double_forward as usize, occupancy) {
                 moves.push(double_forward as usize);
             }
+        }
+
+        let left_capture = single_forward - 1;
+        let right_capture = single_forward + 1;
+        if self.is_square_enemy(self.turn, left_capture as usize) {
+            moves.push(left_capture as usize);
+        }
+        if self.is_square_enemy(self.turn, right_capture as usize) {
+            moves.push(right_capture as usize);
         }
     }
 }
