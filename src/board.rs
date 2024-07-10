@@ -234,6 +234,7 @@ impl Board {
         !occupancy.is_set(index)
     }
 
+    /// Chceck if enemy piece is on square
     fn is_square_enemy(&self, color: Color, position: usize) -> bool {
         match color {
             Color::White => self.black_occupancy.is_set(position),
