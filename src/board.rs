@@ -244,17 +244,17 @@ impl Board {
 
     /// Generate all possible moves at the specified square index
     pub fn generate_moves(&self, index: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
-
         let occupancy = self.white_occupancy.or(&self.black_occupancy);
 
-        self.generate_pawn_moves(&mut moves, occupancy, index);
+        let pawn_moves = self.generate_pawn_moves(occupancy, index);
 
-        moves
+        pawn_moves
     }
 
     /// Generate possible pawn moves at the specified square index
-    fn generate_pawn_moves(&self, moves: &mut Vec<usize>, occupancy: Bitboard, position: usize) {
+    fn generate_pawn_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
+        let mut moves = Vec::new();
+
         let direction = match self.turn {
             Color::White => 8,
             Color::Black => -8,
@@ -280,5 +280,13 @@ impl Board {
         if self.is_square_enemy(self.turn, right_capture as usize) {
             moves.push(right_capture as usize);
         }
+
+        if let Some(square) = self.en_passant_square {
+            if self.is_square_enemy(self.turn, square as usize) {
+                moves.push(square as usize);
+            }
+        }
+
+        moves
     }
 }
