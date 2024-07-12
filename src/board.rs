@@ -289,4 +289,33 @@ impl Board {
 
         moves
     }
+
+    fn generate_bishop_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
+        let mut moves = Vec::new();
+
+        let directions = [-9, -7, 7, 9];
+
+        for &direction in &directions {
+            let mut target = position as isize + direction;
+            while target >= 0 && target < 64 {
+                if (target % 8 == 0 && (direction == -7 || direction == 9))
+                    || (target % 8 == 7 && (direction == 7 || direction == -9))
+                {
+                    break;
+                }
+
+                if occupancy.is_set(target as usize) {
+                    if self.is_square_enemy(self.turn, target as usize) {
+                        moves.push(target as usize);
+                    }
+                    break;
+                }
+
+                moves.push(target as usize);
+                target += direction;
+            }
+        }
+
+        moves
+    }
 }
