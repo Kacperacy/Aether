@@ -290,6 +290,7 @@ impl Board {
         moves
     }
 
+    // Generate possible bishop moves
     fn generate_bishop_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
