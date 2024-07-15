@@ -319,4 +319,6 @@ impl Board {
 
         moves
     }
+
+    fn generate_knight_moves(&self) {}
 }
