@@ -323,6 +323,8 @@ impl Board {
     fn generate_knight_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
+        //let direction
+
         moves
     }
 }
