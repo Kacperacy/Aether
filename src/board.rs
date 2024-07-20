@@ -322,7 +322,6 @@ impl Board {
         let mut moves = Vec::new();
 
         //let directions = []
-        //let directions = []
 
         moves
     }
