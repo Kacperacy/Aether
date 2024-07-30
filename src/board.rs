@@ -318,10 +318,32 @@ impl Board {
         moves
     }
 
+    // Generate possible knight moves
     fn generate_knight_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
-        //let directions = []
+        let directions = [-17, -15, -10, -6, 6, 10, 15, 17];
+
+        for &direction in &directions {
+            let target = position as isize + direction;
+            if target < 0 || target >= 64 {
+                continue;
+            }
+
+            let pos_file = position % 8;
+            let target_file = (target as usize) % 8;
+            if (pos_file <= 1 && target_file >= 6) || (pos_file >= 6 && target_file <= 1) {
+                continue;
+            }
+
+            if occupancy.is_set(target as usize) {
+                if self.is_square_enemy(self.turn, target as usize) {
+                    moves.push(target as usize);
+                }
+            } else {
+                moves.push(target as usize);
+            }
+        }
 
         moves
     }
