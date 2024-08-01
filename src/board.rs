@@ -351,6 +351,8 @@ impl Board {
     fn generate_rook_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
+        let directions = [];
+
         moves
     }
 }
