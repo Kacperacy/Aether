@@ -358,6 +358,10 @@ impl Board {
 
             loop {
                 target += direction;
+
+                if target < 0 || target >= 64 {
+                    break;
+                }
             }
         }
 
