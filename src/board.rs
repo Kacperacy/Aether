@@ -362,6 +362,25 @@ impl Board {
                 if target < 0 || target >= 64 {
                     break;
                 }
+
+                let pos_file = position % 8;
+                let target_file = (target as usize) % 8;
+                if (direction == 1 || direction == -1)
+                    && (pos_file == 0 && target_file == 7 || pos_file == 7 && target_file == 0)
+                {
+                    break;
+                }
+
+                let target_usize = target as usize;
+
+                if occupancy.is_set(target_usize) {
+                    if self.is_square_enemy(self.turn, target_usize) {
+                        moves.push(target_usize);
+                    }
+                    break;
+                }
+
+                moves.push(target_usize);
             }
         }
 
