@@ -390,7 +390,7 @@ impl Board {
     fn generate_queen_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
-        let rook_moves = self.generate_queen_moves(occupancy, position);
+        let rook_moves = self.generate_rook_moves(occupancy, position);
         moves.extend(rook_moves);
 
         let bishop_moves = self.generate_bishop_moves(occupancy, position);
