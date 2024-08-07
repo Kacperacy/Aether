@@ -348,6 +348,7 @@ impl Board {
         moves
     }
 
+    // Generate possible rook moves
     fn generate_rook_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
@@ -387,6 +388,7 @@ impl Board {
         moves
     }
 
+    // Generate possible queen moves
     fn generate_queen_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
