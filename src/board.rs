@@ -400,4 +400,6 @@ impl Board {
 
         moves
     }
+
+    fn generate_king_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {}
 }
