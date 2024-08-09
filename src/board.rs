@@ -401,5 +401,9 @@ impl Board {
         moves
     }
 
-    fn generate_king_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {}
+    fn generate_king_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
+        let mut moves = Vec::new();
+
+        let directions = [1, -1, 8, -8, 9, -9, 7, -7];
+    }
 }
