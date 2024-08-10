@@ -405,5 +405,18 @@ impl Board {
         let mut moves = Vec::new();
 
         let directions = [1, -1, 8, -8, 9, -9, 7, -7];
+
+        for &dir in &directions {
+            let new_pos = position as isize + dir;
+            if new_pos >= 0 && new_pos < 64 {
+                let new_pos = new_pos as usize;
+
+                if !occupancy.is_set(new_pos) || self.is_square_enemy(self.turn, new_pos) {
+                    moves.push(new_pos);
+                }
+            }
+        }
+
+        moves
     }
 }
