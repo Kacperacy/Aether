@@ -401,6 +401,7 @@ impl Board {
         moves
     }
 
+    // Generate possible king moves
     fn generate_king_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
         let mut moves = Vec::new();
 
