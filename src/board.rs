@@ -245,6 +245,7 @@ impl Board {
         let occupancy = self.white_occupancy.or(&self.black_occupancy);
 
         let pawn_moves = self.generate_pawn_moves(occupancy, index);
+        let bishop_moves = self.generate_bishop_moves(occupancy, index);
 
         pawn_moves
     }
