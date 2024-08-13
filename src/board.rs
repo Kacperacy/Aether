@@ -246,6 +246,7 @@ impl Board {
 
         let pawn_moves = self.generate_pawn_moves(occupancy, index);
         let bishop_moves = self.generate_bishop_moves(occupancy, index);
+        let knight_moves = self.generate_knight_moves(occupancy, index);
 
         pawn_moves
     }
