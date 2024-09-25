@@ -50,8 +50,6 @@ pub struct CastlingRights {
 impl Board {
     /// Creates a new chessboard with default values
     pub fn new() -> Self {
-        let white_occupancy = Bitboard::new();
-
         let white_pieces = Pieces {
             pawns: Bitboard(0b0000000000000000000000000000000000000000000000001111111100000000),
             knights: Bitboard(0b0000000000000000000000000000000000000000000000000000000001000010),
@@ -61,7 +59,8 @@ impl Board {
             king: Bitboard(0b0000000000000000000000000000000000000000000000000000000000010000),
         };
 
-        let black_occupancy = Bitboard::new();
+        let white_occupancy = Bitboard::new().or(&white_pieces.pawns).or(&white_pieces.knights).or(&white_pieces.bishops)
+            .or(&white_pieces.rooks).or(&white_pieces.queens).or(&white_pieces.king);
 
         let black_pieces = Pieces {
             pawns: Bitboard(0b0000000011111111000000000000000000000000000000000000000000000000),
@@ -71,6 +70,9 @@ impl Board {
             queens: Bitboard(0b0000100000000000000000000000000000000000000000000000000000000000),
             king: Bitboard(0b0001000000000000000000000000000000000000000000000000000000000000),
         };
+
+        let black_occupancy = Bitboard::new().or(&black_pieces.pawns).or(&black_pieces.knights).or(&black_pieces.bishops)
+            .or(&black_pieces.rooks).or(&black_pieces.queens).or(&black_pieces.king);
 
         let turn = Color::White;
 
@@ -171,11 +173,11 @@ impl Board {
     }
 
     /// Converts a square representation to an index
-    fn square_to_index(square: &str) -> usize {
+    pub fn square_to_index(square: &str) -> usize {
         let file = square.chars().nth(0).unwrap() as usize - 'a' as usize;
         let rank = square.chars().nth(1).unwrap().to_digit(10).unwrap() as usize - 1;
 
-        8 * (7 - rank) + file
+        rank * 8 + file
     }
 
     /// Gets the bitboard for a specific piece and color
@@ -197,7 +199,7 @@ impl Board {
     }
 
     /// Places a piece on the board at the specified square index
-    fn place_piece(&mut self, color: Color, piece: Piece, index: usize) {
+    pub fn place_piece(&mut self, color: Color, piece: Piece, index: usize) {
         match color {
             Color::White => self.white_occupancy.set_bit(index),
             Color::Black => self.black_occupancy.set_bit(index),
@@ -220,7 +222,7 @@ impl Board {
     }
 
     /// Check if pawn position is starting position
-    fn is_pawn_starting_position(&self, color: Color, position: usize) -> bool {
+    pub fn is_pawn_starting_position(color: Color, position: usize) -> bool {
         match color {
             Color::White => (8..16).contains(&position),
             Color::Black => (48..56).contains(&position),
@@ -228,198 +230,212 @@ impl Board {
     }
 
     /// Check is square is empty
-    fn is_square_empty(&self, index: usize, occupancy: Bitboard) -> bool {
+    pub fn is_square_empty(index: usize, occupancy: Bitboard) -> bool {
         !occupancy.is_set(index)
     }
 
     /// Chceck if enemy piece is on square
-    fn is_square_enemy(&self, color: Color, position: usize) -> bool {
+    pub fn is_square_enemy(&self, color: Color, position: usize) -> bool {
         match color {
             Color::White => self.black_occupancy.is_set(position),
             Color::Black => self.white_occupancy.is_set(position),
         }
     }
 
-    /// Generate all possible moves at the specified square index
-    pub fn generate_moves(&self, index: usize) -> Vec<usize> {
-        let occupancy = self.white_occupancy.or(&self.black_occupancy);
-
-        let pawn_moves = self.generate_pawn_moves(occupancy, index);
-        let bishop_moves = self.generate_bishop_moves(occupancy, index);
-        let knight_moves = self.generate_knight_moves(occupancy, index);
-
-        pawn_moves
-    }
-
-    /// Generate possible pawn moves at the specified square index
-    fn generate_pawn_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
-
-        let direction = match self.turn {
-            Color::White => 8,
-            Color::Black => -8,
+    pub fn is_check(&self) -> Option<Color> {
+        let (king_position, opponent_occupancy, opponent_pieces) = match self.turn {
+            Color::White => (
+                self.white_pieces.king,
+                self.black_occupancy,
+                &self.black_pieces
+            ),
+            Color::Black => (
+                self.black_pieces.king,
+                self.white_occupancy,
+                &self.white_pieces
+            )
         };
 
-        let single_forward = position as i8 + direction;
-        if !occupancy.is_set(single_forward as usize) {
-            moves.push(single_forward as usize);
+        let attacks = self.generate_pawn_attacks(self.turn, opponent_pieces.pawns)
+            .or(&self.generate_knight_attacks(opponent_pieces.knights))
+            .or(&self.generate_bishop_attacks(opponent_pieces.bishops, opponent_occupancy))
+            .or(&self.generate_rook_attacks(opponent_pieces.rooks, opponent_occupancy))
+            .or(&self.generate_queen_attacks(opponent_pieces.queens, opponent_occupancy))
+            .or(&self.generate_king_attacks(opponent_pieces.king));
+
+        if attacks.is_set(king_position.first_set_bit().unwrap()) {
+            return Some(self.turn);
         }
 
-        if self.is_pawn_starting_position(self.turn, position) {
-            let double_forward = single_forward + direction;
-            if self.is_square_empty(double_forward as usize, occupancy) {
-                moves.push(double_forward as usize);
-            }
-        }
-
-        let left_capture = single_forward - 1;
-        let right_capture = single_forward + 1;
-        if self.is_square_enemy(self.turn, left_capture as usize) {
-            moves.push(left_capture as usize);
-        }
-        if self.is_square_enemy(self.turn, right_capture as usize) {
-            moves.push(right_capture as usize);
-        }
-
-        if let Some(square) = self.en_passant_square {
-            if self.is_square_enemy(self.turn, square as usize) {
-                moves.push(square as usize);
-            }
-        }
-
-        moves
+        None
     }
 
-    // Generate possible bishop moves
-    fn generate_bishop_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
+    pub fn generate_pawn_attacks(&self, color: Color, pawns: Bitboard) -> Bitboard {
+        match color {
+            Color::White => {
+                let attacks_left = pawns.left_shift(7) & !Bitboard(0x8080808080808080);
+                let attacks_right = pawns.left_shift(9) & !Bitboard(0x0101010101010101);
+                attacks_left.or(&attacks_right)
+            }
+            Color::Black => {
+                let attacks_left = pawns.right_shift(9) & !Bitboard(0x8080808080808080);
+                let attacks_right = pawns.right_shift(7) & !Bitboard(0x0101010101010101);
+                attacks_left.or(&attacks_right)
+            }
+        }
+    }
 
-        let directions = [-9, -7, 7, 9];
+    pub fn generate_knight_attacks(&self, knights: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let knight_positions = knights;
 
-        for &direction in &directions {
-            let mut target = position as isize + direction;
-            while target >= 0 && target < 64 {
-                if (target % 8 == 0 && (direction == -7 || direction == 9))
-                    || (target % 8 == 7 && (direction == 7 || direction == -9))
-                {
-                    break;
-                }
+        for i in 0..64 {
+            if knight_positions.is_set(i) {
+                let rank = i / 8;
+                let file = i % 8;
 
-                if occupancy.is_set(target as usize) {
-                    if self.is_square_enemy(self.turn, target as usize) {
-                        moves.push(target as usize);
+                let knight_moves = [
+                    (i.wrapping_add(17), rank + 2 <= 7 && file + 1 <= 7),
+                    (i.wrapping_add(15), rank + 2 <= 7 && file >= 1),
+                    (i.wrapping_add(10), rank + 1 <= 7 && file + 2 <= 7),
+                    (i.wrapping_add(6), rank + 1 <= 7 && file >= 2),
+                    (i.wrapping_sub(17), rank >= 2 && file >= 1),
+                    (i.wrapping_sub(15), rank >= 2 && file + 1 <= 7),
+                    (i.wrapping_sub(10), rank >= 1 && file >= 2),
+                    (i.wrapping_sub(6), rank >= 1 && file + 2 <= 7),
+                ];
+
+                for &(move_index, valid) in &knight_moves {
+                    if valid && move_index < 64 {
+                        attacks.set_bit(move_index);
                     }
+                }
+            }
+        }
+
+        attacks
+    }
+
+    pub fn generate_bishop_attacks(&self, bishops: Bitboard, occupancy: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let bishop_positions = bishops;
+
+        for i in 0..64 {
+            if bishop_positions.is_set(i) {
+                attacks = attacks.or(&self.generate_diagonal_attacks(i, occupancy));
+            }
+        }
+
+        attacks
+    }
+
+    fn generate_diagonal_attacks(&self, index: usize, occupancy: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let directions = [9, 7, -9, -7];
+
+        for &direction in &directions {
+            let mut current_index = index as isize;
+
+            loop {
+                current_index += direction;
+
+                if current_index < 0 || current_index >= 64 {
                     break;
                 }
 
-                moves.push(target as usize);
-                target += direction;
-            }
-        }
-
-        moves
-    }
-
-    // Generate possible knight moves
-    fn generate_knight_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
-
-        let directions = [-17, -15, -10, -6, 6, 10, 15, 17];
-
-        for &direction in &directions {
-            let target = position as isize + direction;
-            if target < 0 || target >= 64 {
-                continue;
-            }
-
-            let pos_file = position % 8;
-            let target_file = (target as usize) % 8;
-            if (pos_file <= 1 && target_file >= 6) || (pos_file >= 6 && target_file <= 1) {
-                continue;
-            }
-
-            if occupancy.is_set(target as usize) {
-                if self.is_square_enemy(self.turn, target as usize) {
-                    moves.push(target as usize);
+                if (direction == 9 || direction == -7) && current_index % 8 == 0 {
+                    break;
                 }
-            } else {
-                moves.push(target as usize);
+                if (direction == 7 || direction == -9) && current_index % 8 == 7 {
+                    break;
+                }
+
+                let current_index_usize = current_index as usize;
+                attacks.set_bit(current_index_usize);
+
+                if occupancy.is_set(current_index_usize) {
+                    break;
+                }
             }
         }
 
-        moves
+        attacks
     }
 
-    // Generate possible rook moves
-    fn generate_rook_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
+    pub fn generate_rook_attacks(&self, rooks: Bitboard, occupancy: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let rook_positions = rooks;
 
+        for i in 0..64 {
+            if rook_positions.is_set(i) {
+                attacks = attacks.or(&self.generate_straight_attacks(i, occupancy));
+            }
+        }
+
+        attacks
+    }
+
+    fn generate_straight_attacks(&self, index: usize, occupancy: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
         let directions = [8, -8, 1, -1];
 
         for &direction in &directions {
-            let mut target = position as isize;
+            let mut current_index = index as isize;
 
             loop {
-                target += direction;
+                current_index += direction;
 
-                if target < 0 || target >= 64 {
+                if current_index < 0 || current_index >= 64 {
                     break;
                 }
 
-                let pos_file = position % 8;
-                let target_file = (target as usize) % 8;
-                if (direction == 1 || direction == -1)
-                    && (pos_file == 0 && target_file == 7 || pos_file == 7 && target_file == 0)
-                {
+                if (direction == 1 && current_index % 8 == 0) || (direction == -1 && current_index % 8 == 7) {
                     break;
                 }
 
-                let target_usize = target as usize;
+                let current_index_usize = current_index as usize;
+                attacks.set_bit(current_index_usize);
 
-                if occupancy.is_set(target_usize) {
-                    if self.is_square_enemy(self.turn, target_usize) {
-                        moves.push(target_usize);
-                    }
+                if occupancy.is_set(current_index_usize) {
                     break;
-                }
-
-                moves.push(target_usize);
-            }
-        }
-
-        moves
-    }
-
-    // Generate possible queen moves
-    fn generate_queen_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
-
-        let rook_moves = self.generate_rook_moves(occupancy, position);
-        moves.extend(rook_moves);
-
-        let bishop_moves = self.generate_bishop_moves(occupancy, position);
-        moves.extend(bishop_moves);
-
-        moves
-    }
-
-    // Generate possible king moves
-    fn generate_king_moves(&self, occupancy: Bitboard, position: usize) -> Vec<usize> {
-        let mut moves = Vec::new();
-
-        let directions = [1, -1, 8, -8, 9, -9, 7, -7];
-
-        for &dir in &directions {
-            let new_pos = position as isize + dir;
-            if new_pos >= 0 && new_pos < 64 {
-                let new_pos = new_pos as usize;
-
-                if !occupancy.is_set(new_pos) || self.is_square_enemy(self.turn, new_pos) {
-                    moves.push(new_pos);
                 }
             }
         }
 
-        moves
+        attacks
+    }
+
+    pub fn generate_queen_attacks(&self, queens: Bitboard, occupancy: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let queen_positions = queens;
+
+        for i in 0..64 {
+            if queen_positions.is_set(i) {
+                attacks = attacks.or(&self.generate_diagonal_attacks(i, occupancy));
+                attacks = attacks.or(&self.generate_straight_attacks(i, occupancy));
+            }
+        }
+
+        attacks
+    }
+
+    pub fn generate_king_attacks(&self, king: Bitboard) -> Bitboard {
+        let mut attacks = Bitboard::new();
+        let king_index = king.first_set_bit().unwrap();
+
+        let king_moves = [
+            king_index.wrapping_add(8), king_index.wrapping_sub(8),
+            king_index.wrapping_add(1), king_index.wrapping_sub(1),
+            king_index.wrapping_add(9), king_index.wrapping_sub(9),
+            king_index.wrapping_add(7), king_index.wrapping_sub(7),
+        ];
+
+        for &move_index in &king_moves {
+            if move_index < 64 {
+                attacks.set_bit(move_index);
+            }
+        }
+
+        attacks
     }
 }
