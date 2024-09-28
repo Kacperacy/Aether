@@ -438,4 +438,56 @@ impl Board {
 
         attacks
     }
+
+    pub fn generate_all_moves(&self) -> Vec<(usize, usize)> {
+        let mut moves = Vec::new();
+        let (pieces, occupancy, opponent_occupancy) = match self.turn {
+            Color::White => (&self.white_pieces, self.white_occupancy, self.black_occupancy),
+            Color::Black => (&self.black_pieces, self.black_occupancy, self.white_occupancy),
+        };
+
+        moves.extend(self.generate_pawn_moves(pieces.pawns, occupancy, opponent_occupancy));
+
+        moves.extend(self.generate_knight_moves(pieces.knights, occupancy, opponent_occupancy));
+
+        moves.extend(self.generate_bishop_moves(pieces.bishops, occupancy, opponent_occupancy));
+
+        moves.extend(self.generate_rook_moves(pieces.rooks, occupancy, opponent_occupancy));
+
+        moves.extend(self.generate_queen_moves(pieces.queens, occupancy, opponent_occupancy));
+
+        moves.extend(self.generate_king_moves(pieces.king, occupancy, opponent_occupancy));
+
+        moves
+    }
+
+    fn generate_pawn_moves(&self, pawns: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement pawn move generation logic
+        vec![]
+    }
+
+    fn generate_knight_moves(&self, knights: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement knight move generation logic
+        vec![]
+    }
+
+    fn generate_bishop_moves(&self, bishops: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement bishop move generation logic
+        vec![]
+    }
+
+    fn generate_rook_moves(&self, rooks: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement rook move generation logic
+        vec![]
+    }
+
+    fn generate_queen_moves(&self, queens: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement queen move generation logic
+        vec![]
+    }
+
+    fn generate_king_moves(&self, king: Bitboard, occupancy: Bitboard, opponent_occupancy: Bitboard) -> Vec<(usize, usize)> {
+        // Implement king move generation logic
+        vec![]
+    }
 }
