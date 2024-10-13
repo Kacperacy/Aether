@@ -96,4 +96,16 @@ mod tests {
         let bb = Bitboard(0b1010);
         assert_eq!(bb.last_set_bit(), Some(3));
     }
+
+    #[test]
+    fn test_bitboard_from_index() {
+        let bb = Bitboard::from_index(3);
+        assert_eq!(bb.value(), 8); // 1 << 3 = 8
+    }
+
+    #[test]
+    fn test_bitboard_default() {
+        let bb: Bitboard = Default::default();
+        assert_eq!(bb.value(), 0);
+    }
 }

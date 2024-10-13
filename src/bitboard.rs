@@ -3,9 +3,19 @@ use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Bitboard(pub u64);
 
+impl Default for Bitboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Bitboard {
     pub fn new() -> Self {
         Bitboard(0)
+    }
+
+    pub fn from_index(index: usize) -> Self {
+        Bitboard(1 << index)
     }
 
     pub fn value(&self) -> u64 {
