@@ -1,5 +1,6 @@
 use crate::bitboard::Bitboard;
 use crate::constans::STARTING_POSITION;
+use std::ptr::null;
 
 pub struct Board {
     pub white_occupancy: Bitboard,
@@ -48,6 +49,14 @@ pub struct CastlingRights {
     pub white_queen_side: bool,
     pub black_king_side: bool,
     pub black_queen_side: bool,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Move {
+    pub from: usize,
+    pub to: usize,
+    pub piece: Piece,
+    pub color: Color,
 }
 
 impl Default for Board {
@@ -190,6 +199,37 @@ impl Board {
         }
     }
 
+    fn remove_piece(&mut self, color: Color, piece: Piece, index: usize) {
+        let bb = Bitboard::from_index(index);
+
+        match color {
+            Color::White => {
+                self.white_occupancy.clear_bit(index);
+                // self.white_attacks = self.white_attacks.xor(&bb);
+                match piece {
+                    Piece::Pawn => self.white_pieces.pawns = self.white_pieces.pawns.xor(&bb),
+                    Piece::Knight => self.white_pieces.knights = self.white_pieces.knights.xor(&bb),
+                    Piece::Bishop => self.white_pieces.bishops = self.white_pieces.bishops.xor(&bb),
+                    Piece::Rook => self.white_pieces.rooks = self.white_pieces.rooks.xor(&bb),
+                    Piece::Queen => self.white_pieces.queens = self.white_pieces.queens.xor(&bb),
+                    Piece::King => self.white_pieces.king = self.white_pieces.king.xor(&bb),
+                }
+            }
+            Color::Black => {
+                self.black_occupancy.clear_bit(index);
+                // self.black_attacks = self.black_attacks.xor(&bb);
+                match piece {
+                    Piece::Pawn => self.black_pieces.pawns = self.black_pieces.pawns.xor(&bb),
+                    Piece::Knight => self.black_pieces.knights = self.black_pieces.knights.xor(&bb),
+                    Piece::Bishop => self.black_pieces.bishops = self.black_pieces.bishops.xor(&bb),
+                    Piece::Rook => self.black_pieces.rooks = self.black_pieces.rooks.xor(&bb),
+                    Piece::Queen => self.black_pieces.queens = self.black_pieces.queens.xor(&bb),
+                    Piece::King => self.black_pieces.king = self.black_pieces.king.xor(&bb),
+                }
+            }
+        }
+    }
+
     fn square_to_index(square: &str) -> usize {
         let file = square.chars().nth(0).unwrap() as usize - 'a' as usize;
         let rank = square.chars().nth(1).unwrap() as usize - '1' as usize;
@@ -200,5 +240,63 @@ impl Board {
         let file = (index % 8) as u8 + b'a';
         let rank = (index / 8) as u8 + b'1';
         format!("{}{}", file as char, rank as char)
+    }
+
+    pub fn print(&self) {
+        for rank in (0..8).rev() {
+            for file in 0..8 {
+                let index = rank * 8 + file;
+                let square = Board::index_to_square(index);
+                let piece = if self.white_pieces.pawns.is_set(index) {
+                    'P'
+                } else if self.white_pieces.knights.is_set(index) {
+                    'N'
+                } else if self.white_pieces.bishops.is_set(index) {
+                    'B'
+                } else if self.white_pieces.rooks.is_set(index) {
+                    'R'
+                } else if self.white_pieces.queens.is_set(index) {
+                    'Q'
+                } else if self.white_pieces.king.is_set(index) {
+                    'K'
+                } else if self.black_pieces.pawns.is_set(index) {
+                    'p'
+                } else if self.black_pieces.knights.is_set(index) {
+                    'n'
+                } else if self.black_pieces.bishops.is_set(index) {
+                    'b'
+                } else if self.black_pieces.rooks.is_set(index) {
+                    'r'
+                } else if self.black_pieces.queens.is_set(index) {
+                    'q'
+                } else if self.black_pieces.king.is_set(index) {
+                    'k'
+                } else {
+                    '.'
+                };
+                print!("{} ", piece);
+            }
+            println!();
+        }
+        println!();
+    }
+
+    pub fn make_move(&mut self, mv: &Move) {
+        if let Some(index) = self.en_passant_square {
+            self.en_passant_square = None;
+        }
+
+        let from = mv.from;
+        let to = mv.to;
+        let piece = mv.piece;
+        let color = mv.color;
+
+        self.remove_piece(color, piece, from);
+        self.add_piece(color, piece, to / 8, to % 8);
+
+        self.turn = match self.turn {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        };
     }
 }
