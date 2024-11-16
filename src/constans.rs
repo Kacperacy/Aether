@@ -17,3 +17,7 @@ pub const FILE_G: u64 = 0x4040404040404040;
 pub const FILE_H: u64 = 0x8080808080808080;
 
 pub const STARTING_POSITION: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+pub const ROOK_DIRECTIONS: [i32; 4] = [1, -1, 8, -8];
+pub const BISHOP_DIRECTIONS: [i32; 4] = [9, 7, -7, -9];
+pub const KNIGHT_DIRECTIONS: [i32; 8] = [6, 10, 15, 17, -6, -10, -15, -17];

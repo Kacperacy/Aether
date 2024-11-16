@@ -16,6 +16,8 @@ pub struct Board {
     pub en_passant_square: Option<usize>,
     pub halfmove_clock: u8,
     pub fullmove_number: u16,
+
+    pub moves: Vec<Move>,
 }
 
 pub struct Pieces {
@@ -57,6 +59,9 @@ pub struct Move {
     pub to: usize,
     pub piece: Piece,
     pub color: Color,
+    pub en_passant: bool,
+    pub castling: bool,
+    pub promotion: Option<Piece>,
 }
 
 impl Default for Board {
