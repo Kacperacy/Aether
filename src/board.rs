@@ -103,6 +103,7 @@ impl Board {
             en_passant_square: None,
             halfmove_clock: 0,
             fullmove_number: 1,
+            moves: Vec::new(),
         }
     }
 
@@ -179,7 +180,7 @@ impl Board {
         match color {
             Color::White => {
                 self.white_occupancy.set_bit(index);
-                // self.white_attacks = self.white_attacks.or(&bb);
+                // TODO: self.white_attacks = self.white_attacks.or(&bb);
                 match piece {
                     Piece::Pawn => self.white_pieces.pawns = self.white_pieces.pawns.or(&bb),
                     Piece::Knight => self.white_pieces.knights = self.white_pieces.knights.or(&bb),
@@ -191,7 +192,7 @@ impl Board {
             }
             Color::Black => {
                 self.black_occupancy.set_bit(index);
-                // self.black_attacks = self.black_attacks.or(&bb);
+                // TODO: self.black_attacks = self.black_attacks.or(&bb);
                 match piece {
                     Piece::Pawn => self.black_pieces.pawns = self.black_pieces.pawns.or(&bb),
                     Piece::Knight => self.black_pieces.knights = self.black_pieces.knights.or(&bb),
@@ -210,7 +211,7 @@ impl Board {
         match color {
             Color::White => {
                 self.white_occupancy.clear_bit(index);
-                // self.white_attacks = self.white_attacks.xor(&bb);
+                // TODO: self.white_attacks = self.white_attacks.xor(&bb);
                 match piece {
                     Piece::Pawn => self.white_pieces.pawns = self.white_pieces.pawns.xor(&bb),
                     Piece::Knight => self.white_pieces.knights = self.white_pieces.knights.xor(&bb),
@@ -222,7 +223,7 @@ impl Board {
             }
             Color::Black => {
                 self.black_occupancy.clear_bit(index);
-                // self.black_attacks = self.black_attacks.xor(&bb);
+                // TODO: self.black_attacks = self.black_attacks.xor(&bb);
                 match piece {
                     Piece::Pawn => self.black_pieces.pawns = self.black_pieces.pawns.xor(&bb),
                     Piece::Knight => self.black_pieces.knights = self.black_pieces.knights.xor(&bb),
@@ -287,21 +288,72 @@ impl Board {
     }
 
     pub fn make_move(&mut self, mv: &Move) {
-        if let Some(index) = self.en_passant_square {
-            self.en_passant_square = None;
+        if mv.en_passant {
+            let direction = match mv.color {
+                Color::White => 8,
+                Color::Black => -8,
+            };
+            self.remove_piece(mv.color, Piece::Pawn, mv.from);
+            self.add_piece(mv.color, Piece::Pawn, mv.to / 8, mv.to % 8);
+            self.remove_piece(match mv.color {
+                Color::White => Color::Black,
+                Color::Black => Color::White,
+            }, Piece::Pawn, (mv.to as i32 + direction) as usize);
+        } else if mv.castling {
+            match mv.to {
+                2 => {
+                    self.remove_piece(mv.color, Piece::King, mv.from);
+                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.remove_piece(mv.color, Piece::Rook, 0);
+                    self.add_piece(mv.color, Piece::Rook, 3 / 8, 3 % 8);
+                }
+                6 => {
+                    self.remove_piece(mv.color, Piece::King, mv.from);
+                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.remove_piece(mv.color, Piece::Rook, 7);
+                    self.add_piece(mv.color, Piece::Rook, 5 / 8, 5 % 8);
+                }
+                58 => {
+                    self.remove_piece(mv.color, Piece::King, mv.from);
+                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.remove_piece(mv.color, Piece::Rook, 56);
+                    self.add_piece(mv.color, Piece::Rook, 59 / 8, 59 % 8);
+                }
+                62 => {
+                    self.remove_piece(mv.color, Piece::King, mv.from);
+                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.remove_piece(mv.color, Piece::Rook, 63);
+                    self.add_piece(mv.color, Piece::Rook, 61 / 8, 61 % 8);
+                }
+                _ => panic!("Invalid castling move"),
+            }
+        } else if let Some(promotion) = mv.promotion
+        {
+            self.remove_piece(mv.color, Piece::Pawn, mv.from);
+            self.add_piece(mv.color, promotion, mv.to / 8, mv.to % 8);
+        } else {
+            self.remove_piece(mv.color, mv.piece, mv.from);
+            self.add_piece(mv.color, mv.piece, mv.to / 8, mv.to % 8);
         }
 
-        let from = mv.from;
-        let to = mv.to;
-        let piece = mv.piece;
-        let color = mv.color;
-
-        self.remove_piece(color, piece, from);
-        self.add_piece(color, piece, to / 8, to % 8);
+        if let Some(ep) = self.en_passant_square {
+            self.en_passant_square = None;
+        }
 
         self.turn = match self.turn {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
+
+        self.moves.push(*mv);
+
+        self.halfmove_clock += 1;
+        if mv.piece == Piece::Pawn {
+            self.halfmove_clock = 0;
+        }
+
+        if self.turn == Color::Black {
+            self.fullmove_number += 1;
+        }
     }
 }
