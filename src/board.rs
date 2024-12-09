@@ -1,6 +1,5 @@
 use crate::bitboard::Bitboard;
-use crate::constans::STARTING_POSITION;
-use std::ptr::null;
+use crate::constans::*;
 
 pub struct Board {
     pub white_occupancy: Bitboard,
@@ -248,11 +247,14 @@ impl Board {
         format!("{}{}", file as char, rank as char)
     }
 
+    fn is_square_empty(&self, index: usize) -> bool {
+        !self.white_occupancy.is_set(index) && !self.black_occupancy.is_set(index)
+    }
+
     pub fn print(&self) {
         for rank in (0..8).rev() {
             for file in 0..8 {
                 let index = rank * 8 + file;
-                let square = Board::index_to_square(index);
                 let piece = if self.white_pieces.pawns.is_set(index) {
                     'P'
                 } else if self.white_pieces.knights.is_set(index) {
@@ -295,10 +297,14 @@ impl Board {
             };
             self.remove_piece(mv.color, Piece::Pawn, mv.from);
             self.add_piece(mv.color, Piece::Pawn, mv.to / 8, mv.to % 8);
-            self.remove_piece(match mv.color {
-                Color::White => Color::Black,
-                Color::Black => Color::White,
-            }, Piece::Pawn, (mv.to as i32 + direction) as usize);
+            self.remove_piece(
+                match mv.color {
+                    Color::White => Color::Black,
+                    Color::Black => Color::White,
+                },
+                Piece::Pawn,
+                (mv.to as i32 + direction) as usize,
+            );
         } else if mv.castling {
             match mv.to {
                 2 => {
@@ -327,8 +333,7 @@ impl Board {
                 }
                 _ => panic!("Invalid castling move"),
             }
-        } else if let Some(promotion) = mv.promotion
-        {
+        } else if let Some(promotion) = mv.promotion {
             self.remove_piece(mv.color, Piece::Pawn, mv.from);
             self.add_piece(mv.color, promotion, mv.to / 8, mv.to % 8);
         } else {
@@ -355,5 +360,52 @@ impl Board {
         if self.turn == Color::Black {
             self.fullmove_number += 1;
         }
+    }
+
+    pub fn generate_possible_moves(self) -> Vec<Move> {
+        let moves = Vec::new();
+
+        // TODO: Generate all possible moves
+
+        moves
+    }
+
+    pub fn generate_pawn_moves(self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let pawns = match self.turn {
+            Color::White => self.white_pieces.pawns,
+            Color::Black => self.black_pieces.pawns,
+        };
+
+        // TODO: Validate check
+
+        for i in 0..64 {
+            if !pawns.is_set(i) {
+                continue;
+            }
+            let direction = match self.turn {
+                Color::White => 8,
+                Color::Black => -8,
+            };
+
+            let from = i;
+            let to = i as i32 + direction;
+
+            if to < 64 && to >= 0 {
+                if self.is_square_empty(to as usize) {
+                    moves.push(Move {
+                        from,
+                        to: to as usize,
+                        piece: Piece::Pawn,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+
+        moves
     }
 }
