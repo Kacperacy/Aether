@@ -144,7 +144,7 @@ impl Board {
                         _ => panic!("Invalid FEN"),
                     };
 
-                    self.add_piece(color, piece, rank * 8 + file);
+                    self.add_piece(color, piece, rank * BOARD_WIDTH + file);
                     file += 1;
                 }
             }
@@ -237,12 +237,12 @@ impl Board {
     fn square_to_index(square: &str) -> usize {
         let file = square.chars().nth(0).unwrap() as usize - 'a' as usize;
         let rank = square.chars().nth(1).unwrap() as usize - '1' as usize;
-        rank * 8 + file
+        rank * BOARD_WIDTH + file
     }
 
     fn index_to_square(index: usize) -> String {
-        let file = (index % 8) as u8 + b'a';
-        let rank = (index / 8) as u8 + b'1';
+        let file = (index % BOARD_WIDTH) as u8 + b'a';
+        let rank = (index / BOARD_WIDTH) as u8 + b'1';
         format!("{}{}", file as char, rank as char)
     }
 
@@ -250,14 +250,14 @@ impl Board {
         !self.white_occupancy.is_set(index) && !self.black_occupancy.is_set(index)
     }
 
-    pub fn is_index_in_bounds(index: i64) -> bool {
-        index >= 0 && index < 64
+    pub fn is_index_in_bounds(index: i32) -> bool {
+        index >= 0 && index < BOARD_SIZE as i32
     }
 
     pub fn print(&self) {
-        for rank in (0..8).rev() {
-            for file in 0..8 {
-                let index = rank * 8 + file;
+        for rank in (0..BOARD_WIDTH).rev() {
+            for file in 0..BOARD_WIDTH {
+                let index = rank * BOARD_WIDTH + file;
                 let piece = if self.white_pieces.pawns.is_set(index) {
                     'P'
                 } else if self.white_pieces.knights.is_set(index) {
@@ -295,8 +295,8 @@ impl Board {
     pub fn make_move(&mut self, mv: &Move) {
         if mv.en_passant {
             let direction = match mv.color {
-                Color::White => 8,
-                Color::Black => -8,
+                Color::White => MOVE_UP,
+                Color::Black => MOVE_DOWN,
             };
             self.remove_piece(mv.color, Piece::Pawn, mv.from);
             self.add_piece(mv.color, Piece::Pawn, mv.to);
@@ -350,10 +350,10 @@ impl Board {
 
         if mv.en_passant {
             let direction = match mv.color {
-                Color::White => 8,
-                Color::Black => -8,
+                Color::White => MOVE_UP,
+                Color::Black => MOVE_DOWN,
             };
-            self.en_passant_square = Some((mv.to as i64 - direction) as usize);
+            self.en_passant_square = Some((mv.to as i32 - direction) as usize);
         }
 
         self.turn = match self.turn {
@@ -398,19 +398,19 @@ impl Board {
 
         // TODO: Validate check
 
-        for i in 0..64 {
+        for i in 0..BOARD_SIZE {
             if !pawns.is_set(i) {
                 continue;
             }
 
             let direction = match self.turn {
-                Color::White => 8,
-                Color::Black => -8,
+                Color::White => MOVE_UP,
+                Color::Black => MOVE_DOWN,
             };
 
             let pos = i;
             let from = i;
-            let possible_to = i as i64 + direction;
+            let possible_to = i as i32 + direction;
 
             if !Board::is_index_in_bounds(possible_to) {
                 continue;
@@ -419,10 +419,10 @@ impl Board {
             let to = possible_to as usize;
 
             // DOUBLE PUSH
-            if (RANK_2.is_set(pos) && self.turn == Color::White)
-                || (RANK_7.is_set(pos) && self.turn == Color::Black)
+            if (ROW_2.is_set(pos) && self.turn == Color::White)
+                || (ROW_7.is_set(pos) && self.turn == Color::Black)
             {
-                let double = to as i64 + direction;
+                let double = to as i32 + direction;
                 if self.is_square_empty(to) && self.is_square_empty(double as usize) {
                     moves.push(Move {
                         from,
@@ -465,8 +465,8 @@ impl Board {
             }
 
             // PROMOTION
-            if (self.turn == Color::White && RANK_7.is_set(pos) && self.is_square_empty(to))
-                || (self.turn == Color::Black && RANK_2.is_set(pos) && self.is_square_empty(to))
+            if (self.turn == Color::White && ROW_7.is_set(pos) && self.is_square_empty(to))
+                || (self.turn == Color::Black && ROW_2.is_set(pos) && self.is_square_empty(to))
             {
                 moves.push(Move {
                     from,
