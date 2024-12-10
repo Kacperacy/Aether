@@ -144,7 +144,7 @@ impl Board {
                         _ => panic!("Invalid FEN"),
                     };
 
-                    self.add_piece(color, piece, rank, file);
+                    self.add_piece(color, piece, rank * 8 + file);
                     file += 1;
                 }
             }
@@ -172,8 +172,7 @@ impl Board {
         self.fullmove_number = parts[5].parse().unwrap();
     }
 
-    fn add_piece(&mut self, color: Color, piece: Piece, rank: usize, file: usize) {
-        let index = rank * 8 + file;
+    fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
         let bb = Bitboard::from_index(index);
 
         match color {
@@ -251,6 +250,10 @@ impl Board {
         !self.white_occupancy.is_set(index) && !self.black_occupancy.is_set(index)
     }
 
+    pub fn is_index_in_bounds(index: i64) -> bool {
+        index >= 0 && index < 64
+    }
+
     pub fn print(&self) {
         for rank in (0..8).rev() {
             for file in 0..8 {
@@ -296,53 +299,61 @@ impl Board {
                 Color::Black => -8,
             };
             self.remove_piece(mv.color, Piece::Pawn, mv.from);
-            self.add_piece(mv.color, Piece::Pawn, mv.to / 8, mv.to % 8);
+            self.add_piece(mv.color, Piece::Pawn, mv.to);
             self.remove_piece(
                 match mv.color {
                     Color::White => Color::Black,
                     Color::Black => Color::White,
                 },
                 Piece::Pawn,
-                (mv.to as i32 + direction) as usize,
+                (mv.to as i32 - direction) as usize,
             );
         } else if mv.castling {
             match mv.to {
                 2 => {
                     self.remove_piece(mv.color, Piece::King, mv.from);
-                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.add_piece(mv.color, Piece::King, mv.to);
                     self.remove_piece(mv.color, Piece::Rook, 0);
-                    self.add_piece(mv.color, Piece::Rook, 3 / 8, 3 % 8);
+                    self.add_piece(mv.color, Piece::Rook, 3);
                 }
                 6 => {
                     self.remove_piece(mv.color, Piece::King, mv.from);
-                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.add_piece(mv.color, Piece::King, mv.to);
                     self.remove_piece(mv.color, Piece::Rook, 7);
-                    self.add_piece(mv.color, Piece::Rook, 5 / 8, 5 % 8);
+                    self.add_piece(mv.color, Piece::Rook, 5);
                 }
                 58 => {
                     self.remove_piece(mv.color, Piece::King, mv.from);
-                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.add_piece(mv.color, Piece::King, mv.to);
                     self.remove_piece(mv.color, Piece::Rook, 56);
-                    self.add_piece(mv.color, Piece::Rook, 59 / 8, 59 % 8);
+                    self.add_piece(mv.color, Piece::Rook, 59);
                 }
                 62 => {
                     self.remove_piece(mv.color, Piece::King, mv.from);
-                    self.add_piece(mv.color, Piece::King, mv.to / 8, mv.to % 8);
+                    self.add_piece(mv.color, Piece::King, mv.to);
                     self.remove_piece(mv.color, Piece::Rook, 63);
-                    self.add_piece(mv.color, Piece::Rook, 61 / 8, 61 % 8);
+                    self.add_piece(mv.color, Piece::Rook, 61);
                 }
                 _ => panic!("Invalid castling move"),
             }
         } else if let Some(promotion) = mv.promotion {
             self.remove_piece(mv.color, Piece::Pawn, mv.from);
-            self.add_piece(mv.color, promotion, mv.to / 8, mv.to % 8);
+            self.add_piece(mv.color, promotion, mv.to);
         } else {
             self.remove_piece(mv.color, mv.piece, mv.from);
-            self.add_piece(mv.color, mv.piece, mv.to / 8, mv.to % 8);
+            self.add_piece(mv.color, mv.piece, mv.to);
         }
 
-        if let Some(ep) = self.en_passant_square {
+        if self.en_passant_square.is_some() {
             self.en_passant_square = None;
+        }
+
+        if mv.en_passant {
+            let direction = match mv.color {
+                Color::White => 8,
+                Color::Black => -8,
+            };
+            self.en_passant_square = Some((mv.to as i64 - direction) as usize);
         }
 
         self.turn = match self.turn {
@@ -363,14 +374,22 @@ impl Board {
     }
 
     pub fn generate_possible_moves(self) -> Vec<Move> {
-        let moves = Vec::new();
+        let mut moves = Vec::new();
 
-        // TODO: Generate all possible moves
+        moves.append(&mut self.generate_pawn_moves());
+
+        // TODO: Generate bishop moves
+        // TODO: Generate knight moves
+        // TODO: Generate rook moves
+        // TODO: Generate queen moves
+        // TODO: Generate king moves
+
+        moves.iter().for_each(|m| println!("{:?}", m));
 
         moves
     }
 
-    pub fn generate_pawn_moves(self) -> Vec<Move> {
+    pub fn generate_pawn_moves(mut self) -> Vec<Move> {
         let mut moves = Vec::new();
         let pawns = match self.turn {
             Color::White => self.white_pieces.pawns,
@@ -383,19 +402,48 @@ impl Board {
             if !pawns.is_set(i) {
                 continue;
             }
+
             let direction = match self.turn {
                 Color::White => 8,
                 Color::Black => -8,
             };
 
+            let pos = i;
             let from = i;
-            let to = i as i32 + direction;
+            let possible_to = i as i64 + direction;
 
-            if to < 64 && to >= 0 {
-                if self.is_square_empty(to as usize) {
+            if !Board::is_index_in_bounds(possible_to) {
+                continue;
+            }
+
+            let to = possible_to as usize;
+
+            // DOUBLE PUSH
+            if (RANK_2.is_set(pos) && self.turn == Color::White)
+                || (RANK_7.is_set(pos) && self.turn == Color::Black)
+            {
+                let double = to as i64 + direction;
+                if self.is_square_empty(to) && self.is_square_empty(double as usize) {
                     moves.push(Move {
                         from,
-                        to: to as usize,
+                        to: double as usize,
+                        piece: Piece::Pawn,
+                        color: self.turn,
+                        en_passant: true,
+                        castling: false,
+                        promotion: None,
+                    });
+                }
+            }
+
+            // EN PASSANT
+            if let Some(ep) = self.en_passant_square {
+                let left = ep - 1;
+                let right = ep + 1;
+                if left == ep {
+                    moves.push(Move {
+                        from,
+                        to,
                         piece: Piece::Pawn,
                         color: self.turn,
                         en_passant: false,
@@ -403,6 +451,72 @@ impl Board {
                         promotion: None,
                     });
                 }
+                if right == ep {
+                    moves.push(Move {
+                        from,
+                        to,
+                        piece: Piece::Pawn,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                    });
+                }
+            }
+
+            // PROMOTION
+            if (self.turn == Color::White && RANK_7.is_set(pos) && self.is_square_empty(to))
+                || (self.turn == Color::Black && RANK_2.is_set(pos) && self.is_square_empty(to))
+            {
+                moves.push(Move {
+                    from,
+                    to: to,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: Some(Piece::Queen),
+                });
+                moves.push(Move {
+                    from,
+                    to: to,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: Some(Piece::Rook),
+                });
+                moves.push(Move {
+                    from,
+                    to: to,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: Some(Piece::Bishop),
+                });
+                moves.push(Move {
+                    from,
+                    to: to,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: Some(Piece::Knight),
+                });
+            }
+
+            // NORMAL PUSH
+            if self.is_square_empty(to) {
+                moves.push(Move {
+                    from,
+                    to,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: None,
+                });
             }
         }
 
