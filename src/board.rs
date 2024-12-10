@@ -114,18 +114,18 @@ impl Board {
 
     pub fn set_fen(&mut self, fen: &str) {
         let parts: Vec<&str> = fen.split_whitespace().collect();
-        let mut rank = 7;
-        let mut file = 0;
+        let mut row = 7;
+        let mut col = 0;
 
         for c in parts[0].chars() {
             match c {
                 '/' => {
-                    rank -= 1;
-                    file = 0;
+                    row -= 1;
+                    col = 0;
                 }
                 '1'..='8' => {
                     let offset = c.to_digit(10).unwrap() as usize;
-                    file += offset;
+                    col += offset;
                 }
                 _ => {
                     let color = if c.is_uppercase() {
@@ -144,8 +144,8 @@ impl Board {
                         _ => panic!("Invalid FEN"),
                     };
 
-                    self.add_piece(color, piece, rank * BOARD_WIDTH + file);
-                    file += 1;
+                    self.add_piece(color, piece, row * BOARD_WIDTH + col);
+                    col += 1;
                 }
             }
         }
@@ -235,15 +235,15 @@ impl Board {
     }
 
     fn square_to_index(square: &str) -> usize {
-        let file = square.chars().nth(0).unwrap() as usize - 'a' as usize;
-        let rank = square.chars().nth(1).unwrap() as usize - '1' as usize;
-        rank * BOARD_WIDTH + file
+        let col = square.chars().nth(0).unwrap() as usize - 'a' as usize;
+        let row = square.chars().nth(1).unwrap() as usize - '1' as usize;
+        row * BOARD_WIDTH + col
     }
 
     fn index_to_square(index: usize) -> String {
-        let file = (index % BOARD_WIDTH) as u8 + b'a';
-        let rank = (index / BOARD_WIDTH) as u8 + b'1';
-        format!("{}{}", file as char, rank as char)
+        let col = (index % BOARD_WIDTH) as u8 + b'a';
+        let row = (index / BOARD_WIDTH) as u8 + b'1';
+        format!("{}{}", col as char, row as char)
     }
 
     fn is_square_empty(&self, index: usize) -> bool {
@@ -255,9 +255,9 @@ impl Board {
     }
 
     pub fn print(&self) {
-        for rank in (0..BOARD_WIDTH).rev() {
-            for file in 0..BOARD_WIDTH {
-                let index = rank * BOARD_WIDTH + file;
+        for row in (0..BOARD_WIDTH).rev() {
+            for col in 0..BOARD_WIDTH {
+                let index = row * BOARD_WIDTH + col;
                 let piece = if self.white_pieces.pawns.is_set(index) {
                     'P'
                 } else if self.white_pieces.knights.is_set(index) {
@@ -438,8 +438,8 @@ impl Board {
 
             // EN PASSANT
             if let Some(ep) = self.en_passant_square {
-                let left = ep - 1;
-                let right = ep + 1;
+                let left = (to as i32 + MOVE_LEFT) as usize;
+                let right = (to as i32 + MOVE_RIGHT) as usize;
                 if left == ep {
                     moves.push(Move {
                         from,
