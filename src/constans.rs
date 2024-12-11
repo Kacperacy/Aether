@@ -30,3 +30,5 @@ pub const STARTING_POSITION: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
 pub const ROOK_DIRECTIONS: [i32; 4] = [1, -1, 8, -8];
 pub const BISHOP_DIRECTIONS: [i32; 4] = [9, 7, -7, -9];
 pub const KNIGHT_DIRECTIONS: [i32; 8] = [6, 10, 15, 17, -6, -10, -15, -17];
+pub const KING_DIRECTIONS: [i32; 8] = [1, 9, 8, 7, -1, -9, -8, -7];
+pub const QUEEN_DIRECTIONS: [i32; 8] = [1, 9, 8, 7, -1, -9, -8, -7];

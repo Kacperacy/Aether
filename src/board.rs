@@ -471,12 +471,10 @@ impl Board {
 
         moves.extend(&self.generate_pawn_moves());
         moves.extend(&self.generate_bishop_moves());
-
-        // TODO: Generate bishop moves
-        // TODO: Generate knight moves
-        // TODO: Generate rook moves
-        // TODO: Generate queen moves
-        // TODO: Generate king moves
+        moves.extend(&self.generate_knight_moves());
+        moves.extend(&self.generate_rook_moves());
+        moves.extend(&self.generate_queen_moves());
+        moves.extend(&self.generate_king_moves());
 
         println!("Possible {:?} moves:", moves.len());
         moves.iter().for_each(|m: &Move| {
@@ -657,28 +655,29 @@ impl Board {
         moves
     }
 
-    pub fn generate_bishop_moves(&self) -> Vec<Move> {
+    fn generate_slider_moves(
+        &self,
+        directions: &[i32],
+        pieces: Bitboard,
+        piece: Piece,
+    ) -> Vec<Move> {
         let mut moves = Vec::new();
-        let bishops = match self.turn {
-            Color::White => self.white_pieces.bishops,
-            Color::Black => self.black_pieces.bishops,
-        };
 
         for i in 0..BOARD_SIZE {
-            if !bishops.is_set(i) {
+            if !pieces.is_set(i) {
                 continue;
             }
 
             let from = i;
 
-            for direction in BISHOP_DIRECTIONS.iter() {
+            for direction in directions.iter() {
                 let mut to = from as i32 + direction;
                 while Board::is_index_in_bounds(to) {
                     if self.is_square_empty(to as usize) {
                         moves.push(Move {
                             from,
                             to: to as usize,
-                            piece: Piece::Bishop,
+                            piece,
                             color: self.turn,
                             en_passant: false,
                             castling: false,
@@ -689,7 +688,7 @@ impl Board {
                         moves.push(Move {
                             from,
                             to: to as usize,
-                            piece: Piece::Bishop,
+                            piece,
                             color: self.turn,
                             en_passant: false,
                             castling: false,
@@ -706,6 +705,146 @@ impl Board {
                     }
 
                     to += direction;
+                }
+            }
+        }
+
+        moves
+    }
+    pub fn generate_bishop_moves(&self) -> Vec<Move> {
+        let bishops = match self.turn {
+            Color::White => self.white_pieces.bishops,
+            Color::Black => self.black_pieces.bishops,
+        };
+
+        // TODO: Validate check
+
+        self.generate_slider_moves(&BISHOP_DIRECTIONS, bishops, Piece::Bishop)
+    }
+
+    pub fn generate_knight_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let knights = match self.turn {
+            Color::White => self.white_pieces.knights,
+            Color::Black => self.black_pieces.knights,
+        };
+
+        // TODO: Validate check
+
+        for i in 0..BOARD_SIZE {
+            if !knights.is_set(i) {
+                continue;
+            }
+
+            let from = i;
+            for direction in KNIGHT_DIRECTIONS.iter() {
+                let to = from as i32 + direction;
+                if !Board::is_index_in_bounds(to) {
+                    continue;
+                }
+
+                if (to % BOARD_WIDTH as i32 - (from % BOARD_WIDTH) as i32).abs() > 2 {
+                    continue;
+                }
+
+                if self.is_square_empty(to as usize) {
+                    moves.push(Move {
+                        from,
+                        to: to as usize,
+                        piece: Piece::Knight,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: None,
+                    });
+                } else if self.is_enemy(to as usize) {
+                    moves.push(Move {
+                        from,
+                        to: to as usize,
+                        piece: Piece::Knight,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: self.piece_at(to as usize),
+                    });
+                }
+            }
+        }
+
+        moves
+    }
+
+    pub fn generate_rook_moves(&self) -> Vec<Move> {
+        let rooks = match self.turn {
+            Color::White => self.white_pieces.rooks,
+            Color::Black => self.black_pieces.rooks,
+        };
+
+        // TODO: Validate check
+
+        self.generate_slider_moves(&ROOK_DIRECTIONS, rooks, Piece::Rook)
+    }
+
+    pub fn generate_queen_moves(&self) -> Vec<Move> {
+        let queens = match self.turn {
+            Color::White => self.white_pieces.queens,
+            Color::Black => self.black_pieces.queens,
+        };
+
+        // TODO: Validate check
+
+        self.generate_slider_moves(&QUEEN_DIRECTIONS, queens, Piece::Queen)
+    }
+
+    pub fn generate_king_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let king = match self.turn {
+            Color::White => self.white_pieces.king,
+            Color::Black => self.black_pieces.king,
+        };
+
+        // TODO: Validate check
+
+        for i in 0..BOARD_SIZE {
+            if !king.is_set(i) {
+                continue;
+            }
+
+            let from = i;
+            for direction in KING_DIRECTIONS.iter() {
+                let to = from as i32 + direction;
+                if !Board::is_index_in_bounds(to) {
+                    continue;
+                }
+
+                if (to % BOARD_WIDTH as i32 - (from % BOARD_WIDTH) as i32).abs() > 1 {
+                    continue;
+                }
+
+                if self.is_square_empty(to as usize) {
+                    moves.push(Move {
+                        from,
+                        to: to as usize,
+                        piece: Piece::King,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: None,
+                    });
+                } else if self.is_enemy(to as usize) {
+                    moves.push(Move {
+                        from,
+                        to: to as usize,
+                        piece: Piece::King,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: self.piece_at(to as usize),
+                    });
                 }
             }
         }
