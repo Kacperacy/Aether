@@ -44,6 +44,20 @@ pub enum Piece {
     King,
 }
 
+impl ToString for Piece {
+    fn to_string(&self) -> String {
+        match self {
+            Piece::Pawn => "p",
+            Piece::Knight => "n",
+            Piece::Bishop => "b",
+            Piece::Rook => "r",
+            Piece::Queen => "q",
+            Piece::King => "k",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CastlingRights {
     pub white_king_side: bool,
@@ -61,6 +75,7 @@ pub struct Move {
     pub en_passant: bool,
     pub castling: bool,
     pub promotion: Option<Piece>,
+    pub capture: Option<Piece>,
 }
 
 impl Default for Board {
@@ -112,7 +127,42 @@ impl Board {
         board
     }
 
+    fn reset(&mut self) {
+        self.white_occupancy = Bitboard::new();
+        self.white_attacks = Bitboard::new();
+        self.white_pieces = Pieces {
+            pawns: Bitboard::new(),
+            knights: Bitboard::new(),
+            bishops: Bitboard::new(),
+            rooks: Bitboard::new(),
+            queens: Bitboard::new(),
+            king: Bitboard::new(),
+        };
+        self.black_occupancy = Bitboard::new();
+        self.black_attacks = Bitboard::new();
+        self.black_pieces = Pieces {
+            pawns: Bitboard::new(),
+            knights: Bitboard::new(),
+            bishops: Bitboard::new(),
+            rooks: Bitboard::new(),
+            queens: Bitboard::new(),
+            king: Bitboard::new(),
+        };
+        self.turn = Color::White;
+        self.castling_rights = CastlingRights {
+            white_king_side: true,
+            white_queen_side: true,
+            black_king_side: true,
+            black_queen_side: true,
+        };
+        self.en_passant_square = None;
+        self.halfmove_clock = 0;
+        self.fullmove_number = 1;
+        self.moves = Vec::new();
+    }
+
     pub fn set_fen(&mut self, fen: &str) {
+        self.reset();
         let parts: Vec<&str> = fen.split_whitespace().collect();
         let mut row = 7;
         let mut col = 0;
@@ -254,8 +304,51 @@ impl Board {
         index >= 0 && index < BOARD_SIZE as i32
     }
 
+    fn is_enemy(&self, index: usize) -> bool {
+        match self.turn {
+            Color::White => self.black_occupancy.is_set(index),
+            Color::Black => self.white_occupancy.is_set(index),
+        }
+    }
+
+    fn piece_at(&self, index: usize) -> Option<Piece> {
+        if self.white_occupancy.is_set(index) {
+            if self.white_pieces.pawns.is_set(index) {
+                return Some(Piece::Pawn);
+            } else if self.white_pieces.knights.is_set(index) {
+                return Some(Piece::Knight);
+            } else if self.white_pieces.bishops.is_set(index) {
+                return Some(Piece::Bishop);
+            } else if self.white_pieces.rooks.is_set(index) {
+                return Some(Piece::Rook);
+            } else if self.white_pieces.queens.is_set(index) {
+                return Some(Piece::Queen);
+            } else if self.white_pieces.king.is_set(index) {
+                return Some(Piece::King);
+            }
+        } else if self.black_occupancy.is_set(index) {
+            if self.black_pieces.pawns.is_set(index) {
+                return Some(Piece::Pawn);
+            } else if self.black_pieces.knights.is_set(index) {
+                return Some(Piece::Knight);
+            } else if self.black_pieces.bishops.is_set(index) {
+                return Some(Piece::Bishop);
+            } else if self.black_pieces.rooks.is_set(index) {
+                return Some(Piece::Rook);
+            } else if self.black_pieces.queens.is_set(index) {
+                return Some(Piece::Queen);
+            } else if self.black_pieces.king.is_set(index) {
+                return Some(Piece::King);
+            }
+        }
+        None
+    }
+
     pub fn print(&self) {
+        println!();
+        println!("  A B C D E F G H");
         for row in (0..BOARD_WIDTH).rev() {
+            print!("{} ", row + 1);
             for col in 0..BOARD_WIDTH {
                 let index = row * BOARD_WIDTH + col;
                 let piece = if self.white_pieces.pawns.is_set(index) {
@@ -373,10 +466,11 @@ impl Board {
         }
     }
 
-    pub fn generate_possible_moves(self) -> Vec<Move> {
+    pub fn generate_possible_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
 
-        moves.append(&mut self.generate_pawn_moves());
+        moves.extend(&self.generate_pawn_moves());
+        moves.extend(&self.generate_bishop_moves());
 
         // TODO: Generate bishop moves
         // TODO: Generate knight moves
@@ -384,12 +478,19 @@ impl Board {
         // TODO: Generate queen moves
         // TODO: Generate king moves
 
-        moves.iter().for_each(|m| println!("{:?}", m));
+        println!("Possible {:?} moves:", moves.len());
+        moves.iter().for_each(|m: &Move| {
+            let mut move_str = Board::index_to_square(m.from) + &Board::index_to_square(m.to);
+            if let Some(promotion) = m.promotion {
+                move_str.push_str(&promotion.to_string());
+            }
+            print!("{:?} ", move_str);
+        });
 
         moves
     }
 
-    pub fn generate_pawn_moves(mut self) -> Vec<Move> {
+    pub fn generate_pawn_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
         let pawns = match self.turn {
             Color::White => self.white_pieces.pawns,
@@ -408,7 +509,6 @@ impl Board {
                 Color::Black => MOVE_DOWN,
             };
 
-            let pos = i;
             let from = i;
             let possible_to = i as i32 + direction;
 
@@ -417,10 +517,12 @@ impl Board {
             }
 
             let to = possible_to as usize;
+            let left = (to as i32 + MOVE_LEFT) as usize;
+            let right = (to as i32 + MOVE_RIGHT) as usize;
 
             // DOUBLE PUSH
-            if (ROW_2.is_set(pos) && self.turn == Color::White)
-                || (ROW_7.is_set(pos) && self.turn == Color::Black)
+            if (ROW_2.is_set(from) && self.turn == Color::White)
+                || (ROW_7.is_set(from) && self.turn == Color::Black)
             {
                 let double = to as i32 + direction;
                 if self.is_square_empty(to) && self.is_square_empty(double as usize) {
@@ -432,14 +534,13 @@ impl Board {
                         en_passant: true,
                         castling: false,
                         promotion: None,
+                        capture: None,
                     });
                 }
             }
 
             // EN PASSANT
             if let Some(ep) = self.en_passant_square {
-                let left = (to as i32 + MOVE_LEFT) as usize;
-                let right = (to as i32 + MOVE_RIGHT) as usize;
                 if left == ep {
                     moves.push(Move {
                         from,
@@ -449,6 +550,7 @@ impl Board {
                         en_passant: false,
                         castling: false,
                         promotion: None,
+                        capture: Some(Piece::Pawn),
                     });
                 }
                 if right == ep {
@@ -460,49 +562,80 @@ impl Board {
                         en_passant: false,
                         castling: false,
                         promotion: None,
+                        capture: Some(Piece::Pawn),
                     });
                 }
             }
 
+            // CAPTURES
+            if self.is_enemy(left) {
+                moves.push(Move {
+                    from,
+                    to: left,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: None,
+                    capture: self.piece_at(left),
+                });
+            }
+            if self.is_enemy(right) {
+                moves.push(Move {
+                    from,
+                    to: right,
+                    piece: Piece::Pawn,
+                    color: self.turn,
+                    en_passant: false,
+                    castling: false,
+                    promotion: None,
+                    capture: self.piece_at(right),
+                });
+            }
+
             // PROMOTION
-            if (self.turn == Color::White && ROW_7.is_set(pos) && self.is_square_empty(to))
-                || (self.turn == Color::Black && ROW_2.is_set(pos) && self.is_square_empty(to))
+            if (self.turn == Color::White && ROW_7.is_set(from) && self.is_square_empty(to))
+                || (self.turn == Color::Black && ROW_2.is_set(from) && self.is_square_empty(to))
             {
                 moves.push(Move {
                     from,
-                    to: to,
+                    to,
                     piece: Piece::Pawn,
                     color: self.turn,
                     en_passant: false,
                     castling: false,
                     promotion: Some(Piece::Queen),
+                    capture: None,
                 });
                 moves.push(Move {
                     from,
-                    to: to,
+                    to,
                     piece: Piece::Pawn,
                     color: self.turn,
                     en_passant: false,
                     castling: false,
                     promotion: Some(Piece::Rook),
+                    capture: None,
                 });
                 moves.push(Move {
                     from,
-                    to: to,
+                    to,
                     piece: Piece::Pawn,
                     color: self.turn,
                     en_passant: false,
                     castling: false,
                     promotion: Some(Piece::Bishop),
+                    capture: None,
                 });
                 moves.push(Move {
                     from,
-                    to: to,
+                    to,
                     piece: Piece::Pawn,
                     color: self.turn,
                     en_passant: false,
                     castling: false,
                     promotion: Some(Piece::Knight),
+                    capture: None,
                 });
             }
 
@@ -516,7 +649,64 @@ impl Board {
                     en_passant: false,
                     castling: false,
                     promotion: None,
+                    capture: None,
                 });
+            }
+        }
+
+        moves
+    }
+
+    pub fn generate_bishop_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let bishops = match self.turn {
+            Color::White => self.white_pieces.bishops,
+            Color::Black => self.black_pieces.bishops,
+        };
+
+        for i in 0..BOARD_SIZE {
+            if !bishops.is_set(i) {
+                continue;
+            }
+
+            let from = i;
+
+            for direction in BISHOP_DIRECTIONS.iter() {
+                let mut to = from as i32 + direction;
+                while Board::is_index_in_bounds(to) {
+                    if self.is_square_empty(to as usize) {
+                        moves.push(Move {
+                            from,
+                            to: to as usize,
+                            piece: Piece::Bishop,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: false,
+                            promotion: None,
+                            capture: None,
+                        });
+                    } else if self.is_enemy(to as usize) {
+                        moves.push(Move {
+                            from,
+                            to: to as usize,
+                            piece: Piece::Bishop,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: false,
+                            promotion: None,
+                            capture: self.piece_at(to as usize),
+                        });
+                        break;
+                    } else {
+                        break;
+                    }
+
+                    if to as usize % BOARD_WIDTH == 0 || to as usize % BOARD_WIDTH == 7 {
+                        break;
+                    }
+
+                    to += direction;
+                }
             }
         }
 
