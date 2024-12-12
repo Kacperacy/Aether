@@ -847,6 +847,71 @@ impl Board {
                     });
                 }
             }
+
+            // CASTLING
+            if self.turn == Color::White {
+                if self.castling_rights.white_king_side {
+                    if self.is_square_empty(61) && self.is_square_empty(62) {
+                        moves.push(Move {
+                            from,
+                            to: 62,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+                if self.castling_rights.white_queen_side {
+                    if self.is_square_empty(59)
+                        && self.is_square_empty(58)
+                        && self.is_square_empty(57)
+                    {
+                        moves.push(Move {
+                            from,
+                            to: 58,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+            } else {
+                if self.castling_rights.black_king_side {
+                    if self.is_square_empty(5) && self.is_square_empty(6) {
+                        moves.push(Move {
+                            from,
+                            to: 6,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+                if self.castling_rights.black_queen_side {
+                    if self.is_square_empty(3) && self.is_square_empty(2) && self.is_square_empty(1)
+                    {
+                        moves.push(Move {
+                            from,
+                            to: 2,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+            }
         }
 
         moves
