@@ -1,3 +1,3 @@
 pub mod bitboard;
 pub mod board;
-pub mod constans;
+pub mod constants;
