@@ -7,11 +7,11 @@ use crate::constants::*;
 
 pub struct Board {
     pub white_occupancy: Bitboard,
-    pub white_attacks: Bitboard,
+    pub white_attacks: Pieces,
     pub white_pieces: Pieces,
 
     pub black_occupancy: Bitboard,
-    pub black_attacks: Bitboard,
+    pub black_attacks: Pieces,
     pub black_pieces: Pieces,
 
     pub turn: Color,
@@ -30,6 +30,19 @@ pub struct Pieces {
     pub rooks: Bitboard,
     pub queens: Bitboard,
     pub king: Bitboard,
+}
+
+impl Pieces {
+    pub fn new() -> Self {
+        Pieces {
+            pawns: Bitboard::new(),
+            knights: Bitboard::new(),
+            bishops: Bitboard::new(),
+            rooks: Bitboard::new(),
+            queens: Bitboard::new(),
+            king: Bitboard::new(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -92,25 +105,11 @@ impl Board {
     pub fn new() -> Self {
         Board {
             white_occupancy: Bitboard::new(),
-            white_attacks: Bitboard::new(),
-            white_pieces: Pieces {
-                pawns: Bitboard::new(),
-                knights: Bitboard::new(),
-                bishops: Bitboard::new(),
-                rooks: Bitboard::new(),
-                queens: Bitboard::new(),
-                king: Bitboard::new(),
-            },
+            white_attacks: Pieces::new(),
+            white_pieces: Pieces::new(),
             black_occupancy: Bitboard::new(),
-            black_attacks: Bitboard::new(),
-            black_pieces: Pieces {
-                pawns: Bitboard::new(),
-                knights: Bitboard::new(),
-                bishops: Bitboard::new(),
-                rooks: Bitboard::new(),
-                queens: Bitboard::new(),
-                king: Bitboard::new(),
-            },
+            black_attacks: Pieces::new(),
+            black_pieces: Pieces::new(),
             turn: Color::White,
             castling_rights: CastlingRights {
                 white_king_side: true,
@@ -133,25 +132,11 @@ impl Board {
 
     fn reset(&mut self) {
         self.white_occupancy = Bitboard::new();
-        self.white_attacks = Bitboard::new();
-        self.white_pieces = Pieces {
-            pawns: Bitboard::new(),
-            knights: Bitboard::new(),
-            bishops: Bitboard::new(),
-            rooks: Bitboard::new(),
-            queens: Bitboard::new(),
-            king: Bitboard::new(),
-        };
+        self.white_attacks = Pieces::new();
+        self.white_pieces = Pieces::new();
         self.black_occupancy = Bitboard::new();
-        self.black_attacks = Bitboard::new();
-        self.black_pieces = Pieces {
-            pawns: Bitboard::new(),
-            knights: Bitboard::new(),
-            bishops: Bitboard::new(),
-            rooks: Bitboard::new(),
-            queens: Bitboard::new(),
-            king: Bitboard::new(),
-        };
+        self.black_attacks = Pieces::new();
+        self.black_pieces = Pieces::new();
         self.turn = Color::White;
         self.castling_rights = CastlingRights {
             white_king_side: true,

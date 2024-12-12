@@ -1,9 +1,24 @@
 use crate::bitboard::Bitboard;
-use crate::board::{Board, Color};
+use crate::board::{Board, Color, Piece};
 use crate::constants::*;
 
 impl Board {
-    fn generate_pawn_attacks(&self) -> Bitboard {
+    pub fn print_attacks(&self, attacks: &Bitboard) {
+        for i in 0..BOARD_SIZE {
+            if i % BOARD_WIDTH == 0 {
+                println!();
+            }
+
+            if attacks.is_set(i) {
+                print!("X ");
+            } else {
+                print!(". ");
+            }
+        }
+
+        println!();
+    }
+    pub fn generate_pawn_attacks(&self) -> Bitboard {
         let mut attacks = Bitboard::new();
         let pawns = match self.turn {
             Color::White => self.white_pieces.pawns,
@@ -41,7 +56,7 @@ impl Board {
         attacks
     }
 
-    fn generate_knight_attacks(&self) -> Bitboard {
+    pub fn generate_knight_attacks(&self) -> Bitboard {
         let knights = match self.turn {
             Color::White => self.white_pieces.knights,
             Color::Black => self.black_pieces.knights,
@@ -72,7 +87,7 @@ impl Board {
         attacks
     }
 
-    fn generate_slider_attacks(&self, directions: &[i32], pieces: Bitboard) -> Bitboard {
+    pub fn generate_slider_attacks(&self, directions: &[i32], pieces: Bitboard) -> Bitboard {
         let mut attacks = Bitboard::new();
 
         for i in 0..BOARD_SIZE {
@@ -87,11 +102,11 @@ impl Board {
                 while Board::is_index_in_bounds(to) {
                     attacks.set_bit(to as usize);
 
-                    to += direction;
-
                     if to as usize % BOARD_WIDTH == 0 || to as usize % BOARD_WIDTH == 7 {
                         break;
                     }
+
+                    to += direction;
                 }
             }
         }
@@ -155,5 +170,35 @@ impl Board {
         }
 
         attacks
+    }
+
+    pub fn update_attacks(&mut self, piece: Piece) {
+        let attacks = match piece {
+            Piece::Pawn => self.generate_pawn_attacks(),
+            Piece::Knight => self.generate_knight_attacks(),
+            Piece::Bishop => self.generate_bishop_attacks(),
+            Piece::Rook => self.generate_rook_attacks(),
+            Piece::Queen => self.generate_queen_attacks(),
+            Piece::King => self.generate_king_attacks(),
+        };
+
+        match self.turn {
+            Color::White => match piece {
+                Piece::Pawn => self.white_attacks.pawns = attacks,
+                Piece::Knight => self.white_attacks.knights = attacks,
+                Piece::Bishop => self.white_attacks.bishops = attacks,
+                Piece::Rook => self.white_attacks.rooks = attacks,
+                Piece::Queen => self.white_attacks.queens = attacks,
+                Piece::King => self.white_attacks.king = attacks,
+            },
+            Color::Black => match piece {
+                Piece::Pawn => self.black_attacks.pawns = attacks,
+                Piece::Knight => self.black_attacks.knights = attacks,
+                Piece::Bishop => self.black_attacks.bishops = attacks,
+                Piece::Rook => self.black_attacks.rooks = attacks,
+                Piece::Queen => self.black_attacks.queens = attacks,
+                Piece::King => self.black_attacks.king = attacks,
+            },
+        };
     }
 }

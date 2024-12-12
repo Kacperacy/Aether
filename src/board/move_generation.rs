@@ -79,7 +79,7 @@ impl Board {
                 if left == ep {
                     moves.push(Move {
                         from,
-                        to,
+                        to: left,
                         piece: Piece::Pawn,
                         color: self.turn,
                         en_passant: true,
@@ -91,7 +91,7 @@ impl Board {
                 if right == ep {
                     moves.push(Move {
                         from,
-                        to,
+                        to: right,
                         piece: Piece::Pawn,
                         color: self.turn,
                         en_passant: true,
