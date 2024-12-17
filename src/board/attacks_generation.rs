@@ -20,10 +20,7 @@ impl Board {
     }
     pub fn generate_pawn_attacks(&self) -> Bitboard {
         let mut attacks = Bitboard::new();
-        let pawns = match self.turn {
-            Color::White => self.white_pieces.pawns,
-            Color::Black => self.black_pieces.pawns,
-        };
+        let pawns = self.pieces[self.turn as usize][Piece::Pawn as usize];
 
         let direction = match self.turn {
             Color::White => MOVE_UP,
@@ -57,10 +54,7 @@ impl Board {
     }
 
     pub fn generate_knight_attacks(&self) -> Bitboard {
-        let knights = match self.turn {
-            Color::White => self.white_pieces.knights,
-            Color::Black => self.black_pieces.knights,
-        };
+        let knights = self.pieces[self.turn as usize][Piece::Knight as usize];
 
         let mut attacks = Bitboard::new();
 
@@ -115,37 +109,25 @@ impl Board {
     }
 
     pub fn generate_bishop_attacks(&self) -> Bitboard {
-        let bishops = match self.turn {
-            Color::White => self.white_pieces.bishops,
-            Color::Black => self.black_pieces.bishops,
-        };
+        let bishops = self.pieces[self.turn as usize][Piece::Bishop as usize];
 
         self.generate_slider_attacks(&BISHOP_DIRECTIONS, bishops)
     }
 
     pub fn generate_rook_attacks(&self) -> Bitboard {
-        let rooks = match self.turn {
-            Color::White => self.white_pieces.rooks,
-            Color::Black => self.black_pieces.rooks,
-        };
+        let rooks = self.pieces[self.turn as usize][Piece::Rook as usize];
 
         self.generate_slider_attacks(&ROOK_DIRECTIONS, rooks)
     }
 
     pub fn generate_queen_attacks(&self) -> Bitboard {
-        let queens = match self.turn {
-            Color::White => self.white_pieces.queens,
-            Color::Black => self.black_pieces.queens,
-        };
+        let queens = self.pieces[self.turn as usize][Piece::Queen as usize];
 
         self.generate_slider_attacks(&QUEEN_DIRECTIONS, queens)
     }
 
     pub fn generate_king_attacks(&self) -> Bitboard {
-        let king = match self.turn {
-            Color::White => self.white_pieces.king,
-            Color::Black => self.black_pieces.king,
-        };
+        let king = self.pieces[self.turn as usize][Piece::King as usize];
 
         let mut attacks = Bitboard::new();
 
@@ -182,23 +164,6 @@ impl Board {
             Piece::King => self.generate_king_attacks(),
         };
 
-        match self.turn {
-            Color::White => match piece {
-                Piece::Pawn => self.white_attacks.pawns = attacks,
-                Piece::Knight => self.white_attacks.knights = attacks,
-                Piece::Bishop => self.white_attacks.bishops = attacks,
-                Piece::Rook => self.white_attacks.rooks = attacks,
-                Piece::Queen => self.white_attacks.queens = attacks,
-                Piece::King => self.white_attacks.king = attacks,
-            },
-            Color::Black => match piece {
-                Piece::Pawn => self.black_attacks.pawns = attacks,
-                Piece::Knight => self.black_attacks.knights = attacks,
-                Piece::Bishop => self.black_attacks.bishops = attacks,
-                Piece::Rook => self.black_attacks.rooks = attacks,
-                Piece::Queen => self.black_attacks.queens = attacks,
-                Piece::King => self.black_attacks.king = attacks,
-            },
-        };
+        self.attacks[self.turn as usize][piece as usize] = attacks;
     }
 }

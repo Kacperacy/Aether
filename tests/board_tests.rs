@@ -9,8 +9,8 @@ mod tests {
     fn test_board_starting_position() {
         let board = Board::init();
         assert_eq!(board.turn, Color::White);
-        assert!(board.white_pieces.pawns.is_set(8));
-        assert!(board.black_pieces.pawns.is_set(48));
+        assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(8));
+        assert!(board.pieces[Color::Black as usize][Piece::Pawn as usize].is_set(48));
     }
 
     #[test]
@@ -95,52 +95,52 @@ mod tests {
         let board = Board::init();
 
         assert_eq!(
-            board.white_pieces.pawns,
+            board.pieces[Color::White as usize][Piece::Pawn as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000001111111100000000)
         );
         assert_eq!(
-            board.white_pieces.knights,
+            board.pieces[Color::White as usize][Piece::Knight as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000000000000001000010)
         );
         assert_eq!(
-            board.white_pieces.bishops,
+            board.pieces[Color::White as usize][Piece::Bishop as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000100100)
         );
         assert_eq!(
-            board.white_pieces.rooks,
+            board.pieces[Color::White as usize][Piece::Rook as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000000000000010000001)
         );
         assert_eq!(
-            board.white_pieces.queens,
+            board.pieces[Color::White as usize][Piece::Queen as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000001000)
         );
         assert_eq!(
-            board.white_pieces.king,
+            board.pieces[Color::White as usize][Piece::King as usize],
             Bitboard(0b0000000000000000000000000000000000000000000000000000000000010000)
         );
 
         assert_eq!(
-            board.black_pieces.pawns,
+            board.pieces[Color::Black as usize][Piece::Pawn as usize],
             Bitboard(0b0000000011111111000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_pieces.knights,
+            board.pieces[Color::Black as usize][Piece::Knight as usize],
             Bitboard(0b0100001000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_pieces.bishops,
+            board.pieces[Color::Black as usize][Piece::Bishop as usize],
             Bitboard(0b0010010000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_pieces.rooks,
+            board.pieces[Color::Black as usize][Piece::Rook as usize],
             Bitboard(0b1000000100000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_pieces.queens,
+            board.pieces[Color::Black as usize][Piece::Queen as usize],
             Bitboard(0b0000100000000000000000000000000000000000000000000000000000000000)
         );
         assert_eq!(
-            board.black_pieces.king,
+            board.pieces[Color::Black as usize][Piece::King as usize],
             Bitboard(0b0001000000000000000000000000000000000000000000000000000000000000)
         );
 
@@ -644,5 +644,59 @@ mod tests {
         moves_assert.sort_by(|a, b| a.from.cmp(&b.from).then(a.to.cmp(&b.to)));
 
         assert_eq!(moves, moves_assert);
+    }
+
+    #[test]
+    fn test_white_castling() {
+        let mut board = Board::new();
+        board.set_fen("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5");
+
+        let mut castling = board.generate_king_moves();
+        let mut castling_assert = vec![
+            Move {
+                from: 4,
+                to: 6,
+                piece: Piece::King,
+                color: Color::White,
+                en_passant: false,
+                castling: true,
+                promotion: None,
+                capture: None,
+            },
+            Move {
+                from: 4,
+                to: 12,
+                piece: Piece::King,
+                color: Color::White,
+                en_passant: false,
+                castling: false,
+                promotion: None,
+                capture: None,
+            },
+            Move {
+                from: 4,
+                to: 11,
+                piece: Piece::King,
+                color: Color::White,
+                en_passant: false,
+                castling: false,
+                promotion: None,
+                capture: None,
+            },
+            Move {
+                from: 4,
+                to: 5,
+                piece: Piece::King,
+                color: Color::White,
+                en_passant: false,
+                castling: false,
+                promotion: None,
+                capture: None,
+            },
+        ];
+        castling.sort_by(|a, b| a.from.cmp(&b.from).then(a.to.cmp(&b.to)));
+        castling_assert.sort_by(|a, b| a.from.cmp(&b.from).then(a.to.cmp(&b.to)));
+
+        assert_eq!(castling, castling_assert);
     }
 }

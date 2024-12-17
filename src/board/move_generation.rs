@@ -6,6 +6,11 @@ impl Board {
     pub fn generate_possible_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
 
+        // 50 moves draw
+        if self.halfmove_clock >= 100 {
+            return moves;
+        }
+
         moves.extend(&self.generate_pawn_moves());
         moves.extend(&self.generate_bishop_moves());
         moves.extend(&self.generate_knight_moves());
@@ -27,10 +32,7 @@ impl Board {
 
     pub fn generate_pawn_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let pawns = match self.turn {
-            Color::White => self.white_pieces.pawns,
-            Color::Black => self.black_pieces.pawns,
-        };
+        let pawns = self.pieces[self.turn as usize][Piece::Pawn as usize];
 
         // TODO: Validate check
 
@@ -104,28 +106,32 @@ impl Board {
 
             // CAPTURES
             if self.is_enemy(left) {
-                moves.push(Move {
-                    from,
-                    to: left,
-                    piece: Piece::Pawn,
-                    color: self.turn,
-                    en_passant: false,
-                    castling: false,
-                    promotion: None,
-                    capture: self.piece_at(left),
-                });
+                if let Some(piece_at) = self.piece_at(left) {
+                    moves.push(Move {
+                        from,
+                        to: left,
+                        piece: Piece::Pawn,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: Some(piece_at.piece),
+                    });
+                }
             }
             if self.is_enemy(right) {
-                moves.push(Move {
-                    from,
-                    to: right,
-                    piece: Piece::Pawn,
-                    color: self.turn,
-                    en_passant: false,
-                    castling: false,
-                    promotion: None,
-                    capture: self.piece_at(right),
-                });
+                if let Some(piece_at) = self.piece_at(right) {
+                    moves.push(Move {
+                        from,
+                        to: right,
+                        piece: Piece::Pawn,
+                        color: self.turn,
+                        en_passant: false,
+                        castling: false,
+                        promotion: None,
+                        capture: Some(piece_at.piece),
+                    });
+                }
             }
 
             // PROMOTION
@@ -222,16 +228,18 @@ impl Board {
                             capture: None,
                         });
                     } else if self.is_enemy(to as usize) {
-                        moves.push(Move {
-                            from,
-                            to: to as usize,
-                            piece,
-                            color: self.turn,
-                            en_passant: false,
-                            castling: false,
-                            promotion: None,
-                            capture: self.piece_at(to as usize),
-                        });
+                        if let Some(piece_at) = self.piece_at(to as usize) {
+                            moves.push(Move {
+                                from,
+                                to: to as usize,
+                                piece,
+                                color: self.turn,
+                                en_passant: false,
+                                castling: false,
+                                promotion: None,
+                                capture: Some(piece_at.piece),
+                            });
+                        }
                         break;
                     } else {
                         break;
@@ -249,10 +257,7 @@ impl Board {
         moves
     }
     pub fn generate_bishop_moves(&self) -> Vec<Move> {
-        let bishops = match self.turn {
-            Color::White => self.white_pieces.bishops,
-            Color::Black => self.black_pieces.bishops,
-        };
+        let bishops = self.pieces[self.turn as usize][Piece::Bishop as usize];
 
         // TODO: Validate check
 
@@ -261,10 +266,7 @@ impl Board {
 
     pub fn generate_knight_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let knights = match self.turn {
-            Color::White => self.white_pieces.knights,
-            Color::Black => self.black_pieces.knights,
-        };
+        let knights = self.pieces[self.turn as usize][Piece::Knight as usize];
 
         // TODO: Validate check
 
@@ -296,16 +298,18 @@ impl Board {
                         capture: None,
                     });
                 } else if self.is_enemy(to as usize) {
-                    moves.push(Move {
-                        from,
-                        to: to as usize,
-                        piece: Piece::Knight,
-                        color: self.turn,
-                        en_passant: false,
-                        castling: false,
-                        promotion: None,
-                        capture: self.piece_at(to as usize),
-                    });
+                    if let Some(piece_at) = self.piece_at(to as usize) {
+                        moves.push(Move {
+                            from,
+                            to: to as usize,
+                            piece: Piece::Knight,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: false,
+                            promotion: None,
+                            capture: Some(piece_at.piece),
+                        });
+                    }
                 }
             }
         }
@@ -314,10 +318,7 @@ impl Board {
     }
 
     pub fn generate_rook_moves(&self) -> Vec<Move> {
-        let rooks = match self.turn {
-            Color::White => self.white_pieces.rooks,
-            Color::Black => self.black_pieces.rooks,
-        };
+        let rooks = self.pieces[self.turn as usize][Piece::Rook as usize];
 
         // TODO: Validate check
 
@@ -325,10 +326,7 @@ impl Board {
     }
 
     pub fn generate_queen_moves(&self) -> Vec<Move> {
-        let queens = match self.turn {
-            Color::White => self.white_pieces.queens,
-            Color::Black => self.black_pieces.queens,
-        };
+        let queens = self.pieces[self.turn as usize][Piece::Queen as usize];
 
         // TODO: Validate check
 
@@ -337,10 +335,7 @@ impl Board {
 
     pub fn generate_king_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let king = match self.turn {
-            Color::White => self.white_pieces.king,
-            Color::Black => self.black_pieces.king,
-        };
+        let king = self.pieces[self.turn as usize][Piece::King as usize];
 
         // TODO: Validate check
 
@@ -372,54 +367,24 @@ impl Board {
                         capture: None,
                     });
                 } else if self.is_enemy(to as usize) {
-                    moves.push(Move {
-                        from,
-                        to: to as usize,
-                        piece: Piece::King,
-                        color: self.turn,
-                        en_passant: false,
-                        castling: false,
-                        promotion: None,
-                        capture: self.piece_at(to as usize),
-                    });
+                    if let Some(piece_at) = self.piece_at(to as usize) {
+                        moves.push(Move {
+                            from,
+                            to: to as usize,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: false,
+                            promotion: None,
+                            capture: Some(piece_at.piece),
+                        });
+                    }
                 }
             }
 
             // CASTLING
             if self.turn == Color::White {
                 if self.castling_rights.white_king_side {
-                    if self.is_square_empty(61) && self.is_square_empty(62) {
-                        moves.push(Move {
-                            from,
-                            to: 62,
-                            piece: Piece::King,
-                            color: self.turn,
-                            en_passant: false,
-                            castling: true,
-                            promotion: None,
-                            capture: None,
-                        });
-                    }
-                }
-                if self.castling_rights.white_queen_side {
-                    if self.is_square_empty(59)
-                        && self.is_square_empty(58)
-                        && self.is_square_empty(57)
-                    {
-                        moves.push(Move {
-                            from,
-                            to: 58,
-                            piece: Piece::King,
-                            color: self.turn,
-                            en_passant: false,
-                            castling: true,
-                            promotion: None,
-                            capture: None,
-                        });
-                    }
-                }
-            } else {
-                if self.castling_rights.black_king_side {
                     if self.is_square_empty(5) && self.is_square_empty(6) {
                         moves.push(Move {
                             from,
@@ -433,12 +398,44 @@ impl Board {
                         });
                     }
                 }
-                if self.castling_rights.black_queen_side {
+                if self.castling_rights.white_queen_side {
                     if self.is_square_empty(3) && self.is_square_empty(2) && self.is_square_empty(1)
                     {
                         moves.push(Move {
                             from,
                             to: 2,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+            } else {
+                if self.castling_rights.black_king_side {
+                    if self.is_square_empty(61) && self.is_square_empty(62) {
+                        moves.push(Move {
+                            from,
+                            to: 62,
+                            piece: Piece::King,
+                            color: self.turn,
+                            en_passant: false,
+                            castling: true,
+                            promotion: None,
+                            capture: None,
+                        });
+                    }
+                }
+                if self.castling_rights.black_queen_side {
+                    if self.is_square_empty(59)
+                        && self.is_square_empty(58)
+                        && self.is_square_empty(57)
+                    {
+                        moves.push(Move {
+                            from,
+                            to: 58,
                             piece: Piece::King,
                             color: self.turn,
                             en_passant: false,
