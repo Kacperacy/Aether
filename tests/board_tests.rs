@@ -6,11 +6,76 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_board_starting_position() {
+    fn test_board_init() {
         let board = Board::init();
         assert_eq!(board.turn, Color::White);
         assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(8));
         assert!(board.pieces[Color::Black as usize][Piece::Pawn as usize].is_set(48));
+    }
+
+    #[test]
+    fn test_board_reset() {
+        let mut board = Board::new();
+        board.reset();
+        assert_eq!(board.turn, Color::White);
+        assert_eq!(board.halfmove_clock, 0);
+        assert_eq!(board.fullmove_number, 1);
+        assert!(board
+            .pieces
+            .iter()
+            .all(|color| color.iter().all(|piece| piece.is_empty())));
+    }
+
+    #[test]
+    fn test_board_set_fen() {
+        let mut board = Board::new();
+        board.set_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(board.turn, Color::White);
+        assert_eq!(board.fullmove_number, 1);
+        assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(8));
+        assert!(board.pieces[Color::Black as usize][Piece::Pawn as usize].is_set(48));
+    }
+
+    #[test]
+    fn test_board_add_piece() {
+        let mut board = Board::new();
+        board.add_piece(Color::White, Piece::Knight, 1);
+        assert!(board.pieces[Color::White as usize][Piece::Knight as usize].is_set(1));
+    }
+
+    #[test]
+    fn test_board_remove_piece() {
+        let mut board = Board::new();
+        board.add_piece(Color::White, Piece::Knight, 1);
+        board.remove_piece(Color::White, Piece::Knight, 1);
+        assert!(!board.pieces[Color::White as usize][Piece::Knight as usize].is_set(1));
+    }
+
+    #[test]
+    fn test_board_move_piece() {
+        let mut board = Board::new();
+        board.add_piece(Color::White, Piece::Knight, 1);
+        board.move_piece(Color::White, Piece::Knight, 1, 18);
+        assert!(!board.pieces[Color::White as usize][Piece::Knight as usize].is_set(1));
+        assert!(board.pieces[Color::White as usize][Piece::Knight as usize].is_set(18));
+    }
+
+    #[test]
+    fn test_board_make_move() {
+        let mut board = Board::init();
+        let mv = Move {
+            from: 12,
+            to: 28,
+            piece: Piece::Pawn,
+            color: Color::White,
+            en_passant: false,
+            castling: false,
+            promotion: None,
+            capture: None,
+        };
+        board.make_move(&mv);
+        assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(28));
+        assert!(!board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(12));
     }
 
     #[test]
@@ -146,15 +211,7 @@ mod tests {
 
         assert_eq!(board.turn, Color::White);
 
-        assert_eq!(
-            board.castling_rights,
-            CastlingRights {
-                white_king_side: true,
-                white_queen_side: true,
-                black_king_side: true,
-                black_queen_side: true,
-            }
-        );
+        assert_eq!(board.castling_rights, 0b1111);
 
         assert_eq!(board.en_passant_square, None);
 

@@ -14,7 +14,7 @@ pub struct Board {
     pub pieces: [[Bitboard; 6]; 2],
 
     pub turn: Color,
-    pub castling_rights: CastlingRights,
+    pub castling_rights: u8,
     pub en_passant_square: Option<usize>,
     pub halfmove_clock: u8,
     pub fullmove_number: u16,
@@ -65,14 +65,6 @@ impl Display for Piece {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct CastlingRights {
-    pub white_king_side: bool,
-    pub white_queen_side: bool,
-    pub black_king_side: bool,
-    pub black_queen_side: bool,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Move {
     pub from: usize,
     pub to: usize,
@@ -97,12 +89,7 @@ impl Board {
             attacks: [[Bitboard::new(); 6]; 2],
             pieces: [[Bitboard::new(); 6]; 2],
             turn: Color::White,
-            castling_rights: CastlingRights {
-                white_king_side: true,
-                white_queen_side: true,
-                black_king_side: true,
-                black_queen_side: true,
-            },
+            castling_rights: CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1],
             en_passant_square: None,
             halfmove_clock: 0,
             fullmove_number: 1,
@@ -117,17 +104,12 @@ impl Board {
         board
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.occupancy = [Bitboard::new(); 2];
         self.attacks = [[Bitboard::new(); 6]; 2];
         self.pieces = [[Bitboard::new(); 6]; 2];
         self.turn = Color::White;
-        self.castling_rights = CastlingRights {
-            white_king_side: true,
-            white_queen_side: true,
-            black_king_side: true,
-            black_queen_side: true,
-        };
+        self.castling_rights = CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1];
         self.en_passant_square = None;
         self.halfmove_clock = 0;
         self.fullmove_number = 1;
@@ -180,12 +162,19 @@ impl Board {
             _ => panic!("Invalid FEN"),
         };
 
-        self.castling_rights = CastlingRights {
-            white_king_side: parts[2].contains('K'),
-            white_queen_side: parts[2].contains('Q'),
-            black_king_side: parts[2].contains('k'),
-            black_queen_side: parts[2].contains('q'),
-        };
+        self.castling_rights = 0;
+        if parts[2].contains('K') {
+            self.castling_rights |= CASTLING_WHITE_KING;
+        }
+        if parts[2].contains('Q') {
+            self.castling_rights |= CASTLING_WHITE_QUEEN;
+        }
+        if parts[2].contains('k') {
+            self.castling_rights |= CASTLING_BLACK_KING;
+        }
+        if parts[2].contains('q') {
+            self.castling_rights |= CASTLING_BLACK_QUEEN;
+        }
 
         self.en_passant_square = match parts[3] {
             "-" => None,
@@ -198,7 +187,7 @@ impl Board {
         self.current_zobrist = ZOBRIST.hash(&self);
     }
 
-    fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
+    pub fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
         let bb = Bitboard::from_index(index);
 
         self.occupancy[color as usize] = self.occupancy[color as usize].or(&bb);
@@ -206,7 +195,7 @@ impl Board {
             self.pieces[color as usize][piece as usize].or(&bb);
     }
 
-    fn remove_piece(&mut self, color: Color, piece: Piece, index: usize) {
+    pub fn remove_piece(&mut self, color: Color, piece: Piece, index: usize) {
         let bb = Bitboard::from_index(index);
 
         self.occupancy[color as usize] = self.occupancy[color as usize].and(&bb.not());
@@ -214,7 +203,7 @@ impl Board {
             self.pieces[color as usize][piece as usize].and(&bb.not());
     }
 
-    fn move_piece(&mut self, color: Color, piece: Piece, from: usize, to: usize) {
+    pub fn move_piece(&mut self, color: Color, piece: Piece, from: usize, to: usize) {
         self.remove_piece(color, piece, from);
         self.add_piece(color, piece, to);
     }
@@ -239,14 +228,55 @@ impl Board {
         println!();
     }
 
+    pub fn is_empty_between(&self, from: usize, to: usize) -> bool {
+        let direction = (to as i32 - from as i32).signum();
+        let mut index = from as i32 + direction;
+
+        while index != to as i32 {
+            if self.occupancy[Color::White as usize].is_set(index as usize)
+                || self.occupancy[Color::Black as usize].is_set(index as usize)
+            {
+                return false;
+            }
+            index += direction;
+        }
+
+        true
+    }
+
+    pub fn can_castle(&self, color: Color, is_king_side: bool) -> bool {
+        let index = match color {
+            Color::White => 0,
+            Color::Black => 2,
+        } + if is_king_side { 0 } else { 1 };
+
+        let mask = 1 << index;
+        let king_square = CASTLING_RIGHTS_SQUARES[index][0];
+        let rook_square = CASTLING_ROOKS[index];
+
+        if self.castling_rights & mask == 0 {
+            return false;
+        }
+
+        self.is_empty_between(king_square, rook_square)
+    }
+
+    fn update_zobrist(&mut self, mv: &Move, square: usize) {
+        self.current_zobrist ^= ZOBRIST.pieces
+            [mv.piece as usize + if mv.color == Color::Black { 0 } else { 6 }][square];
+    }
+
     pub fn make_move(&mut self, mv: &Move) {
+        let mut new_zobrist = self.current_zobrist;
         self.move_piece(mv.color, mv.piece, mv.from, mv.to);
 
+        // handle capture
         if mv.capture.is_some() {
-            let mut direction = 0;
+            let mut capture_square = mv.to as i32;
 
+            // handle en passant capture
             if mv.en_passant {
-                direction = match mv.color {
+                capture_square -= match mv.color {
                     Color::White => MOVE_DOWN,
                     Color::Black => MOVE_UP,
                 };
@@ -255,52 +285,92 @@ impl Board {
             self.remove_piece(
                 mv.color.opposite(),
                 mv.capture.unwrap(),
-                (mv.to as i32 - direction) as usize,
+                capture_square as usize,
             );
+
+            self.update_zobrist(mv, capture_square as usize);
         }
 
-        // Update en passant square
-        if self.en_passant_square.is_some() {
-            self.en_passant_square = None;
+        // handle castling
+        if mv.piece == Piece::King {
+            if mv.castling {
+                let (rook_from, rook_to) = match mv.to {
+                    2 => (0, 3),
+                    6 => (7, 5),
+                    _ => panic!("Invalid castling move"),
+                };
+
+                self.move_piece(mv.color, Piece::Rook, rook_from, rook_to);
+                self.update_zobrist(mv, rook_from);
+                self.update_zobrist(mv, rook_to);
+            }
         }
 
+        // handle promotion
+        if mv.promotion.is_some() {
+            self.remove_piece(mv.color, Piece::Pawn, mv.to);
+            self.add_piece(mv.color, mv.promotion.unwrap(), mv.to);
+            self.update_zobrist(mv, mv.to);
+        }
+
+        // update en passant square
         if mv.piece == Piece::Pawn && (mv.to as i32 - mv.from as i32).abs() == 16 {
             let direction = match mv.color {
                 Color::White => MOVE_UP,
                 Color::Black => MOVE_DOWN,
             };
             self.en_passant_square = Some((mv.to as i32 - direction) as usize);
+            new_zobrist ^= ZOBRIST.en_passant[self.en_passant_square.unwrap() % 8];
+        } else {
+            self.en_passant_square = None;
         }
 
-        if mv.piece == Piece::King {
-            match mv.color {
-                Color::White => {
-                    self.castling_rights.white_king_side = false;
-                    self.castling_rights.white_queen_side = false;
-                }
-                Color::Black => {
-                    self.castling_rights.black_king_side = false;
-                    self.castling_rights.black_queen_side = false;
-                }
-            }
-        } else if mv.piece == Piece::Rook {
-            match mv.color {
-                Color::White => {
-                    if mv.from == 0 {
-                        self.castling_rights.white_queen_side = false;
-                    } else if mv.from == 7 {
-                        self.castling_rights.white_king_side = false;
-                    }
-                }
-                Color::Black => {
-                    if mv.from == 56 {
-                        self.castling_rights.black_queen_side = false;
-                    } else if mv.from == 63 {
-                        self.castling_rights.black_king_side = false;
-                    }
-                }
-            }
-        }
+        // update castling rights
+
+        // TODO: Handle rest of move types
+
+        // Update en passant square
+        // if self.en_passant_square.is_some() {
+        //     self.en_passant_square = None;
+        // }
+        //
+        // if mv.piece == Piece::Pawn && (mv.to as i32 - mv.from as i32).abs() == 16 {
+        //     let direction = match mv.color {
+        //         Color::White => MOVE_UP,
+        //         Color::Black => MOVE_DOWN,
+        //     };
+        //     self.en_passant_square = Some((mv.to as i32 - direction) as usize);
+        // }
+        //
+        // if mv.piece == Piece::King {
+        //     match mv.color {
+        //         Color::White => {
+        //             self.castling_rights.white_king_side = false;
+        //             self.castling_rights.white_queen_side = false;
+        //         }
+        //         Color::Black => {
+        //             self.castling_rights.black_king_side = false;
+        //             self.castling_rights.black_queen_side = false;
+        //         }
+        //     }
+        // } else if mv.piece == Piece::Rook {
+        //     match mv.color {
+        //         Color::White => {
+        //             if mv.from == 0 {
+        //                 self.castling_rights.white_queen_side = false;
+        //             } else if mv.from == 7 {
+        //                 self.castling_rights.white_king_side = false;
+        //             }
+        //         }
+        //         Color::Black => {
+        //             if mv.from == 56 {
+        //                 self.castling_rights.black_queen_side = false;
+        //             } else if mv.from == 63 {
+        //                 self.castling_rights.black_king_side = false;
+        //             }
+        //         }
+        //     }
+        // }
 
         // Update turn and move counters
         self.moves.push(*mv);

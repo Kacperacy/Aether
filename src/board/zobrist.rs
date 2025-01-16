@@ -55,17 +55,10 @@ impl Zobrist {
             hash ^= self.side;
         }
 
-        if board.castling_rights.white_king_side {
-            hash ^= self.castling_rights[0];
-        }
-        if board.castling_rights.white_queen_side {
-            hash ^= self.castling_rights[1];
-        }
-        if board.castling_rights.black_king_side {
-            hash ^= self.castling_rights[2];
-        }
-        if board.castling_rights.black_queen_side {
-            hash ^= self.castling_rights[3];
+        for i in 0..4 {
+            if board.castling_rights & (1 << i) != 0 {
+                hash ^= self.castling_rights[i];
+            }
         }
 
         if let Some(en_passant) = board.en_passant_square {
