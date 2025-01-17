@@ -9,18 +9,25 @@ use crate::constants::*;
 use std::fmt::Display;
 
 pub struct Board {
+    pub all_occupancy: Bitboard,
     pub occupancy: [Bitboard; 2],
     pub attacks: [[Bitboard; 6]; 2],
     pub pieces: [[Bitboard; 6]; 2],
 
     pub turn: Color,
-    pub castling_rights: u8,
-    pub en_passant_square: Option<usize>,
-    pub halfmove_clock: u8,
-    pub fullmove_number: u16,
+    pub ply: u32,
+    pub game_state: GameState,
 
     pub moves: Vec<Move>,
+    pub zobrist_history: Vec<u64>,
+    pub fen_history: Vec<String>,
+}
 
+pub struct GameState {
+    pub captured_piece: Option<Piece>,
+    pub en_passant_square: Option<usize>,
+    pub castling_rights: u8,
+    pub fifty_move_ply_count: u8,
     pub current_zobrist: u64,
 }
 
@@ -85,16 +92,22 @@ impl Default for Board {
 impl Board {
     pub fn new() -> Self {
         Board {
+            all_occupancy: Bitboard::new(),
             occupancy: [Bitboard::new(); 2],
             attacks: [[Bitboard::new(); 6]; 2],
             pieces: [[Bitboard::new(); 6]; 2],
             turn: Color::White,
-            castling_rights: CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1],
-            en_passant_square: None,
-            halfmove_clock: 0,
-            fullmove_number: 1,
+            game_state: GameState {
+                captured_piece: None,
+                en_passant_square: None,
+                castling_rights: CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1],
+                fifty_move_ply_count: 0,
+                current_zobrist: 0,
+            },
+            ply: 0,
             moves: Vec::new(),
-            current_zobrist: 0,
+            zobrist_history: Vec::new(),
+            fen_history: Vec::new(),
         }
     }
 
@@ -109,12 +122,17 @@ impl Board {
         self.attacks = [[Bitboard::new(); 6]; 2];
         self.pieces = [[Bitboard::new(); 6]; 2];
         self.turn = Color::White;
-        self.castling_rights = CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1];
-        self.en_passant_square = None;
-        self.halfmove_clock = 0;
-        self.fullmove_number = 1;
+        self.game_state = GameState {
+            captured_piece: None,
+            en_passant_square: None,
+            castling_rights: CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1],
+            fifty_move_ply_count: 0,
+            current_zobrist: 0,
+        };
+        self.ply = 0;
         self.moves = Vec::new();
-        self.current_zobrist = 0;
+        self.zobrist_history = Vec::new();
+        self.fen_history = Vec::new();
     }
 
     pub fn set_fen(&mut self, fen: &str) {
@@ -162,29 +180,29 @@ impl Board {
             _ => panic!("Invalid FEN"),
         };
 
-        self.castling_rights = 0;
         if parts[2].contains('K') {
-            self.castling_rights |= CASTLING_WHITE_KING;
+            self.game_state.castling_rights |= CASTLING_WHITE_KING;
         }
         if parts[2].contains('Q') {
-            self.castling_rights |= CASTLING_WHITE_QUEEN;
+            self.game_state.castling_rights |= CASTLING_WHITE_QUEEN;
         }
         if parts[2].contains('k') {
-            self.castling_rights |= CASTLING_BLACK_KING;
+            self.game_state.castling_rights |= CASTLING_BLACK_KING;
         }
         if parts[2].contains('q') {
-            self.castling_rights |= CASTLING_BLACK_QUEEN;
+            self.game_state.castling_rights |= CASTLING_BLACK_QUEEN;
         }
 
-        self.en_passant_square = match parts[3] {
+        self.game_state.en_passant_square = match parts[3] {
             "-" => None,
             s => Some(Board::square_to_index(s)),
         };
 
-        self.halfmove_clock = parts[4].parse().unwrap();
-        self.fullmove_number = parts[5].parse().unwrap();
+        self.game_state.fifty_move_ply_count = parts[4].parse().unwrap();
+        self.ply = (parts[5].parse::<u32>().unwrap() - 1) * 2
+            + if self.turn == Color::Black { 1 } else { 0 };
 
-        self.current_zobrist = ZOBRIST.hash(&self);
+        self.game_state.current_zobrist = ZOBRIST.hash(&self);
     }
 
     pub fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
@@ -254,7 +272,7 @@ impl Board {
         let king_square = CASTLING_RIGHTS_SQUARES[index][0];
         let rook_square = CASTLING_ROOKS[index];
 
-        if self.castling_rights & mask == 0 {
+        if self.game_state.castling_rights & mask == 0 {
             return false;
         }
 
@@ -262,12 +280,15 @@ impl Board {
     }
 
     fn update_zobrist(&mut self, mv: &Move, square: usize) {
-        self.current_zobrist ^= ZOBRIST.pieces
+        self.game_state.current_zobrist ^= ZOBRIST.pieces
             [mv.piece as usize + if mv.color == Color::Black { 0 } else { 6 }][square];
     }
 
     pub fn make_move(&mut self, mv: &Move) {
-        let mut new_zobrist = self.current_zobrist;
+        let mut new_zobrist = self.game_state.current_zobrist;
+        let mut new_castling_rights = self.game_state.castling_rights;
+        let mut new_en_passant_square = None;
+
         self.move_piece(mv.color, mv.piece, mv.from, mv.to);
 
         // handle capture
@@ -293,6 +314,8 @@ impl Board {
 
         // handle castling
         if mv.piece == Piece::King {
+            new_castling_rights &= !CASTLING_RIGHTS[mv.color as usize];
+
             if mv.castling {
                 let (rook_from, rook_to) = match mv.to {
                     2 => (0, 3),
@@ -319,71 +342,45 @@ impl Board {
                 Color::White => MOVE_UP,
                 Color::Black => MOVE_DOWN,
             };
-            self.en_passant_square = Some((mv.to as i32 - direction) as usize);
-            new_zobrist ^= ZOBRIST.en_passant[self.en_passant_square.unwrap() % 8];
-        } else {
-            self.en_passant_square = None;
+            new_en_passant_square = Some((mv.to as i32 - direction) as usize);
+            new_zobrist ^= ZOBRIST.en_passant[new_en_passant_square.unwrap() % 8];
         }
 
         // update castling rights
+        if new_castling_rights != 0 {
+            if mv.from == CASTLING_ROOKS[0] || mv.to == CASTLING_ROOKS[0] {
+                new_castling_rights &= !CASTLING_WHITE_QUEEN;
+            }
+            if mv.from == CASTLING_ROOKS[1] || mv.to == CASTLING_ROOKS[1] {
+                new_castling_rights &= !CASTLING_WHITE_KING;
+            }
+            if mv.from == CASTLING_ROOKS[2] || mv.to == CASTLING_ROOKS[2] {
+                new_castling_rights &= !CASTLING_BLACK_QUEEN;
+            }
+            if mv.from == CASTLING_ROOKS[3] || mv.to == CASTLING_ROOKS[3] {
+                new_castling_rights &= !CASTLING_BLACK_KING;
+            }
+        }
 
-        // TODO: Handle rest of move types
+        // update zobrist
+        let piece_index = mv.piece as usize + if mv.color == Color::Black { 0 } else { 6 };
+        new_zobrist ^= ZOBRIST.side;
+        new_zobrist ^= ZOBRIST.pieces[piece_index][mv.from];
+        new_zobrist ^= ZOBRIST.pieces[piece_index][mv.to];
+        new_zobrist ^= ZOBRIST.en_passant[self.game_state.en_passant_square.unwrap_or(0) % 8];
 
-        // Update en passant square
-        // if self.en_passant_square.is_some() {
-        //     self.en_passant_square = None;
-        // }
-        //
-        // if mv.piece == Piece::Pawn && (mv.to as i32 - mv.from as i32).abs() == 16 {
-        //     let direction = match mv.color {
-        //         Color::White => MOVE_UP,
-        //         Color::Black => MOVE_DOWN,
-        //     };
-        //     self.en_passant_square = Some((mv.to as i32 - direction) as usize);
-        // }
-        //
-        // if mv.piece == Piece::King {
-        //     match mv.color {
-        //         Color::White => {
-        //             self.castling_rights.white_king_side = false;
-        //             self.castling_rights.white_queen_side = false;
-        //         }
-        //         Color::Black => {
-        //             self.castling_rights.black_king_side = false;
-        //             self.castling_rights.black_queen_side = false;
-        //         }
-        //     }
-        // } else if mv.piece == Piece::Rook {
-        //     match mv.color {
-        //         Color::White => {
-        //             if mv.from == 0 {
-        //                 self.castling_rights.white_queen_side = false;
-        //             } else if mv.from == 7 {
-        //                 self.castling_rights.white_king_side = false;
-        //             }
-        //         }
-        //         Color::Black => {
-        //             if mv.from == 56 {
-        //                 self.castling_rights.black_queen_side = false;
-        //             } else if mv.from == 63 {
-        //                 self.castling_rights.black_king_side = false;
-        //             }
-        //         }
-        //     }
-        // }
+        if new_castling_rights != self.game_state.castling_rights {
+            new_zobrist ^= ZOBRIST.castling_rights[self.game_state.castling_rights as usize];
+            new_zobrist ^= ZOBRIST.castling_rights[new_castling_rights as usize];
+        }
 
         // Update turn and move counters
-        self.moves.push(*mv);
-
-        self.halfmove_clock += 1;
-        if mv.piece == Piece::Pawn || mv.capture.is_some() {
-            self.halfmove_clock = 0;
-        }
-
-        if self.turn == Color::Black {
-            self.fullmove_number += 1;
-        }
-
         self.turn = self.turn.opposite();
+
+        self.ply += 1;
+        let mut new_fifty_move_ply_count = self.game_state.fifty_move_ply_count + 1;
+        if mv.piece == Piece::Pawn || mv.capture.is_some() {
+            new_fifty_move_ply_count = 0;
+        }
     }
 }
