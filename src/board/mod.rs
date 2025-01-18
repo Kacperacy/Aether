@@ -21,8 +21,10 @@ pub struct Board {
     pub moves: Vec<Move>,
     pub zobrist_history: Vec<u64>,
     pub fen_history: Vec<String>,
+    pub game_state_history: Vec<GameState>,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct GameState {
     pub captured_piece: Option<Piece>,
     pub en_passant_square: Option<usize>,
@@ -108,6 +110,7 @@ impl Board {
             moves: Vec::new(),
             zobrist_history: Vec::new(),
             fen_history: Vec::new(),
+            game_state_history: Vec::new(),
         }
     }
 
@@ -133,6 +136,7 @@ impl Board {
         self.moves = Vec::new();
         self.zobrist_history = Vec::new();
         self.fen_history = Vec::new();
+        self.game_state_history = Vec::new();
     }
 
     pub fn set_fen(&mut self, fen: &str) {
@@ -204,6 +208,85 @@ impl Board {
             + if self.turn == Color::Black { 1 } else { 0 };
 
         self.game_state.current_zobrist = ZOBRIST.hash(&self);
+    }
+
+    pub fn to_fen(&self) -> String {
+        let mut fen = String::new();
+
+        for row in (0..BOARD_WIDTH).rev() {
+            let mut empty = 0;
+            for col in 0..BOARD_WIDTH {
+                let index = row * BOARD_WIDTH + col;
+
+                if self.piece_at(index).is_none() {
+                    empty += 1;
+                } else {
+                    if empty > 0 {
+                        fen.push_str(&empty.to_string());
+                        empty = 0;
+                    }
+
+                    let piece = self.piece_at(index).unwrap();
+                    let c = match piece.color {
+                        Color::White => piece
+                            .piece
+                            .to_string()
+                            .to_uppercase()
+                            .chars()
+                            .next()
+                            .unwrap(),
+                        Color::Black => piece.piece.to_string().chars().next().unwrap(),
+                    };
+                    fen.push(c);
+                }
+            }
+
+            if empty > 0 {
+                fen.push_str(&empty.to_string());
+            }
+
+            if row > 0 {
+                fen.push('/');
+            }
+        }
+
+        fen.push(' ');
+        fen.push_str(match self.turn {
+            Color::White => "w",
+            Color::Black => "b",
+        });
+
+        fen.push(' ');
+        if self.game_state.castling_rights == 0 {
+            fen.push('-');
+        } else {
+            if self.game_state.castling_rights & CASTLING_WHITE_KING != 0 {
+                fen.push('K');
+            }
+            if self.game_state.castling_rights & CASTLING_WHITE_QUEEN != 0 {
+                fen.push('Q');
+            }
+            if self.game_state.castling_rights & CASTLING_BLACK_KING != 0 {
+                fen.push('k');
+            }
+            if self.game_state.castling_rights & CASTLING_BLACK_QUEEN != 0 {
+                fen.push('q');
+            }
+        }
+
+        fen.push(' ');
+        match self.game_state.en_passant_square {
+            Some(square) => fen.push_str(&Board::index_to_square(square)),
+            None => fen.push('-'),
+        }
+
+        fen.push(' ');
+        fen.push_str(&self.game_state.fifty_move_ply_count.to_string());
+
+        fen.push(' ');
+        fen.push_str(&((self.ply / 2) + 1).to_string());
+
+        fen
     }
 
     pub fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
@@ -384,5 +467,19 @@ impl Board {
         if mv.piece == Piece::Pawn || mv.capture.is_some() {
             new_fifty_move_ply_count = 0;
         }
+
+        let new_game_state = GameState {
+            captured_piece: mv.capture,
+            en_passant_square: new_en_passant_square,
+            castling_rights: new_castling_rights,
+            fifty_move_ply_count: new_fifty_move_ply_count,
+            current_zobrist: new_zobrist,
+        };
+
+        self.game_state = new_game_state;
+        self.game_state_history.push(new_game_state);
+        self.zobrist_history.push(new_zobrist);
+        self.fen_history.push(self.to_fen());
+        self.moves.push(*mv);
     }
 }
