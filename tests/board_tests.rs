@@ -18,8 +18,8 @@ mod tests {
         let mut board = Board::new();
         board.reset();
         assert_eq!(board.turn, Color::White);
-        assert_eq!(board.halfmove_clock, 0);
-        assert_eq!(board.fullmove_number, 1);
+        assert_eq!(board.game_state.fifty_move_ply_count, 0);
+        assert_eq!(board.ply, 0);
         assert!(board
             .pieces
             .iter()
@@ -31,7 +31,7 @@ mod tests {
         let mut board = Board::new();
         board.set_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         assert_eq!(board.turn, Color::White);
-        assert_eq!(board.fullmove_number, 1);
+        assert_eq!(board.ply, 0);
         assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(8));
         assert!(board.pieces[Color::Black as usize][Piece::Pawn as usize].is_set(48));
     }
@@ -211,12 +211,12 @@ mod tests {
 
         assert_eq!(board.turn, Color::White);
 
-        assert_eq!(board.castling_rights, 0b1111);
+        assert_eq!(board.game_state.castling_rights, 0b1111);
 
-        assert_eq!(board.en_passant_square, None);
+        assert_eq!(board.game_state.en_passant_square, None);
 
-        assert_eq!(board.halfmove_clock, 0);
-        assert_eq!(board.fullmove_number, 1);
+        assert_eq!(board.game_state.fifty_move_ply_count, 0);
+        assert_eq!(board.ply, 0);
     }
 
     #[test]

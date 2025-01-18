@@ -104,7 +104,7 @@ impl Board {
                 fifty_move_ply_count: 0,
                 current_zobrist: 0,
             },
-            ply: 0,
+            ply: 1,
             moves: Vec::new(),
             zobrist_history: Vec::new(),
             fen_history: Vec::new(),
@@ -180,6 +180,7 @@ impl Board {
             _ => panic!("Invalid FEN"),
         };
 
+        self.game_state.castling_rights = 0;
         if parts[2].contains('K') {
             self.game_state.castling_rights |= CASTLING_WHITE_KING;
         }
@@ -269,12 +270,13 @@ impl Board {
         } + if is_king_side { 0 } else { 1 };
 
         let mask = 1 << index;
-        let king_square = CASTLING_RIGHTS_SQUARES[index][0];
-        let rook_square = CASTLING_ROOKS[index];
 
         if self.game_state.castling_rights & mask == 0 {
             return false;
         }
+
+        let king_square = CASTLING_RIGHTS_SQUARES[index][0];
+        let rook_square = CASTLING_ROOKS[index];
 
         self.is_empty_between(king_square, rook_square)
     }
