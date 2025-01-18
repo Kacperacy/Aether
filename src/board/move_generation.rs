@@ -7,7 +7,7 @@ impl Board {
         let mut moves = Vec::new();
 
         // 50 moves draw
-        if self.halfmove_clock >= 100 {
+        if self.game_state.fifty_move_ply_count >= 100 {
             return moves;
         }
 
@@ -77,7 +77,7 @@ impl Board {
             }
 
             // EN PASSANT
-            if let Some(ep) = self.en_passant_square {
+            if let Some(ep) = self.game_state.en_passant_square {
                 if left == ep {
                     moves.push(Move {
                         from,

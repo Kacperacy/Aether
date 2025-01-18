@@ -56,12 +56,12 @@ impl Zobrist {
         }
 
         for i in 0..4 {
-            if board.castling_rights & (1 << i) != 0 {
+            if board.game_state.castling_rights & (1 << i) != 0 {
                 hash ^= self.castling_rights[i];
             }
         }
 
-        if let Some(en_passant) = board.en_passant_square {
+        if let Some(en_passant) = board.game_state.en_passant_square {
             hash ^= self.en_passant[en_passant % 8];
         }
 
