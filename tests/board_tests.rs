@@ -755,4 +755,47 @@ mod tests {
 
         assert_eq!(castling, castling_assert);
     }
+
+    #[test]
+    fn test_make_move() {
+        let mut board = Board::init();
+        let mv = Move {
+            from: 12,
+            to: 28,
+            piece: Piece::Pawn,
+            color: Color::White,
+            en_passant: false,
+            castling: false,
+            promotion: None,
+            capture: None,
+        };
+
+        board.make_move(&mv);
+
+        assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(28));
+        assert!(!board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(12));
+    }
+
+    #[test]
+    fn test_undo_move() {
+        let mut board = Board::init();
+        let fen_before = board.to_fen();
+        let mv = Move {
+            from: 12,
+            to: 28,
+            piece: Piece::Pawn,
+            color: Color::White,
+            en_passant: false,
+            castling: false,
+            promotion: None,
+            capture: None,
+        };
+
+        board.make_move(&mv);
+        board.undo_move(&mv);
+
+        assert!(board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(12));
+        assert!(!board.pieces[Color::White as usize][Piece::Pawn as usize].is_set(28));
+        assert_eq!(fen_before, board.to_fen());
+    }
 }

@@ -110,7 +110,13 @@ impl Board {
             moves: Vec::new(),
             zobrist_history: Vec::new(),
             fen_history: Vec::new(),
-            game_state_history: Vec::new(),
+            game_state_history: vec![GameState {
+                captured_piece: None,
+                en_passant_square: None,
+                castling_rights: CASTLING_RIGHTS[0] | CASTLING_RIGHTS[1],
+                fifty_move_ply_count: 0,
+                current_zobrist: 0,
+            }],
         }
     }
 
@@ -136,7 +142,7 @@ impl Board {
         self.moves = Vec::new();
         self.zobrist_history = Vec::new();
         self.fen_history = Vec::new();
-        self.game_state_history = Vec::new();
+        self.game_state_history = vec![self.game_state];
     }
 
     pub fn set_fen(&mut self, fen: &str) {
@@ -481,5 +487,56 @@ impl Board {
         self.zobrist_history.push(new_zobrist);
         self.fen_history.push(self.to_fen());
         self.moves.push(*mv);
+    }
+
+    pub fn undo_move(&mut self, mv: &Move) {
+        self.turn = self.turn.opposite();
+        let last_move = self.moves.pop().unwrap();
+
+        if last_move != *mv {
+            panic!("Invalid move");
+        }
+
+        if mv.promotion == Some(Piece::Pawn) {
+            self.remove_piece(mv.color, mv.promotion.unwrap(), mv.to);
+            self.add_piece(mv.color, Piece::Pawn, mv.to);
+        }
+
+        self.move_piece(mv.color, mv.piece, mv.to, mv.from);
+
+        if mv.capture.is_some() {
+            let mut capture_square = mv.to as i32;
+
+            if mv.en_passant {
+                capture_square -= match mv.color {
+                    Color::White => MOVE_DOWN,
+                    Color::Black => MOVE_UP,
+                };
+            }
+
+            self.add_piece(
+                mv.color.opposite(),
+                mv.capture.unwrap(),
+                capture_square as usize,
+            );
+        }
+
+        if mv.piece == Piece::King {
+            if mv.castling {
+                let (rook_from, rook_to) = match mv.to {
+                    2 => (0, 3),
+                    6 => (7, 5),
+                    _ => panic!("Invalid castling move"),
+                };
+
+                self.move_piece(mv.color, Piece::Rook, rook_to, rook_from);
+            }
+        }
+
+        self.game_state_history.pop();
+        self.game_state = self.game_state_history.last().unwrap().clone();
+        self.zobrist_history.pop();
+        self.fen_history.pop();
+        self.ply -= 1;
     }
 }
