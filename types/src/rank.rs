@@ -13,6 +13,17 @@ pub enum Rank {
     Eight,
 }
 
+pub const ALL_RANKS: [Rank; 8] = [
+    Rank::One,
+    Rank::Two,
+    Rank::Three,
+    Rank::Four,
+    Rank::Five,
+    Rank::Six,
+    Rank::Seven,
+    Rank::Eight,
+];
+
 impl FromStr for Rank {
     type Err = ();
 

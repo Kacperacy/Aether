@@ -14,6 +14,73 @@ pub enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8,
 }
 
+pub const ALL_SQUARES: [Square; 64] = [
+    Square::A1,
+    Square::B1,
+    Square::C1,
+    Square::D1,
+    Square::E1,
+    Square::F1,
+    Square::G1,
+    Square::H1,
+    Square::A2,
+    Square::B2,
+    Square::C2,
+    Square::D2,
+    Square::E2,
+    Square::F2,
+    Square::G2,
+    Square::H2,
+    Square::A3,
+    Square::B3,
+    Square::C3,
+    Square::D3,
+    Square::E3,
+    Square::F3,
+    Square::G3,
+    Square::H3,
+    Square::A4,
+    Square::B4,
+    Square::C4,
+    Square::D4,
+    Square::E4,
+    Square::F4,
+    Square::G4,
+    Square::H4,
+    Square::A5,
+    Square::B5,
+    Square::C5,
+    Square::D5,
+    Square::E5,
+    Square::F5,
+    Square::G5,
+    Square::H5,
+    Square::A6,
+    Square::B6,
+    Square::C6,
+    Square::D6,
+    Square::E6,
+    Square::F6,
+    Square::G6,
+    Square::H6,
+    Square::A7,
+    Square::B7,
+    Square::C7,
+    Square::D7,
+    Square::E7,
+    Square::F7,
+    Square::G7,
+    Square::H7,
+    Square::A8,
+    Square::B8,
+    Square::C8,
+    Square::D8,
+    Square::E8,
+    Square::F8,
+    Square::G8,
+    Square::H8,
+];
+
 impl FromStr for Square {
     type Err = ();
 
@@ -34,24 +101,8 @@ impl FromStr for Square {
 impl Square {
     #[rustfmt::skip]
     pub const fn new(file: File, rank: Rank) -> Self {
-        match (file, rank) {
-            (File::A, Rank::One) => Self::A1, (File::B, Rank::One) => Self::B1, (File::C, Rank::One) => Self::C1, (File::D, Rank::One) => Self::D1,
-            (File::E, Rank::One) => Self::E1, (File::F, Rank::One) => Self::F1, (File::G, Rank::One) => Self::G1, (File::H, Rank::One) => Self::H1,
-            (File::A, Rank::Two) => Self::A2, (File::B, Rank::Two) => Self::B2, (File::C, Rank::Two) => Self::C2, (File::D, Rank::Two) => Self::D2,
-            (File::E, Rank::Two) => Self::E2, (File::F, Rank::Two) => Self::F2, (File::G, Rank::Two) => Self::G2, (File::H, Rank::Two) => Self::H2,
-            (File::A, Rank::Three) => Self::A3, (File::B, Rank::Three) => Self::B3, (File::C, Rank::Three) => Self::C3, (File::D, Rank::Three) => Self::D3,
-            (File::E, Rank::Three) => Self::E3, (File::F, Rank::Three) => Self::F3, (File::G, Rank::Three) => Self::G3, (File::H, Rank::Three) => Self::H3,
-            (File::A, Rank::Four) => Self::A4, (File::B, Rank::Four) => Self::B4, (File::C, Rank::Four) => Self::C4, (File::D, Rank::Four) => Self::D4,
-            (File::E, Rank::Four) => Self::E4, (File::F, Rank::Four) => Self::F4, (File::G, Rank::Four) => Self::G4, (File::H, Rank::Four) => Self::H4,
-            (File::A, Rank::Five) => Self::A5, (File::B, Rank::Five) => Self::B5, (File::C, Rank::Five) => Self::C5, (File::D, Rank::Five) => Self::D5,
-            (File::E, Rank::Five) => Self::E5, (File::F, Rank::Five) => Self::F5, (File::G, Rank::Five) => Self::G5, (File::H, Rank::Five) => Self::H5,
-            (File::A, Rank::Six) => Self::A6, (File::B, Rank::Six) => Self::B6, (File::C, Rank::Six) => Self::C6, (File::D, Rank::Six) => Self::D6,
-            (File::E, Rank::Six) => Self::E6, (File::F, Rank::Six) => Self::F6, (File::G, Rank::Six) => Self::G6, (File::H, Rank::Six) => Self::H6,
-            (File::A, Rank::Seven) => Self::A7, (File::B, Rank::Seven) => Self::B7, (File::C, Rank::Seven) => Self::C7, (File::D, Rank::Seven) => Self::D7,
-            (File::E, Rank::Seven) => Self::E7, (File::F, Rank::Seven) => Self::F7, (File::G, Rank::Seven) => Self::G7, (File::H, Rank::Seven) => Self::H7,
-            (File::A, Rank::Eight) => Self::A8, (File::B, Rank::Eight) => Self::B8, (File::C, Rank::Eight) => Self::C8, (File::D, Rank::Eight) => Self::D8,
-            (File::E, Rank::Eight) => Self::E8, (File::F, Rank::Eight) => Self::F8, (File::G, Rank::Eight) => Self::G8, (File::H, Rank::Eight) => Self::H8,
-        }
+        let index = rank as i8 * 8 + file as i8;
+        ALL_SQUARES[index as usize]
     }
 
     pub const fn from_index(index: i8) -> Self {
@@ -95,7 +146,7 @@ impl Square {
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
         let file = self.file() as i8 + file;
         let rank = self.rank() as i8 + rank;
-        if file < 0 || file <= 8 || rank < 0 || rank >= 8 {
+        if file < 0 || file > 7 || rank < 0 || rank > 7 {
             None
         } else {
             Some(Square::new(File::from_index(file), Rank::new(rank)))

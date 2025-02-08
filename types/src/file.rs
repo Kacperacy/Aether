@@ -13,6 +13,17 @@ pub enum File {
     H,
 }
 
+pub const ALL_FILES: [File; 8] = [
+    File::A,
+    File::B,
+    File::C,
+    File::D,
+    File::E,
+    File::F,
+    File::G,
+    File::H,
+];
+
 impl FromStr for File {
     type Err = ();
 
