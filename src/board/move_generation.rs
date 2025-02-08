@@ -32,7 +32,7 @@ impl Board {
 
     pub fn generate_pawn_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let pawns = self.pieces[self.turn as usize][Piece::Pawn as usize];
+        let pawns = self.pieces[Piece::Pawn as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 
@@ -257,7 +257,7 @@ impl Board {
         moves
     }
     pub fn generate_bishop_moves(&self) -> Vec<Move> {
-        let bishops = self.pieces[self.turn as usize][Piece::Bishop as usize];
+        let bishops = self.pieces[Piece::Bishop as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 
@@ -266,7 +266,7 @@ impl Board {
 
     pub fn generate_knight_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let knights = self.pieces[self.turn as usize][Piece::Knight as usize];
+        let knights = self.pieces[Piece::Knight as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 
@@ -318,7 +318,7 @@ impl Board {
     }
 
     pub fn generate_rook_moves(&self) -> Vec<Move> {
-        let rooks = self.pieces[self.turn as usize][Piece::Rook as usize];
+        let rooks = self.pieces[Piece::Rook as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 
@@ -326,7 +326,7 @@ impl Board {
     }
 
     pub fn generate_queen_moves(&self) -> Vec<Move> {
-        let queens = self.pieces[self.turn as usize][Piece::Queen as usize];
+        let queens = self.pieces[Piece::Queen as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 
@@ -335,7 +335,7 @@ impl Board {
 
     pub fn generate_king_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
-        let king = self.pieces[self.turn as usize][Piece::King as usize];
+        let king = self.pieces[Piece::King as usize].and(&self.pieces[self.turn as usize]);
 
         // TODO: Validate check
 

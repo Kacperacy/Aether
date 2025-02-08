@@ -1,0 +1,8 @@
+[package]
+name = "aether-types"
+version = "0.1.0"
+authors = ["Kacper Maciołek"]
+repository = "https://github.com/Kacperacy/Aether"
+edition = "2021"
+
+[dependencies]

@@ -20,8 +20,9 @@ impl Board {
     }
 
     pub fn is_square_empty(&self, index: usize) -> bool {
-        !self.occupancy[Color::White as usize].is_set(index)
-            && !self.occupancy[Color::Black as usize].is_set(index)
+        self.colors[Color::White as usize]
+            .and(&self.colors[Color::Black as usize])
+            .is_set(index)
     }
 
     pub fn is_index_in_bounds(index: i32) -> bool {
@@ -29,26 +30,33 @@ impl Board {
     }
 
     pub fn is_enemy(&self, index: usize) -> bool {
-        self.occupancy[self.turn.opposite() as usize].is_set(index)
+        self.colors[self.turn.opposite() as usize].is_set(index)
     }
 
     pub fn piece_at(&self, index: usize) -> Option<PieceAt> {
-        for &color in &[Color::White, Color::Black] {
-            if self.occupancy[color as usize].is_set(index) {
-                for piece in [
-                    Piece::Pawn,
-                    Piece::Knight,
-                    Piece::Bishop,
-                    Piece::Rook,
-                    Piece::Queen,
-                    Piece::King,
-                ] {
-                    if self.pieces[color as usize][piece as usize].is_set(index) {
-                        return Some(PieceAt { piece, color });
-                    }
+        for color in [Color::White, Color::Black].iter() {
+            if !self.colors[*color as usize].is_set(index) {
+                continue;
+            }
+            for piece in [
+                Piece::Pawn,
+                Piece::Knight,
+                Piece::Bishop,
+                Piece::Rook,
+                Piece::Queen,
+                Piece::King,
+            ]
+            .iter()
+            {
+                if self.pieces[*piece as usize].is_set(index) {
+                    return Some(PieceAt {
+                        piece: *piece,
+                        color: *color,
+                    });
                 }
             }
         }
+
         None
     }
 }

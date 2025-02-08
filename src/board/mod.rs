@@ -9,10 +9,8 @@ use crate::constants::*;
 use std::fmt::Display;
 
 pub struct Board {
-    pub all_occupancy: Bitboard,
-    pub occupancy: [Bitboard; 2],
-    pub attacks: [[Bitboard; 6]; 2],
-    pub pieces: [[Bitboard; 6]; 2],
+    pub colors: [Bitboard; 2],
+    pub pieces: [Bitboard; 6],
 
     pub turn: Color,
     pub ply: u32,
@@ -94,10 +92,8 @@ impl Default for Board {
 impl Board {
     pub fn new() -> Self {
         Board {
-            all_occupancy: Bitboard::new(),
-            occupancy: [Bitboard::new(); 2],
-            attacks: [[Bitboard::new(); 6]; 2],
-            pieces: [[Bitboard::new(); 6]; 2],
+            colors: [Bitboard::new(); 2],
+            pieces: [Bitboard::new(); 6],
             turn: Color::White,
             game_state: GameState {
                 captured_piece: None,
@@ -127,9 +123,8 @@ impl Board {
     }
 
     pub fn reset(&mut self) {
-        self.occupancy = [Bitboard::new(); 2];
-        self.attacks = [[Bitboard::new(); 6]; 2];
-        self.pieces = [[Bitboard::new(); 6]; 2];
+        self.colors = [Bitboard::new(); 2];
+        self.pieces = [Bitboard::new(); 6];
         self.turn = Color::White;
         self.game_state = GameState {
             captured_piece: None,
@@ -298,17 +293,15 @@ impl Board {
     pub fn add_piece(&mut self, color: Color, piece: Piece, index: usize) {
         let bb = Bitboard::from_index(index);
 
-        self.occupancy[color as usize] = self.occupancy[color as usize].or(&bb);
-        self.pieces[color as usize][piece as usize] =
-            self.pieces[color as usize][piece as usize].or(&bb);
+        self.colors[color as usize] = self.colors[color as usize].or(&bb);
+        self.pieces[piece as usize] = self.pieces[color as usize].or(&bb);
     }
 
     pub fn remove_piece(&mut self, color: Color, piece: Piece, index: usize) {
         let bb = Bitboard::from_index(index);
 
-        self.occupancy[color as usize] = self.occupancy[color as usize].and(&bb.not());
-        self.pieces[color as usize][piece as usize] =
-            self.pieces[color as usize][piece as usize].and(&bb.not());
+        self.colors[color as usize] = self.colors[color as usize].xor(&bb);
+        self.pieces[piece as usize] = self.pieces[color as usize].xor(&bb);
     }
 
     pub fn move_piece(&mut self, color: Color, piece: Piece, from: usize, to: usize) {
@@ -339,11 +332,10 @@ impl Board {
     pub fn is_empty_between(&self, from: usize, to: usize) -> bool {
         let direction = (to as i32 - from as i32).signum();
         let mut index = from as i32 + direction;
+        let occupancy = self.colors[Color::White as usize].or(&self.colors[Color::Black as usize]);
 
         while index != to as i32 {
-            if self.occupancy[Color::White as usize].is_set(index as usize)
-                || self.occupancy[Color::Black as usize].is_set(index as usize)
-            {
+            if occupancy.is_set(index as usize) {
                 return false;
             }
             index += direction;
@@ -369,6 +361,21 @@ impl Board {
 
         self.is_empty_between(king_square, rook_square)
     }
+
+    // TODO: CHECK STATUS
+    // pub fn check_status(&mut self) -> bool {
+    // }
+
+    // TODO: CALCULATE IS CHECK
+    // pub fn calculate_is_check(&self) -> bool {
+    //     let king_square = self.pieces[self.turn as usize][Piece::King as usize].lsb();
+    //     let enemy_orthogonal = self.pieces[self.turn.opposite() as usize][Piece::Rook as usize]
+    //         .or(&self.pieces[self.turn.opposite() as usize][Piece::Queen as usize]);
+    //     let enemy_diagonal = self.pieces[self.turn.opposite() as usize][Piece::Bishop as usize]
+    //         .or(&self.pieces[self.turn.opposite() as usize][Piece::Queen as usize]);
+    //
+    //     false
+    // }
 
     fn update_zobrist(&mut self, mv: &Move, square: usize) {
         self.game_state.current_zobrist ^= ZOBRIST.pieces
@@ -465,7 +472,6 @@ impl Board {
             new_zobrist ^= ZOBRIST.castling_rights[new_castling_rights as usize];
         }
 
-        // Update turn and move counters
         self.turn = self.turn.opposite();
 
         self.ply += 1;
@@ -533,7 +539,6 @@ impl Board {
             }
         }
 
-        self.game_state_history.pop();
         self.game_state = self.game_state_history.last().unwrap().clone();
         self.zobrist_history.pop();
         self.fen_history.pop();

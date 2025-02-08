@@ -42,7 +42,7 @@ impl Zobrist {
     pub fn hash(&self, board: &Board) -> u64 {
         let mut hash = 0;
         let occupancy =
-            board.occupancy[Color::White as usize] | board.occupancy[Color::Black as usize];
+            board.colors[Color::White as usize].or(&board.colors[Color::Black as usize]);
 
         for i in 0..64 {
             if occupancy.is_set(i) {

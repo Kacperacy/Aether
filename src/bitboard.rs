@@ -85,6 +85,10 @@ impl Bitboard {
     pub fn is_empty(&self) -> bool {
         self.0 == 0
     }
+
+    pub fn lsb(&self) -> usize {
+        self.0.trailing_zeros() as usize
+    }
 }
 
 impl BitAnd for Bitboard {
