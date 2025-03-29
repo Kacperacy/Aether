@@ -21,3 +21,7 @@ members = [
 [workspace.dependencies]
 aether-types = { path = "./types" }
 board = { path = "./board" }
+
+[[bin]]
+name = "aether"
+path = "src/main.rs"
