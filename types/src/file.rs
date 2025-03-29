@@ -57,6 +57,28 @@ impl File {
         }
     }
 
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::A => 'a',
+            Self::B => 'b',
+            Self::C => 'c',
+            Self::D => 'd',
+            Self::E => 'e',
+            Self::F => 'f',
+            Self::G => 'g',
+            Self::H => 'h',
+        }
+    }
+
+    pub const fn offset(self, offset: i8) -> Option<Self> {
+        let new_file = self as i8 + offset;
+        if new_file < 0 || new_file > 7 {
+            None
+        } else {
+            Some(Self::from_index(new_file))
+        }
+    }
+
     pub const fn flip(self) -> Self {
         match self {
             Self::A => Self::H,

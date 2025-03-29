@@ -57,6 +57,28 @@ impl Rank {
         }
     }
 
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::One => '1',
+            Self::Two => '2',
+            Self::Three => '3',
+            Self::Four => '4',
+            Self::Five => '5',
+            Self::Six => '6',
+            Self::Seven => '7',
+            Self::Eight => '8',
+        }
+    }
+
+    pub const fn offset(self, offset: i8) -> Option<Self> {
+        let new_rank = self as i8 + offset;
+        if new_rank < 0 || new_rank > 7 {
+            None
+        } else {
+            Some(Self::new(new_rank))
+        }
+    }
+
     pub const fn flip(self) -> Self {
         match self {
             Self::One => Self::Eight,

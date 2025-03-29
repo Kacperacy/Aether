@@ -3,7 +3,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::ops::*;
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct BitBoard(pub u64);
 
 impl Display for BitBoard {

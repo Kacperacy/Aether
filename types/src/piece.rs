@@ -25,3 +25,39 @@ impl FromStr for Piece {
         }
     }
 }
+
+impl Piece {
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::Pawn => 'p',
+            Self::Knight => 'n',
+            Self::Bishop => 'b',
+            Self::Rook => 'r',
+            Self::Queen => 'q',
+            Self::King => 'k',
+        }
+    }
+
+    pub const fn from_char(c: char) -> Option<Self> {
+        match c {
+            'p' => Some(Self::Pawn),
+            'n' => Some(Self::Knight),
+            'b' => Some(Self::Bishop),
+            'r' => Some(Self::Rook),
+            'q' => Some(Self::Queen),
+            'k' => Some(Self::King),
+            _ => None,
+        }
+    }
+
+    pub const fn all() -> [Self; 6] {
+        [
+            Self::Pawn,
+            Self::Knight,
+            Self::Bishop,
+            Self::Rook,
+            Self::Queen,
+            Self::King,
+        ]
+    }
+}

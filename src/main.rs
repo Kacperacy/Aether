@@ -1,10 +1,8 @@
-use aether::board::Board;
+use board::Board;
 
 fn main() {
-    let mut board = Board::init();
+    let board =
+        Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+
     board.print();
-    let _ = board.generate_possible_moves();
-    board.set_fen("rnbqkbnr/pppp1ppp/8/4q3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
-    board.print();
-    board.generate_possible_moves();
 }

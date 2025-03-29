@@ -14,71 +14,16 @@ pub enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8,
 }
 
+#[rustfmt::skip]
 pub const ALL_SQUARES: [Square; 64] = [
-    Square::A1,
-    Square::B1,
-    Square::C1,
-    Square::D1,
-    Square::E1,
-    Square::F1,
-    Square::G1,
-    Square::H1,
-    Square::A2,
-    Square::B2,
-    Square::C2,
-    Square::D2,
-    Square::E2,
-    Square::F2,
-    Square::G2,
-    Square::H2,
-    Square::A3,
-    Square::B3,
-    Square::C3,
-    Square::D3,
-    Square::E3,
-    Square::F3,
-    Square::G3,
-    Square::H3,
-    Square::A4,
-    Square::B4,
-    Square::C4,
-    Square::D4,
-    Square::E4,
-    Square::F4,
-    Square::G4,
-    Square::H4,
-    Square::A5,
-    Square::B5,
-    Square::C5,
-    Square::D5,
-    Square::E5,
-    Square::F5,
-    Square::G5,
-    Square::H5,
-    Square::A6,
-    Square::B6,
-    Square::C6,
-    Square::D6,
-    Square::E6,
-    Square::F6,
-    Square::G6,
-    Square::H6,
-    Square::A7,
-    Square::B7,
-    Square::C7,
-    Square::D7,
-    Square::E7,
-    Square::F7,
-    Square::G7,
-    Square::H7,
-    Square::A8,
-    Square::B8,
-    Square::C8,
-    Square::D8,
-    Square::E8,
-    Square::F8,
-    Square::G8,
-    Square::H8,
+    Square::A1, Square::B1, Square::C1, Square::D1, Square::E1, Square::F1, Square::G1, Square::H1,
+    Square::A2, Square::B2, Square::C2, Square::D2, Square::E2, Square::F2, Square::G2, Square::H2,
+    Square::A3, Square::B3, Square::C3, Square::D3, Square::E3, Square::F3, Square::G3, Square::H3,
+    Square::A4, Square::B4, Square::C4, Square::D4, Square::E4, Square::F4, Square::G4, Square::H4,
+    Square::A5, Square::B5, Square::C5, Square::D5, Square::E5, Square::F5, Square::G5, Square::H5,
+    Square::A6, Square::B6, Square::C6, Square::D6, Square::E6, Square::F6, Square::G6, Square::H6,
+    Square::A7, Square::B7, Square::C7, Square::D7, Square::E7, Square::F7, Square::G7, Square::H7,
+    Square::A8, Square::B8, Square::C8, Square::D8, Square::E8, Square::F8, Square::G8, Square::H8,
 ];
 
 impl FromStr for Square {
@@ -109,6 +54,32 @@ impl Square {
         let file = File::from_index(index % 8);
         let rank = Rank::new(index / 8);
         Self::new(file, rank)
+    }
+
+    pub const fn to_index(self) -> u8 {
+        (self as u8) % 64
+    }
+
+    pub fn from_algebraic(algebraic: &str) -> Result<Self, &'static str> {
+        if algebraic.len() != 2 {
+            return Err("Algebraic notation must be exactly 2 characters");
+        }
+
+        let file = match File::from_str(&algebraic[0..1]) {
+            Ok(file) => file,
+            Err(_) => return Err("Invalid file character (must be a-h)"),
+        };
+
+        let rank = match Rank::from_str(&algebraic[1..2]) {
+            Ok(rank) => rank,
+            Err(_) => return Err("Invalid rank character (must be 1-8)"),
+        };
+
+        Ok(Self::new(file, rank))
+    }
+
+    pub fn to_algebraic(self) -> String {
+        format!("{}{}", self.file().as_char(), self.rank() as i8)
     }
 
     #[rustfmt::skip]
@@ -146,7 +117,7 @@ impl Square {
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
         let file = self.file() as i8 + file;
         let rank = self.rank() as i8 + rank;
-        if file < 0 || file > 7 || rank < 0 || rank > 7 {
+        if file < 0 || file <= 8 || rank < 0 || rank >= 8 {
             None
         } else {
             Some(Square::new(File::from_index(file), Rank::new(rank)))
