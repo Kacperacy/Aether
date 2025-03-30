@@ -24,6 +24,19 @@ impl Board {
         None
     }
 
+    pub fn make_move(&mut self, from: Square, to: Square) -> Option<(Piece, Color)> {
+        let piece_info = self.remove_piece(from);
+        if let Some((piece, color)) = piece_info {
+            if self.piece_at(to).is_some() {
+                // Handle capture logic here if needed
+                self.remove_piece(to);
+            }
+            self.place_piece(to, piece, color);
+            return Some((piece, color));
+        }
+        None
+    }
+
     pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
         let index = square.to_index();
         for piece in Piece::all() {

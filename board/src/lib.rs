@@ -52,7 +52,9 @@ impl Board {
     }
 
     pub fn print(&self) {
+        println!("  +-----------------+");
         for rank in (Rank::One as i8..=Rank::Eight as i8).rev() {
+            print!("{} | ", rank + 1); // Rank indicator (1-8)
             for file in File::A as i8..=File::H as i8 {
                 let square = Square::new(File::from_index(file), Rank::new(rank));
                 if let Some((piece, color)) = self.piece_at(square) {
@@ -65,7 +67,9 @@ impl Board {
                     print!(". ");
                 }
             }
-            println!();
+            println!("|");
         }
+        println!("  +-----------------+");
+        println!("    A B C D E F G H");
     }
 }
