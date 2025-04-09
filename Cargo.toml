@@ -6,8 +6,6 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-board = { workspace = true }
-aether-types = { workspace = true }
 
 [workspace]
 members = [
@@ -21,6 +19,7 @@ members = [
 [workspace.dependencies]
 aether-types = { path = "./types" }
 board = { path = "./board" }
+movegen = { path = "./movegen" }
 
 [[bin]]
 name = "aether"

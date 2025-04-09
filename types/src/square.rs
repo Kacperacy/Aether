@@ -117,7 +117,7 @@ impl Square {
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
         let file = self.file() as i8 + file;
         let rank = self.rank() as i8 + rank;
-        if file < 0 || file <= 8 || rank < 0 || rank >= 8 {
+        if file < 0 || file >= 8 || rank < 0 || rank >= 8 {
             None
         } else {
             Some(Square::new(File::from_index(file), Rank::new(rank)))

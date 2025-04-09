@@ -28,7 +28,6 @@ impl Board {
         let piece_info = self.remove_piece(from);
         if let Some((piece, color)) = piece_info {
             if self.piece_at(to).is_some() {
-                // Handle capture logic here if needed
                 self.remove_piece(to);
             }
             self.place_piece(to, piece, color);
