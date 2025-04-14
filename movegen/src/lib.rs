@@ -1,3 +1,3 @@
 pub mod magic;
-
-pub use magic::{Magic, MagicBitboards};
+mod magic_constants;
+pub mod magic_gen;

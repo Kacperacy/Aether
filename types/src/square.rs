@@ -44,6 +44,8 @@ impl FromStr for Square {
 }
 
 impl Square {
+    pub const NUM: usize = 64;
+
     #[rustfmt::skip]
     pub const fn new(file: File, rank: Rank) -> Self {
         let index = rank as i8 * 8 + file as i8;
