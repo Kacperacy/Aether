@@ -8,19 +8,19 @@ fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
     index
 }
 
-fn get_rook_moves(square: Square, blockers: BitBoard) -> BitBoard {
+pub fn get_rook_moves(square: Square, blockers: BitBoard) -> BitBoard {
     let magic = &ROOK_MAGICS[square as usize];
     let moves = &ROOK_MOVES[square as usize];
     moves[magic_index(magic, blockers)]
 }
 
-fn get_bishop_moves(square: Square, blockers: BitBoard) -> BitBoard {
+pub fn get_bishop_moves(square: Square, blockers: BitBoard) -> BitBoard {
     let magic = &BISHOP_MAGICS[square as usize];
     let moves = &BISHOP_MOVES[square as usize];
     moves[magic_index(magic, blockers)]
 }
 
-fn get_queen_moves(square: Square, blockers: BitBoard) -> BitBoard {
+pub fn get_queen_moves(square: Square, blockers: BitBoard) -> BitBoard {
     let rook_moves = get_rook_moves(square, blockers);
     let bishop_moves = get_bishop_moves(square, blockers);
     rook_moves | bishop_moves
