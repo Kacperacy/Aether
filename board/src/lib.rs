@@ -1,5 +1,6 @@
 mod fen;
 mod movement;
+mod zobrist;
 
 use aether_types::{BitBoard, CastlingRights, Color, File, Rank, Square};
 

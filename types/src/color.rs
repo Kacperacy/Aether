@@ -16,3 +16,22 @@ impl Not for Color {
         }
     }
 }
+
+impl Color {
+    pub const NUM: usize = 2;
+
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::White => 'w',
+            Self::Black => 'b',
+        }
+    }
+
+    pub const fn from_char(c: char) -> Option<Self> {
+        match c {
+            'w' => Some(Self::White),
+            'b' => Some(Self::Black),
+            _ => None,
+        }
+    }
+}

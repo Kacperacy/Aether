@@ -1,13 +1,8 @@
 // Auto-generated magic bitboard constants
 // Do not edit manually
 
+use crate::magic::MagicEntry;
 use aether_types::{BitBoard as bb, Square};
-
-pub struct MagicEntry {
-    pub mask: bb,
-    pub magic: u64,
-    pub index_bits: u8,
-}
 
 #[rustfmt::skip]
 pub const ROOK_MAGICS: &[MagicEntry; Square::NUM] = &[

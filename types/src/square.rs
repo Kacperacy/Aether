@@ -15,7 +15,7 @@ pub enum Square {
 }
 
 #[rustfmt::skip]
-pub const ALL_SQUARES: [Square; 64] = [
+pub const ALL_SQUARES: [Square; Square::NUM] = [
     Square::A1, Square::B1, Square::C1, Square::D1, Square::E1, Square::F1, Square::G1, Square::H1,
     Square::A2, Square::B2, Square::C2, Square::D2, Square::E2, Square::F2, Square::G2, Square::H2,
     Square::A3, Square::B3, Square::C3, Square::D3, Square::E3, Square::F3, Square::G3, Square::H3,

@@ -252,10 +252,6 @@ fn generate_magic_tables() -> (Vec<MagicEntry>, Vec<MagicEntry>) {
 fn generate_magic_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> String {
     let mut code = String::new();
 
-    code.push_str(
-        "pub struct MagicEntry {\n    pub mask: bb,\n    pub magic: u64,\n    pub index_bits: u8,\n}\n\n",
-    );
-
     code.push_str("#[rustfmt::skip]\n");
     code.push_str("pub const ROOK_MAGICS: &[MagicEntry; Square::NUM] = &[\n");
     for entry in rook_magics {
@@ -315,6 +311,7 @@ pub fn generate_magic_constants(output_path: &str) -> std::io::Result<()> {
     writeln!(file, "// Auto-generated magic bitboard constants")?;
     writeln!(file, "// Do not edit manually")?;
     writeln!(file, "")?;
+    writeln!(file, "use crate::magic::MagicEntry;")?;
     writeln!(file, "use aether_types::{{BitBoard as bb, Square}};")?;
     writeln!(file, "")?;
 

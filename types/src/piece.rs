@@ -27,6 +27,8 @@ impl FromStr for Piece {
 }
 
 impl Piece {
+    pub const NUM: usize = 6;
+
     pub const fn as_char(self) -> char {
         match self {
             Self::Pawn => 'p',

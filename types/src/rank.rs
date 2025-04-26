@@ -43,6 +43,7 @@ impl FromStr for Rank {
 }
 
 impl Rank {
+    pub const NUM: usize = 8;
     pub const fn new(rank: i8) -> Self {
         match rank {
             0 => Self::One,

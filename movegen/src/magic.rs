@@ -1,5 +1,11 @@
-use crate::magic_constants::{BISHOP_MAGICS, BISHOP_MOVES, MagicEntry, ROOK_MAGICS, ROOK_MOVES};
+use crate::magic_constants::{BISHOP_MAGICS, BISHOP_MOVES, ROOK_MAGICS, ROOK_MOVES};
 use aether_types::{BitBoard, Square};
+
+pub struct MagicEntry {
+    pub mask: BitBoard,
+    pub magic: u64,
+    pub index_bits: u8,
+}
 
 fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
     let blockers = blockers & entry.mask;

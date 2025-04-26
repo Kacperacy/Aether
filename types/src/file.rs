@@ -43,6 +43,7 @@ impl FromStr for File {
 }
 
 impl File {
+    pub const NUM: usize = 8;
     pub const fn from_index(file: i8) -> Self {
         match file {
             0 => Self::A,
