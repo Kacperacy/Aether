@@ -16,10 +16,10 @@ impl Display for BitBoard {
                 s.push_str(". ");
             }
             if x % 8 == 7 {
-                s.push_str("\n");
+                s.push('\n');
             }
         }
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

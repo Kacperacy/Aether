@@ -9,7 +9,7 @@ fn main() {
         println!("Generating magic bitboard constants...");
 
         if let Err(e) = magic_gen::generate_magic_constants(constants_path) {
-            eprintln!("Failed to generate magic constants: {}", e);
+            eprintln!("Failed to generate magic constants: {e}");
             std::process::exit(1);
         }
 

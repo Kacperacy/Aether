@@ -62,9 +62,9 @@ fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
 
     for i in 0..count {
         let mut blocker = BitBoard::EMPTY;
-        for j in 0..bits.len() {
+        for (j, &sq) in bits.iter().enumerate() {
             if (i & (1 << j)) != 0 {
-                blocker |= BitBoard::from_square(bits[j]);
+                blocker |= BitBoard::from_square(sq);
             }
         }
         result.push(blocker);
@@ -310,13 +310,13 @@ pub fn generate_magic_constants(output_path: &str) -> std::io::Result<()> {
 
     writeln!(file, "// Auto-generated magic bitboard constants")?;
     writeln!(file, "// Do not edit manually")?;
-    writeln!(file, "")?;
+    writeln!(file)?;
     writeln!(file, "use crate::magic::MagicEntry;")?;
     writeln!(file, "use aether_types::{{BitBoard as bb, Square}};")?;
-    writeln!(file, "")?;
+    writeln!(file)?;
 
     file.write_all(code.as_bytes())?;
 
-    println!("Magic constants written to {}", output_path);
+    println!("Magic constants written to {output_path}");
     Ok(())
 }

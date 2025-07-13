@@ -10,8 +10,7 @@ pub struct MagicEntry {
 fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
     let blockers = blockers & entry.mask;
     let hash = blockers.0.wrapping_mul(entry.magic);
-    let index = (hash >> (64 - entry.index_bits)) as usize;
-    index
+    (hash >> (64 - entry.index_bits)) as usize
 }
 
 pub fn get_rook_moves(square: Square, blockers: BitBoard) -> BitBoard {

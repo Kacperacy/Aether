@@ -15,6 +15,12 @@ pub struct Board {
     fullmove_number: u16,
 }
 
+impl Default for Board {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Board {
     pub fn new() -> Self {
         Self {
