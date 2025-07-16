@@ -1,6 +1,6 @@
 use aether_types::{BitBoard, Color, Piece, Square};
 use movegen::{
-    magic::{get_bishop_moves, get_rook_moves},
+    magic::{get_bishop_attacks, get_rook_attacks},
     pieces::{get_king_moves, knight::get_knight_attacks, pawn::get_pawn_attacks_to_square},
 };
 
@@ -39,12 +39,12 @@ impl Board {
         let knight_attacks = get_knight_attacks(square);
         attackers |= knight_attacks & self.pieces[color as usize][Piece::Knight as usize];
 
-        let bishop_attacks = get_bishop_moves(square, occupied);
+        let bishop_attacks = get_bishop_attacks(square, occupied);
         attackers |= bishop_attacks
             & (self.pieces[color as usize][Piece::Bishop as usize]
                 | self.pieces[color as usize][Piece::Queen as usize]);
 
-        let rook_attacks = get_rook_moves(square, occupied);
+        let rook_attacks = get_rook_attacks(square, occupied);
         attackers |= rook_attacks
             & (self.pieces[color as usize][Piece::Rook as usize]
                 | self.pieces[color as usize][Piece::Queen as usize]);

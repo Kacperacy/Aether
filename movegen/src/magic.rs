@@ -13,21 +13,21 @@ fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
     (hash >> (64 - entry.index_bits)) as usize
 }
 
-pub fn get_rook_moves(square: Square, blockers: BitBoard) -> BitBoard {
+pub fn get_rook_attacks(square: Square, blockers: BitBoard) -> BitBoard {
     let magic = &ROOK_MAGICS[square as usize];
     let moves = &ROOK_MOVES[square as usize];
     moves[magic_index(magic, blockers)]
 }
 
-pub fn get_bishop_moves(square: Square, blockers: BitBoard) -> BitBoard {
+pub fn get_bishop_attacks(square: Square, blockers: BitBoard) -> BitBoard {
     let magic = &BISHOP_MAGICS[square as usize];
     let moves = &BISHOP_MOVES[square as usize];
     moves[magic_index(magic, blockers)]
 }
 
-pub fn get_queen_moves(square: Square, blockers: BitBoard) -> BitBoard {
-    let rook_moves = get_rook_moves(square, blockers);
-    let bishop_moves = get_bishop_moves(square, blockers);
+pub fn get_queen_attacks(square: Square, blockers: BitBoard) -> BitBoard {
+    let rook_moves = get_rook_attacks(square, blockers);
+    let bishop_moves = get_bishop_attacks(square, blockers);
     rook_moves | bishop_moves
 }
 
@@ -41,7 +41,7 @@ mod tests {
         let empty_board = BitBoard::EMPTY;
 
         let a1 = Square::A1;
-        let a1_moves = get_rook_moves(a1, empty_board);
+        let a1_moves = get_rook_attacks(a1, empty_board);
         let expected_a1 = BitBoard(72340172838076926);
         assert_eq!(
             a1_moves, expected_a1,
@@ -50,7 +50,7 @@ mod tests {
 
         // Center square D4
         let d4 = Square::D4;
-        let d4_moves = get_rook_moves(d4, empty_board);
+        let d4_moves = get_rook_attacks(d4, empty_board);
         let expected_d4 = BitBoard(578721386714368008);
         assert_eq!(
             d4_moves, expected_d4,
@@ -63,7 +63,7 @@ mod tests {
             | BitBoard::from_square(Square::C4)
             | BitBoard::from_square(Square::E4);
 
-        let d4_blocked_moves = get_rook_moves(d4, blockers);
+        let d4_blocked_moves = get_rook_attacks(d4, blockers);
 
         let expected_blocked = BitBoard(34695806976);
 
@@ -78,12 +78,12 @@ mod tests {
         let empty_board = BitBoard::EMPTY;
 
         let a1 = Square::A1;
-        let a1_moves = get_bishop_moves(a1, empty_board);
+        let a1_moves = get_bishop_attacks(a1, empty_board);
         let expected_a1 = BitBoard(9241421688590303744);
         assert_eq!(a1_moves, expected_a1, "Bishop on A1 should attack diagonal");
 
         let d4 = Square::D4;
-        let d4_moves = get_bishop_moves(d4, empty_board);
+        let d4_moves = get_bishop_attacks(d4, empty_board);
         let expected_d4 = BitBoard(9241705379636978241);
         assert_eq!(
             d4_moves, expected_d4,
@@ -95,7 +95,7 @@ mod tests {
             | BitBoard::from_square(Square::C5)
             | BitBoard::from_square(Square::E5);
 
-        let d4_blocked_moves = get_bishop_moves(d4, blockers);
+        let d4_blocked_moves = get_bishop_attacks(d4, blockers);
 
         let expected_blocked = BitBoard(85900656640);
 
@@ -110,9 +110,9 @@ mod tests {
         let empty_board = BitBoard::EMPTY;
         let d4 = Square::D4;
 
-        let queen_moves = get_queen_moves(d4, empty_board);
-        let rook_moves = get_rook_moves(d4, empty_board);
-        let bishop_moves = get_bishop_moves(d4, empty_board);
+        let queen_moves = get_queen_attacks(d4, empty_board);
+        let rook_moves = get_rook_attacks(d4, empty_board);
+        let bishop_moves = get_bishop_attacks(d4, empty_board);
 
         assert_eq!(
             queen_moves,
@@ -126,8 +126,8 @@ mod tests {
         let all_occupied = BitBoard::FULL ^ BitBoard::from_square(Square::D4);
         let d4 = Square::D4;
 
-        let rook_moves = get_rook_moves(d4, all_occupied);
-        let bishop_moves = get_bishop_moves(d4, all_occupied);
+        let rook_moves = get_rook_attacks(d4, all_occupied);
+        let bishop_moves = get_bishop_attacks(d4, all_occupied);
 
         let expected_rook = BitBoard::from_square(Square::D3)
             | BitBoard::from_square(Square::D5)
@@ -177,12 +177,12 @@ mod tests {
 
         assert_eq!(
             rook_moves,
-            get_rook_moves(sq, blockers),
+            get_rook_attacks(sq, blockers),
             "Rook moves from table should match get_rook_moves result"
         );
         assert_eq!(
             bishop_moves,
-            get_bishop_moves(sq, blockers),
+            get_bishop_attacks(sq, blockers),
             "Bishop moves from table should match get_bishop_moves result"
         );
     }

@@ -17,6 +17,9 @@ members = [
     "board",
     "search",
     "engine",
+    "eval",
+    "uci",
+    "cli",
 ]
 
 [workspace.dependencies]
