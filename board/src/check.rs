@@ -19,6 +19,10 @@ impl Board {
         self.attackers_to_square(king_square, color.opponent()) != BitBoard::EMPTY
     }
 
+    pub fn is_square_attacked(&self, square: Square, color: Color) -> bool {
+        self.attackers_to_square(square, color).is_empty()
+    }
+
     pub fn attackers_to_square(&self, square: Square, color: Color) -> BitBoard {
         let mut attackers = BitBoard::EMPTY;
         let occupied = self.occupied;
@@ -38,12 +42,12 @@ impl Board {
         let bishop_attacks = get_bishop_moves(square, occupied);
         attackers |= bishop_attacks
             & (self.pieces[color as usize][Piece::Bishop as usize]
-            | self.pieces[color as usize][Piece::Queen as usize]);
+                | self.pieces[color as usize][Piece::Queen as usize]);
 
         let rook_attacks = get_rook_moves(square, occupied);
         attackers |= rook_attacks
             & (self.pieces[color as usize][Piece::Rook as usize]
-            | self.pieces[color as usize][Piece::Queen as usize]);
+                | self.pieces[color as usize][Piece::Queen as usize]);
 
         let king_attacks = get_king_moves(square);
         attackers |= king_attacks & self.pieces[color as usize][Piece::King as usize];
