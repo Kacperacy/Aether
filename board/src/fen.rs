@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_types::{BitBoard, CastlingRights, Color, File, Piece, Rank, Square};
+use aether_types::{BitBoard, BoardQuery, CastlingRights, Color, File, Piece, Rank, Square};
 
 impl Board {
     pub fn from_fen(fen: &str) -> Result<Self, &'static str> {

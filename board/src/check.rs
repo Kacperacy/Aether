@@ -1,4 +1,4 @@
-use aether_types::{BitBoard, Color, Piece, Square};
+use aether_types::{BitBoard, BoardQuery, Color, Piece, Square};
 use movegen::{
     magic::{get_bishop_attacks, get_rook_attacks},
     pieces::{get_king_moves, knight::get_knight_attacks, pawn::get_pawn_attacks_to_square},
@@ -17,10 +17,6 @@ impl Board {
         let king_square = king_square.unwrap();
 
         self.attackers_to_square(king_square, color.opponent()) != BitBoard::EMPTY
-    }
-
-    pub fn is_square_attacked(&self, square: Square, color: Color) -> bool {
-        self.attackers_to_square(square, color).is_empty()
     }
 
     pub fn attackers_to_square(&self, square: Square, color: Color) -> BitBoard {

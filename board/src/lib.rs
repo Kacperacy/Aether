@@ -3,7 +3,7 @@ mod fen;
 mod movement;
 mod zobrist;
 
-use aether_types::{BitBoard, CastlingRights, Color, File, Piece, Rank, Square};
+use aether_types::{BitBoard, BoardQuery, CastlingRights, Color, File, Piece, Rank, Square};
 
 #[derive(Clone, Debug)]
 pub struct Board {
@@ -37,6 +37,56 @@ impl Default for Board {
     }
 }
 
+impl BoardQuery for Board {
+    fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
+        if !self.occupied.has(square) {
+            return None;
+        }
+
+        let color = if self.color_combined[Color::White as usize].has(square) {
+            Color::White
+        } else {
+            Color::Black
+        };
+
+        let index = square.to_index();
+        for piece in Piece::all() {
+            if self.pieces[color as usize][piece as usize].is_set_index(index) {
+                return Some((piece, color));
+            }
+        }
+        None
+    }
+
+    fn is_square_occupied(&self, square: Square) -> bool {
+        self.occupied.has(square)
+    }
+
+    fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
+        self.attackers_to_square(square, by_color).is_empty()
+    }
+
+    fn get_king_square(&self, color: Color) -> Option<Square> {
+        self.pieces[color as usize][Piece::King as usize].to_square()
+    }
+
+    fn can_castle_short(&self, color: Color) -> bool {
+        self.castling_rights[color as usize].short.is_some()
+    }
+
+    fn can_castle_long(&self, color: Color) -> bool {
+        self.castling_rights[color as usize].long.is_some()
+    }
+
+    fn en_passant_square(&self) -> Option<Square> {
+        self.en_passant_square
+    }
+
+    fn side_to_move(&self) -> Color {
+        self.side_to_move
+    }
+}
+
 impl Board {
     pub fn new() -> Self {
         Self {
@@ -53,28 +103,12 @@ impl Board {
         }
     }
 
-    pub fn side_to_move(&self) -> Color {
-        self.side_to_move
-    }
-
-    pub fn en_passant(&self) -> Option<Square> {
-        self.en_passant_square
-    }
-
     pub fn halfmove_clock(&self) -> u8 {
         self.halfmove_clock
     }
 
     pub fn fullmove_number(&self) -> u16 {
         self.fullmove_number
-    }
-
-    pub fn can_castle_short(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].short.is_some()
-    }
-
-    pub fn can_castle_long(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].long.is_some()
     }
 
     pub fn print(&self) {
@@ -108,10 +142,6 @@ impl Board {
             .fold(BitBoard::default(), |acc, &bb| acc | bb);
         self.occupied =
             self.color_combined[Color::White as usize] | self.color_combined[Color::Black as usize];
-    }
-
-    pub fn get_king_square(&self, color: Color) -> Option<Square> {
-        self.pieces[color as usize][Piece::King as usize].to_square()
     }
 
     pub fn invalidate_cached_check_status(&mut self) {

@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_types::{BitBoard, Color, Piece, Square};
+use aether_types::{BitBoard, BoardQuery, Color, Piece, Square};
 
 impl Board {
     pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) {
@@ -36,26 +36,6 @@ impl Board {
             }
             self.place_piece(to, piece, color);
             return Some((piece, color));
-        }
-        None
-    }
-
-    pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        if !self.occupied.has(square) {
-            return None;
-        }
-
-        let color = if self.color_combined[Color::White as usize].has(square) {
-            Color::White
-        } else {
-            Color::Black
-        };
-
-        let index = square.to_index();
-        for piece in Piece::all() {
-            if self.pieces[color as usize][piece as usize].is_set_index(index) {
-                return Some((piece, color));
-            }
         }
         None
     }

@@ -1,37 +1,40 @@
 use crate::{Piece, Square};
-use std::str::FromStr;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Move {
     pub from: Square,
     pub to: Square,
+    pub piece: Piece,
+    pub capture: Option<Piece>,
     pub promotion: Option<Piece>,
+    pub flags: MoveFlags,
 }
 
-impl FromStr for Move {
-    type Err = ();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MoveFlags {
+    pub is_castle: bool,
+    pub is_en_passant: bool,
+    pub is_double_pawn_push: bool,
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let from = Square::from_str(&s[0..2]).map_err(|_| ())?;
-        let to = Square::from_str(&s[2..4]).map_err(|_| ())?;
-        let promotion = if let Some(promotion) = s.get(4..5) {
-            let piece = Piece::from_str(promotion).map_err(|_| ())?;
-            if piece == Piece::Queen
-                || piece == Piece::Rook
-                || piece == Piece::Bishop
-                || piece == Piece::Knight
-            {
-                Some(piece)
-            } else {
-                return Err(());
-            }
-        } else {
-            None
-        };
-
-        Ok(Self {
+impl Move {
+    pub fn new(from: Square, to: Square) -> Self {
+        Move {
             from,
             to,
-            promotion,
-        })
+            piece: Piece::Pawn, // This should be properly determined
+            capture: None,
+            promotion: None,
+            flags: MoveFlags {
+                is_castle: false,
+                is_en_passant: false,
+                is_double_pawn_push: false,
+            },
+        }
+    }
+
+    pub fn with_promotion(mut self, piece: Piece) -> Self {
+        self.promotion = Some(piece);
+        self
     }
 }
