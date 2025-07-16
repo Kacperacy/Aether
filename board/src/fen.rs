@@ -5,8 +5,7 @@ impl Board {
     pub fn from_fen(fen: &str) -> Result<Self, &'static str> {
         let mut board = Self::new();
 
-        board.pieces = [BitBoard::EMPTY; 6];
-        board.colors = [BitBoard::EMPTY; 2];
+        board.pieces = [[BitBoard::default(); 6]; 2];
 
         let sections: Vec<&str> = fen.split_whitespace().collect();
         if sections.len() < 6 {
@@ -138,7 +137,7 @@ impl Board {
 
         if sections[3] != "-" {
             if let Ok(square) = Square::from_algebraic(sections[3]) {
-                board.en_passant = Some(square);
+                board.en_passant_square = Some(square);
             } else {
                 return Err("Invalid FEN: invalid en passant square");
             }
@@ -228,7 +227,7 @@ impl Board {
 
         fen.push_str(
             &self
-                .en_passant
+                .en_passant_square
                 .map_or("-".to_string(), |square| square.to_algebraic()),
         );
 

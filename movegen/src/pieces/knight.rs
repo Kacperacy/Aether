@@ -15,3 +15,7 @@ static KNIGHT_MOVES: [BitBoard; Square::NUM] = generate_offsets_table([
 pub fn get_knight_moves(sq: Square) -> BitBoard {
     KNIGHT_MOVES[sq as usize]
 }
+
+pub fn get_knight_attacks(sq: Square) -> BitBoard {
+    KNIGHT_MOVES[sq.to_index() as usize]
+}

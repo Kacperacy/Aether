@@ -9,8 +9,9 @@ pub struct BitBoard(pub u64);
 impl Display for BitBoard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s: String = String::new();
+        s.push('\n');
         for x in 0..64 {
-            if self.is_set_index(x) {
+            if self.is_set_index(63 - x) {
                 s.push_str("X ");
             } else {
                 s.push_str(". ");

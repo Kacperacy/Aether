@@ -1,7 +1,9 @@
 use aether_types::{BitBoard, Color, Rank, Square};
 
-static WHITE_PAWN_ATTACKS: [BitBoard; Square::NUM] = init_pawn_attacks(Color::White);
-static BLACK_PAWN_ATTACKS: [BitBoard; Square::NUM] = init_pawn_attacks(Color::Black);
+pub static PAWN_ATTACKS: [[BitBoard; Square::NUM]; 2] = [
+    init_pawn_attacks(Color::White),
+    init_pawn_attacks(Color::Black),
+];
 
 const fn init_pawn_attacks(color: Color) -> [BitBoard; Square::NUM] {
     let mut attacks = [BitBoard::EMPTY; Square::NUM];
@@ -40,10 +42,32 @@ const fn compute_pawn_attacks(sq: Square, color: Color) -> BitBoard {
 }
 
 pub fn get_pawn_attacks(sq: Square, color: Color) -> BitBoard {
+    PAWN_ATTACKS[color as usize][sq.to_index() as usize]
+}
+
+pub fn get_pawn_attacks_to_square(sq: Square, color: Color) -> BitBoard {
+    let mut attacks = BitBoard::EMPTY;
+
     match color {
-        Color::White => WHITE_PAWN_ATTACKS[sq as usize],
-        Color::Black => BLACK_PAWN_ATTACKS[sq as usize],
+        Color::White => {
+            if let Some(target) = sq.offset(-1, 1) {
+                attacks |= BitBoard::from_square(target);
+            }
+            if let Some(target) = sq.offset(1, 1) {
+                attacks |= BitBoard::from_square(target);
+            }
+        }
+        Color::Black => {
+            if let Some(target) = sq.offset(-1, -1) {
+                attacks |= BitBoard::from_square(target);
+            }
+            if let Some(target) = sq.offset(1, -1) {
+                attacks |= BitBoard::from_square(target);
+            }
+        }
     }
+
+    attacks
 }
 
 pub fn get_pawn_moves(sq: Square, color: Color, occupied: BitBoard) -> BitBoard {

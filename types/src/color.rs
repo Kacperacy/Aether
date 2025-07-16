@@ -34,4 +34,12 @@ impl Color {
             _ => None,
         }
     }
+
+    pub fn all() -> [Self; 2] {
+        [Self::White, Self::Black]
+    }
+
+    pub fn opponent(self) -> Self {
+        !self
+    }
 }
