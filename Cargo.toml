@@ -9,35 +9,45 @@ edition = "2024"
 aether-types = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
-criterion = "0.6.0"
+search = { workspace = true }
+eval = { workspace = true }
+engine = { workspace = true }
 
 [workspace]
 members = [
     "types",
-    "movegen",
     "board",
+    "movegen",
     "search",
-    "engine",
     "eval",
+    "engine",
     "uci",
-    "cli",
+    "cli"
 ]
 
 [workspace.dependencies]
 # External dependencies
 rand = "0.9.1"
 thiserror = "2.0.12"
+criterion = "0.6.0"
 
 # Workspace members as dependencies
 aether-types = { path = "./types" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
 search = { path = "./search" }
-engine = { path = "./engine" }
 eval = { path = "./eval" }
+engine = { path = "./engine" }
 uci = { path = "./uci" }
 cli = { path = "./cli" }
 
-[[bin]]
-name = "aether"
-path = "src/main.rs"
+[dev-dependencies]
+criterion = { workspace = true }
+
+[features]
+default = []
+bench = []
+
+#[[bench]]
+#name = "move_generation"
+#harness = false

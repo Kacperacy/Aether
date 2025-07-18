@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 aether-types = { workspace = true }
 board = { workspace = true }
-criterion = "0.6.0"
+criterion = { workspace = true }
