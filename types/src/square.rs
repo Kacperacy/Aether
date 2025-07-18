@@ -1,4 +1,5 @@
 use crate::{BitBoard, Color, File, Rank};
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[rustfmt::skip]
@@ -43,8 +44,18 @@ impl FromStr for Square {
     }
 }
 
+impl Display for Square {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.file(), self.rank())
+    }
+}
+
 impl Square {
     pub const NUM: usize = 64;
+
+    pub const fn all() -> &'static [Square; Self::NUM] {
+        &ALL_SQUARES
+    }
 
     #[rustfmt::skip]
     pub const fn new(file: File, rank: Rank) -> Self {

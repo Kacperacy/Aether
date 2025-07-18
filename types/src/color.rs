@@ -1,9 +1,10 @@
 use std::ops::Not;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum Color {
-    White,
-    Black,
+    White = 0,
+    Black = 1,
 }
 
 impl Not for Color {
@@ -35,11 +36,35 @@ impl Color {
         }
     }
 
-    pub fn all() -> [Self; 2] {
+    pub const fn all() -> [Self; 2] {
         [Self::White, Self::Black]
     }
 
-    pub fn opponent(self) -> Self {
-        !self
+    pub const fn opponent(self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
+
+    pub const fn pawn_start_rank(self) -> crate::Rank {
+        match self {
+            Self::White => crate::Rank::Two,
+            Self::Black => crate::Rank::Seven,
+        }
+    }
+
+    pub const fn pawn_promotion_rank(self) -> crate::Rank {
+        match self {
+            Self::White => crate::Rank::Eight,
+            Self::Black => crate::Rank::One,
+        }
+    }
+
+    pub const fn forward_direction(self) -> i8 {
+        match self {
+            Self::White => 1,
+            Self::Black => -1,
+        }
     }
 }

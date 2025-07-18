@@ -21,9 +21,9 @@ impl Board {
 
     pub fn attackers_to_square(&self, square: Square, color: Color) -> BitBoard {
         let mut attackers = BitBoard::EMPTY;
-        let occupied = self.occupied;
+        let occupied = self.cache.occupied;
 
-        let attacking_pieces = self.color_combined[color as usize];
+        let attacking_pieces = self.cache.color_combined[color as usize];
 
         if attacking_pieces.is_empty() {
             return attackers;

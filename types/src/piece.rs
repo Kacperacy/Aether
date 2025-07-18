@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
 pub enum Piece {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
+    Pawn = 0,
+    Knight = 1,
+    Bishop = 2,
+    Rook = 3,
+    Queen = 4,
+    King = 5,
 }
 
 impl FromStr for Piece {
@@ -61,5 +62,28 @@ impl Piece {
             Self::Queen,
             Self::King,
         ]
+    }
+
+    pub const fn value(self) -> u16 {
+        match self {
+            Self::Pawn => 100,
+            Self::Knight => 320,
+            Self::Bishop => 330,
+            Self::Rook => 500,
+            Self::Queen => 900,
+            Self::King => 20000,
+        }
+    }
+
+    pub const fn is_sliding(self) -> bool {
+        matches!(self, Self::Bishop | Self::Rook | Self::Queen)
+    }
+
+    pub const fn is_major(self) -> bool {
+        matches!(self, Self::Rook | Self::Queen)
+    }
+
+    pub const fn is_minor(self) -> bool {
+        matches!(self, Self::Knight | Self::Bishop)
     }
 }

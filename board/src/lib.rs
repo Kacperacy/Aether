@@ -1,57 +1,88 @@
+mod builder;
+mod cache;
 mod check;
+mod error;
 mod fen;
+mod game_state;
 mod movement;
 mod zobrist;
 
-use aether_types::{BitBoard, BoardQuery, CastlingRights, Color, File, Piece, Rank, Square};
+pub use builder::BoardBuilder;
+pub use cache::BoardCache;
+pub use error::*;
+pub use game_state::GameState;
 
-#[derive(Clone, Debug)]
+use aether_types::{BitBoard, BoardQuery, Color, Piece, Square};
+use std::num::NonZeroU64;
+
+#[derive(Debug, Clone)]
 pub struct Board {
-    /// 12 individual piece bitboards: [color][piece_type]
-    /// White = 0, Black = 1
-    /// Pawn = 0, Knight = 1, Bishop = 2, Rook = 3, Queen = 4, King = 5
     pieces: [[BitBoard; 6]; 2],
-
-    /// Aggregate bitboards for optimization
-    color_combined: [BitBoard; 2], // All white pieces, all black pieces
-    occupied: BitBoard, // All pieces combined
-
-    /// Game state information
-    side_to_move: Color,
-    castling_rights: [CastlingRights; 2],
-    en_passant_square: Option<Square>,
-    halfmove_clock: u8,
-    fullmove_number: u16,
-
-    /// Hash for transposition table
+    game_state: GameState,
+    cache: BoardCache,
     zobrist_hash: u64,
-
-    /// Cached check status
-    /// 0 = White in check, 1 = Black in check
-    cached_check_status: [Option<bool>; 2],
 }
 
-impl Default for Board {
-    fn default() -> Self {
-        Self::new()
+impl Board {
+    pub fn new() -> Result<Self> {
+        BoardBuilder::new().build()
+    }
+
+    pub fn starting_position() -> Result<Self> {
+        BoardBuilder::starting_position().build()
+    }
+
+    pub fn builder() -> BoardBuilder {
+        BoardBuilder::new()
+    }
+
+    pub fn pieces(&self) -> &[[BitBoard; 6]; 2] {
+        &self.pieces
+    }
+
+    pub fn game_state(&self) -> &GameState {
+        &self.game_state
+    }
+
+    pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
+        NonZeroU64::new(self.zobrist_hash)
+    }
+
+    pub fn update_zobrist_incremental(
+        &mut self,
+        piece: Piece,
+        color: Color,
+        from: Square,
+        to: Square,
+    ) {
+        // Incremental zobrist update - remove from old square, add to new square
+        // self.zobrist_hash ^= zobrist::piece_hash(piece, color, from);
+        // self.zobrist_hash ^= zobrist::piece_hash(piece, color, to);
+    }
+
+    fn update_cache(&mut self) {
+        self.cache.update_occupancy(&self.pieces);
+    }
+
+    pub fn invalidate_cache(&mut self) {
+        self.cache.invalidate_check_cache();
     }
 }
 
 impl BoardQuery for Board {
     fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        if !self.occupied.has(square) {
+        if !self.cache.occupied.has(square) {
             return None;
         }
 
-        let color = if self.color_combined[Color::White as usize].has(square) {
+        let color = if self.cache.color_combined[Color::White as usize].has(square) {
             Color::White
         } else {
             Color::Black
         };
 
-        let index = square.to_index();
         for piece in Piece::all() {
-            if self.pieces[color as usize][piece as usize].is_set_index(index) {
+            if self.pieces[color as usize][piece as usize].has(square) {
                 return Some((piece, color));
             }
         }
@@ -59,7 +90,7 @@ impl BoardQuery for Board {
     }
 
     fn is_square_occupied(&self, square: Square) -> bool {
-        self.occupied.has(square)
+        self.cache.occupied.has(square)
     }
 
     fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
@@ -71,52 +102,80 @@ impl BoardQuery for Board {
     }
 
     fn can_castle_short(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].short.is_some()
+        self.game_state.castling_rights[color as usize]
+            .short
+            .is_some()
     }
 
     fn can_castle_long(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].long.is_some()
+        self.game_state.castling_rights[color as usize]
+            .long
+            .is_some()
     }
 
     fn en_passant_square(&self) -> Option<Square> {
-        self.en_passant_square
+        self.game_state.en_passant_square
     }
 
     fn side_to_move(&self) -> Color {
-        self.side_to_move
+        self.game_state.side_to_move
     }
 }
 
-impl Board {
-    pub fn new() -> Self {
-        Self {
-            pieces: [[BitBoard::default(); 6]; 2],
-            color_combined: [BitBoard::default(); 2],
-            occupied: BitBoard::default(),
-            side_to_move: Color::White,
-            castling_rights: [CastlingRights::EMPTY; 2],
-            en_passant_square: None,
-            halfmove_clock: 0,
-            fullmove_number: 1,
-            zobrist_hash: 0,
-            cached_check_status: [None; 2],
+impl Default for Board {
+    fn default() -> Self {
+        Self::starting_position().expect("Failed to create starting position")
+    }
+}
+
+// Trait for board operations
+pub trait BoardOps {
+    fn make_move(&mut self, mv: aether_types::Move) -> Result<()>;
+    fn unmake_move(&mut self, mv: aether_types::Move) -> Result<()>;
+}
+
+// Trait for mutable board operations
+pub trait BoardMut {
+    fn set_piece(&mut self, square: Square, piece: Piece, color: Color);
+    fn remove_piece(&mut self, square: Square);
+    fn clear_board(&mut self);
+}
+
+impl BoardMut for Board {
+    fn set_piece(&mut self, square: Square, piece: Piece, color: Color) {
+        self.pieces[color as usize][piece as usize] |= square.bitboard();
+        self.update_cache();
+        self.invalidate_cache();
+    }
+
+    fn remove_piece(&mut self, square: Square) {
+        for color in 0..2 {
+            for piece in 0..6 {
+                self.pieces[color][piece] &= !square.bitboard();
+            }
         }
+        self.update_cache();
+        self.invalidate_cache();
     }
 
-    pub fn halfmove_clock(&self) -> u8 {
-        self.halfmove_clock
+    fn clear_board(&mut self) {
+        self.pieces = [[BitBoard::EMPTY; 6]; 2];
+        self.update_cache();
+        self.invalidate_cache();
     }
+}
 
-    pub fn fullmove_number(&self) -> u16 {
-        self.fullmove_number
-    }
-
+// Extension methods for board
+impl Board {
     pub fn print(&self) {
-        println!("  +-----------------+");
-        for rank in (Rank::One as i8..=Rank::Eight as i8).rev() {
-            print!("{} | ", rank + 1); // Rank indicator (1-8)
-            for file in File::A as i8..=File::H as i8 {
-                let square = Square::new(File::from_index(file), Rank::new(rank));
+        println!(" +---+---+---+---+---+---+---+---+");
+        for rank in (0..8).rev() {
+            print!("{} | ", rank + 1);
+            for file in 0..8 {
+                let square = Square::new(
+                    aether_types::File::from_index(file),
+                    aether_types::Rank::new(rank),
+                );
                 if let Some((piece, color)) = self.piece_at(square) {
                     if color == Color::White {
                         print!("{} ", piece.as_char().to_ascii_uppercase());
@@ -126,39 +185,11 @@ impl Board {
                 } else {
                     print!(". ");
                 }
+                print!("| ");
             }
-            println!("|");
+            println!();
+            println!(" +---+---+---+---+---+---+---+---+");
         }
-        println!("  +-----------------+");
-        println!("    A B C D E F G H");
-    }
-
-    pub fn update_aggregate_bitboards(&mut self) {
-        self.color_combined[Color::White as usize] = self.pieces[Color::White as usize]
-            .iter()
-            .fold(BitBoard::default(), |acc, &bb| acc | bb);
-        self.color_combined[Color::Black as usize] = self.pieces[Color::Black as usize]
-            .iter()
-            .fold(BitBoard::default(), |acc, &bb| acc | bb);
-        self.occupied =
-            self.color_combined[Color::White as usize] | self.color_combined[Color::Black as usize];
-    }
-
-    pub fn invalidate_cached_check_status(&mut self) {
-        self.cached_check_status[Color::White as usize] = None;
-        self.cached_check_status[Color::Black as usize] = None;
-    }
-
-    pub fn get_cached_check_status(&mut self, color: Color) -> bool {
-        if let Some(status) = self.cached_check_status[color as usize] {
-            return status;
-        }
-
-        // If not cached, calculate and cache it
-        let in_check = self.is_in_check(color);
-
-        self.cached_check_status[color as usize] = Some(in_check);
-
-        in_check
+        println!("   a   b   c   d   e   f   g   h");
     }
 }

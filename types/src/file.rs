@@ -1,4 +1,5 @@
 use crate::BitBoard;
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -39,6 +40,12 @@ impl FromStr for File {
             "h" => Ok(Self::H),
             _ => Err(()),
         }
+    }
+}
+
+impl Display for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
     }
 }
 

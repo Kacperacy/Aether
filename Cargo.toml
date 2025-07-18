@@ -1,14 +1,15 @@
 [package]
 name = "aether"
 version = "0.1.0"
+authors = ["Kacper Maciołek"]
+repository = "https://github.com/Kacperacy/Aether"
 edition = "2024"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 aether-types = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
+criterion = "0.6.0"
 
 [workspace]
 members = [
@@ -23,9 +24,19 @@ members = [
 ]
 
 [workspace.dependencies]
+# External dependencies
+rand = "0.9.1"
+thiserror = "2.0.12"
+
+# Workspace members as dependencies
 aether-types = { path = "./types" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
+search = { path = "./search" }
+engine = { path = "./engine" }
+eval = { path = "./eval" }
+uci = { path = "./uci" }
+cli = { path = "./cli" }
 
 [[bin]]
 name = "aether"

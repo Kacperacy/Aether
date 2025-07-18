@@ -1,6 +1,8 @@
 use crate::{BoardQuery, Move};
 
-pub trait MoveGenerator {
-    fn generate_moves<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
-    fn is_legal_move<T: BoardQuery>(&self, board: &T, mv: Move) -> bool;
+pub trait MoveGen {
+    fn pseudo_legal<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
+    fn legal<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
+    fn captures<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
+    fn quiet_moves<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
 }

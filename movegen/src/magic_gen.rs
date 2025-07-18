@@ -256,7 +256,7 @@ fn generate_magic_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry])
     code.push_str("pub const ROOK_MAGICS: &[MagicEntry; Square::NUM] = &[\n");
     for entry in rook_magics {
         code.push_str(&format!(
-            "    MagicEntry {{ mask: bb({}), magic: {}, index_bits: {} }},\n",
+            "    MagicEntry {{ mask: {}, magic: {}, index_bits: {} }},\n",
             entry.mask.0, entry.magic, entry.index_bits
         ));
     }
@@ -266,31 +266,31 @@ fn generate_magic_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry])
     code.push_str("pub const BISHOP_MAGICS: &[MagicEntry; Square::NUM] = &[\n");
     for entry in bishop_magics {
         code.push_str(&format!(
-            "    MagicEntry {{ mask: bb({}), magic: {}, index_bits: {} }},\n",
+            "    MagicEntry {{ mask: {}, magic: {}, index_bits: {} }},\n",
             entry.mask.0, entry.magic, entry.index_bits
         ));
     }
     code.push_str("];\n\n");
 
     code.push_str("#[rustfmt::skip]\n");
-    code.push_str("pub const ROOK_MOVES: &[&[bb]; Square::NUM] = &[\n");
+    code.push_str("pub const ROOK_MOVES: &[&[u64]; Square::NUM] = &[\n");
     for entry in rook_magics {
         code.push_str("    &[\n");
         code.push_str("    ");
         for mov in &entry.moves {
-            code.push_str(&format!("bb({}), ", mov.0));
+            code.push_str(&format!("{}, ", mov.0));
         }
         code.push_str("    ],\n");
     }
     code.push_str("];\n\n");
 
     code.push_str("#[rustfmt::skip]\n");
-    code.push_str("pub const BISHOP_MOVES: &[&[bb]; Square::NUM] = &[\n");
+    code.push_str("pub const BISHOP_MOVES: &[&[u64]; Square::NUM] = &[\n");
     for entry in bishop_magics {
         code.push_str("    &[\n");
         code.push_str("    ");
         for mov in &entry.moves {
-            code.push_str(&format!("bb({}), ", mov.0));
+            code.push_str(&format!("{}, ", mov.0));
         }
         code.push_str("    ],\n");
     }
@@ -312,7 +312,7 @@ pub fn generate_magic_constants(output_path: &str) -> std::io::Result<()> {
     writeln!(file, "// Do not edit manually")?;
     writeln!(file)?;
     writeln!(file, "use crate::magic::MagicEntry;")?;
-    writeln!(file, "use aether_types::{{BitBoard as bb, Square}};")?;
+    writeln!(file, "use aether_types::Square;")?;
     writeln!(file)?;
 
     file.write_all(code.as_bytes())?;

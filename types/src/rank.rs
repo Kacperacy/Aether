@@ -1,4 +1,5 @@
 use crate::{BitBoard, Color};
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -39,6 +40,12 @@ impl FromStr for Rank {
             "8" => Ok(Self::Eight),
             _ => Err(()),
         }
+    }
+}
+
+impl Display for Rank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
     }
 }
 

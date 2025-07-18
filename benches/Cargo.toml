@@ -1,10 +1,9 @@
 [package]
-name = "cli"
+name = "benches"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 aether-types = { workspace = true }
 board = { workspace = true }
-engine = { workspace = true }
-uci = { workspace = true }
+criterion = "0.6.0"

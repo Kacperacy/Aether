@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 board = { workspace = true }
 aether-types = { workspace = true }
+search = { workspace = true }
+eval = { workspace = true }

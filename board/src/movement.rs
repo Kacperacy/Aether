@@ -6,8 +6,8 @@ impl Board {
         self.pieces[color as usize][piece as usize] |= BitBoard::from_square(square);
 
         // Update combined bitboards
-        self.color_combined[color as usize] |= BitBoard::from_square(square);
-        self.occupied |= BitBoard::from_square(square);
+        self.cache.color_combined[color as usize] |= BitBoard::from_square(square);
+        self.cache.occupied |= BitBoard::from_square(square);
     }
 
     pub fn remove_piece(&mut self, square: Square) -> Option<(Piece, Color)> {
@@ -18,8 +18,8 @@ impl Board {
                     self.pieces[color as usize][piece as usize] -= BitBoard::from_square(square);
 
                     // Update combined bitboards
-                    self.color_combined[color as usize] -= BitBoard::from_square(square);
-                    self.occupied -= BitBoard::from_square(square);
+                    self.cache.color_combined[color as usize] -= BitBoard::from_square(square);
+                    self.cache.occupied -= BitBoard::from_square(square);
 
                     return Some((piece, color));
                 }
