@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::Not;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -5,6 +6,12 @@ use std::ops::Not;
 pub enum Color {
     White = 0,
     Black = 1,
+}
+
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
 }
 
 impl Not for Color {

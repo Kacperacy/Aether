@@ -103,12 +103,12 @@ impl BoardBuilder {
 
             // Check if king is in starting position for castling
             let king_square = Square::new(aether_types::File::E, back_rank);
-            if !self.pieces[color as usize][Piece::King as usize].has(king_square) {
-                if rights.short.is_some() || rights.long.is_some() {
-                    return Err(BoardError::InvalidCastlingRights {
-                        reason: format!("King not on starting square for {:?}", color),
-                    });
-                }
+            if !self.pieces[color as usize][Piece::King as usize].has(king_square)
+                && (rights.short.is_some() || rights.long.is_some())
+            {
+                return Err(BoardError::InvalidCastlingRights {
+                    reason: format!("King not on starting square for {color}",),
+                });
             }
         }
         Ok(())

@@ -50,14 +50,17 @@ impl Board {
 
     pub fn update_zobrist_incremental(
         &mut self,
-        piece: Piece,
-        color: Color,
-        from: Square,
-        to: Square,
+        _piece: Piece,
+        _color: Color,
+        _from: Square,
+        _to: Square,
     ) {
         // Incremental zobrist update - remove from old square, add to new square
         // self.zobrist_hash ^= zobrist::piece_hash(piece, color, from);
         // self.zobrist_hash ^= zobrist::piece_hash(piece, color, to);
+
+        // not implemented yet
+        self.zobrist_hash = 0; // Placeholder for now
     }
 
     fn update_cache(&mut self) {

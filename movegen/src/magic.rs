@@ -56,6 +56,12 @@ pub struct AttackCache {
     bishop_cache: [[BitBoard; 512]; 64],
 }
 
+impl Default for AttackCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AttackCache {
     pub fn new() -> Self {
         Self {
