@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use aether_types::File;
+    use std::str::FromStr;
 
     #[test]
     fn test_file_from_str() {
