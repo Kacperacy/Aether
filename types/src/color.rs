@@ -74,4 +74,11 @@ impl Color {
             Self::Black => -1,
         }
     }
+
+    pub const fn back_rank(self) -> crate::Rank {
+        match self {
+            Self::White => crate::Rank::One,
+            Self::Black => crate::Rank::Eight,
+        }
+    }
 }

@@ -12,7 +12,7 @@ pub use cache::BoardCache;
 pub use error::*;
 pub use game_state::GameState;
 
-use aether_types::{BitBoard, BoardQuery, Color, Piece, Square};
+use aether_types::{BitBoard, BoardQuery, Color, File, Piece, Rank, Square};
 use std::num::NonZeroU64;
 
 #[derive(Debug, Clone)]
@@ -64,7 +64,7 @@ impl Board {
     }
 
     fn update_cache(&mut self) {
-        self.cache.update_occupancy(&self.pieces);
+        self.cache.refresh(&self.pieces);
     }
 
     pub fn invalidate_cache(&mut self) {
@@ -84,12 +84,10 @@ impl BoardQuery for Board {
             Color::Black
         };
 
-        for piece in Piece::all() {
-            if self.pieces[color as usize][piece as usize].has(square) {
-                return Some((piece, color));
-            }
-        }
-        None
+        Piece::all()
+            .into_iter()
+            .find(|&p| self.pieces[color as usize][p as usize].has(square))
+            .map(|p| (p, color))
     }
 
     fn is_square_occupied(&self, square: Square) -> bool {
@@ -171,28 +169,31 @@ impl BoardMut for Board {
 // Extension methods for board
 impl Board {
     pub fn print(&self) {
-        println!(" +---+---+---+---+---+---+---+---+");
+        println!("{}", self.as_ascii());
+    }
+
+    /// Returns an ASCII diagram of the current board.
+    pub fn as_ascii(&self) -> String {
+        use std::fmt::Write;
+        let mut out = String::new();
+        writeln!(out, " +---+---+---+---+---+---+---+---+").unwrap();
         for rank in (0..8).rev() {
-            print!("{} | ", rank + 1);
+            write!(out, "{} |", rank + 1).unwrap();
             for file in 0..8 {
-                let square = Square::new(
-                    aether_types::File::from_index(file),
-                    aether_types::Rank::new(rank),
-                );
-                if let Some((piece, color)) = self.piece_at(square) {
-                    if color == Color::White {
-                        print!("{} ", piece.as_char().to_ascii_uppercase());
+                let sq = Square::new(File::from_index(file), Rank::new(rank));
+                let ch = self.piece_at(sq).map_or('.', |(p, c)| {
+                    let ch = p.as_char();
+                    if c == Color::White {
+                        ch.to_ascii_uppercase()
                     } else {
-                        print!("{} ", piece.as_char());
+                        ch
                     }
-                } else {
-                    print!(". ");
-                }
-                print!("| ");
+                });
+                write!(out, " {} |", ch).unwrap();
             }
-            println!();
-            println!(" +---+---+---+---+---+---+---+---+");
+            writeln!(out, "\n +---+---+---+---+---+---+---+---+").unwrap();
         }
-        println!("   a   b   c   d   e   f   g   h");
+        writeln!(out, "   a   b   c   d   e   f   g   h").unwrap();
+        out
     }
 }

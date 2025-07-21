@@ -1,5 +1,5 @@
 use crate::{cache::BoardCache, error::*, game_state::GameState};
-use aether_types::{BitBoard, Color, Piece, Square};
+use aether_types::{BitBoard, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
@@ -22,7 +22,6 @@ impl BoardBuilder {
     }
 
     pub fn place_piece(mut self, square: Square, piece: Piece, color: Color) -> Result<Self> {
-        // Check for overlapping pieces
         if self.is_square_occupied(square) {
             return Err(BoardError::OverlappingPieces { square });
         }
@@ -64,7 +63,7 @@ impl BoardBuilder {
         self.validate()?;
 
         let mut cache = BoardCache::new();
-        cache.update_occupancy(&self.pieces);
+        cache.refresh(&self.pieces);
 
         let zobrist_hash = self.compute_zobrist_hash();
 
@@ -94,20 +93,15 @@ impl BoardBuilder {
     }
 
     fn validate_castling_rights(&self) -> Result<()> {
-        for color in [Color::White, Color::Black] {
+        for &color in &[Color::White, Color::Black] {
             let rights = &self.game_state.castling_rights[color as usize];
-            let back_rank = match color {
-                Color::White => aether_types::Rank::One,
-                Color::Black => aether_types::Rank::Eight,
-            };
-
-            // Check if king is in starting position for castling
-            let king_square = Square::new(aether_types::File::E, back_rank);
-            if !self.pieces[color as usize][Piece::King as usize].has(king_square)
-                && (rights.short.is_some() || rights.long.is_some())
-            {
+            if rights.is_empty() {
+                continue;
+            }
+            let king_square = Square::new(File::E, color.back_rank());
+            if !self.pieces[color as usize][Piece::King as usize].has(king_square) {
                 return Err(BoardError::InvalidCastlingRights {
-                    reason: format!("King not on starting square for {color}",),
+                    reason: format!("{color} king not on starting square"),
                 });
             }
         }

@@ -8,46 +8,29 @@ use crate::Board;
 
 impl Board {
     pub fn is_in_check(&self, color: Color) -> bool {
-        let king_square = self.get_king_square(color);
+        let Some(king_sq) = self.get_king_square(color) else {
+            return false;
+        };
 
-        if king_square.is_none() {
-            return false; // No king on the board, cannot be in check
-        }
-
-        let king_square = king_square.unwrap();
-
-        self.attackers_to_square(king_square, color.opponent()) != BitBoard::EMPTY
+        !self
+            .attackers_to_square(king_sq, color.opponent())
+            .is_empty()
     }
 
-    pub fn attackers_to_square(&self, square: Square, color: Color) -> BitBoard {
-        let mut attackers = BitBoard::EMPTY;
-        let occupied = self.cache.occupied;
+    pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
+        let occ = self.cache.occupied;
+        let their = &self.pieces[color as usize];
 
-        let attacking_pieces = self.cache.color_combined[color as usize];
-
-        if attacking_pieces.is_empty() {
-            return attackers;
-        }
-
-        let pawn_attacks = get_pawn_attacks_to_square(square, color);
-        attackers |= pawn_attacks & self.pieces[color as usize][Piece::Pawn as usize];
-
-        let knight_attacks = get_knight_attacks(square);
-        attackers |= knight_attacks & self.pieces[color as usize][Piece::Knight as usize];
-
-        let bishop_attacks = get_bishop_attacks(square, occupied);
-        attackers |= bishop_attacks
-            & (self.pieces[color as usize][Piece::Bishop as usize]
-                | self.pieces[color as usize][Piece::Queen as usize]);
-
-        let rook_attacks = get_rook_attacks(square, occupied);
-        attackers |= rook_attacks
-            & (self.pieces[color as usize][Piece::Rook as usize]
-                | self.pieces[color as usize][Piece::Queen as usize]);
-
-        let king_attacks = get_king_moves(square);
-        attackers |= king_attacks & self.pieces[color as usize][Piece::King as usize];
-
-        attackers
+        [
+            get_pawn_attacks_to_square(sq, color) & their[Piece::Pawn as usize],
+            get_knight_attacks(sq) & their[Piece::Knight as usize],
+            get_bishop_attacks(sq, occ)
+                & (their[Piece::Bishop as usize] | their[Piece::Queen as usize]),
+            get_rook_attacks(sq, occ)
+                & (their[Piece::Rook as usize] | their[Piece::Queen as usize]),
+            get_king_moves(sq) & their[Piece::King as usize],
+        ]
+        .into_iter()
+        .fold(BitBoard::new(), |acc, bb| acc | bb)
     }
 }

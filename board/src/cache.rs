@@ -16,17 +16,11 @@ impl BoardCache {
         }
     }
 
-    pub fn update_occupancy(&mut self, pieces: &[[BitBoard; 6]; 2]) {
-        self.color_combined[Color::White as usize] = pieces[Color::White as usize]
-            .iter()
-            .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
-
-        self.color_combined[Color::Black as usize] = pieces[Color::Black as usize]
-            .iter()
-            .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
-
-        self.occupied =
-            self.color_combined[Color::White as usize] | self.color_combined[Color::Black as usize];
+    pub fn refresh(&mut self, pieces: &[[BitBoard; 6]; 2]) {
+        for &color in &[Color::White, Color::Black] {
+            self.color_combined[color as usize] = combine_piece_boards(pieces[color as usize]);
+        }
+        self.occupied = self.color_combined[0] | self.color_combined[1];
     }
 
     pub fn invalidate_check_cache(&mut self) {
@@ -46,4 +40,10 @@ impl Default for BoardCache {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn combine_piece_boards(piece_bbs: [BitBoard; 6]) -> BitBoard {
+    piece_bbs
+        .into_iter()
+        .fold(BitBoard::EMPTY, |acc, bb| acc | bb)
 }
