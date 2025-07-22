@@ -189,7 +189,7 @@ impl Board {
                         ch
                     }
                 });
-                write!(out, " {} |", ch).unwrap();
+                write!(out, " {ch} |").unwrap();
             }
             writeln!(out, "\n +---+---+---+---+---+---+---+---+").unwrap();
         }
