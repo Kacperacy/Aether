@@ -1,3 +1,4 @@
+use board::{Board, FenOps, STARTING_POSITION_FEN};
 use movegen::magic_gen;
 use std::env;
 
@@ -15,4 +16,6 @@ fn main() {
 
         println!("Magic constants generation complete!");
     }
+
+    let _ = Board::from_fen(STARTING_POSITION_FEN);
 }

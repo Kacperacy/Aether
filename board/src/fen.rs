@@ -133,9 +133,9 @@ impl<'a> FenParser<'a> {
                 if ch.is_ascii_digit() {
                     // Empty squares
                     let empty_count = ch.to_digit(10).unwrap() as i8;
-                    if empty_count < 1 || empty_count > 8 {
+                    if !(1..=8).contains(&empty_count) {
                         return Err(BoardError::FenParsingError {
-                            message: format!("Invalid empty square count: {}", empty_count),
+                            message: format!("Invalid empty square count: {empty_count}"),
                         });
                     }
                     file_index += empty_count;
@@ -181,7 +181,7 @@ impl<'a> FenParser<'a> {
             'k' => (Piece::King, Color::Black),
             _ => {
                 return Err(BoardError::FenParsingError {
-                    message: format!("Invalid piece character: {}", ch),
+                    message: format!("Invalid piece character: {ch}"),
                 });
             }
         };
@@ -221,7 +221,7 @@ impl<'a> FenParser<'a> {
                 'a'..='h' => black_rights.long = Some(File::from_str(&ch.to_string()).unwrap()),
                 _ => {
                     return Err(BoardError::FenParsingError {
-                        message: format!("Invalid castling right: {}", ch),
+                        message: format!("Invalid castling right: {ch}"),
                     });
                 }
             }
@@ -240,7 +240,7 @@ impl<'a> FenParser<'a> {
 
         if en_passant_str.len() != 2 {
             return Err(BoardError::FenParsingError {
-                message: format!("Invalid en passant square format: {}", en_passant_str),
+                message: format!("Invalid en passant square format: {en_passant_str}"),
             });
         }
 
@@ -255,8 +255,7 @@ impl<'a> FenParser<'a> {
                 if square.rank() != expected_rank {
                     return Err(BoardError::FenParsingError {
                         message: format!(
-                            "En passant square {} is not on expected rank {}",
-                            square, expected_rank
+                            "En passant square {square} is not on expected rank {expected_rank}"
                         ),
                     });
                 }
@@ -264,7 +263,7 @@ impl<'a> FenParser<'a> {
                 Ok(Some(square))
             }
             Err(_) => Err(BoardError::FenParsingError {
-                message: format!("Invalid en passant square: {}", en_passant_str),
+                message: format!("Invalid en passant square: {en_passant_str}"),
             }),
         }
     }
@@ -311,10 +310,7 @@ impl<'a> FenGenerator<'a> {
         let halfmove = self.generate_halfmove_clock();
         let fullmove = self.generate_fullmove_number();
 
-        format!(
-            "{} {} {} {} {} {}",
-            placement, side_to_move, castling, en_passant, halfmove, fullmove
-        )
+        format!("{placement} {side_to_move} {castling} {en_passant} {halfmove} {fullmove}")
     }
 
     /// Generate piece placement field

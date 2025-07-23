@@ -8,11 +8,12 @@ mod movement;
 mod zobrist;
 
 pub use builder::BoardBuilder;
-pub use cache::BoardCache;
-pub use error::*;
-pub use game_state::GameState;
+pub use fen::{FenOps, STARTING_POSITION_FEN};
 
 use aether_types::{BitBoard, BoardQuery, Color, File, Piece, Rank, Square};
+use cache::BoardCache;
+use error::*;
+use game_state::GameState;
 use std::num::NonZeroU64;
 
 #[derive(Debug, Clone)]
