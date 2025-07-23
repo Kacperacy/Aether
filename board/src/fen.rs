@@ -9,7 +9,7 @@
 //! 5. Halfmove clock (moves since last pawn move or capture)
 //! 6. Fullmove number (increments after Black's move)
 
-use crate::{Board, BoardBuilder, BoardError,  Result};
+use crate::{Board, BoardBuilder, BoardError, Result};
 use aether_types::{BoardQuery, CastlingRights, Color, File, Piece, Rank, Square};
 use std::str::FromStr;
 
