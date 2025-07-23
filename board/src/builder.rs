@@ -21,7 +21,7 @@ impl BoardBuilder {
         builder
     }
 
-    pub fn place_piece(mut self, square: Square, piece: Piece, color: Color) -> Result<Self> {
+    pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) -> Result<&mut Self> {
         if self.is_square_occupied(square) {
             return Err(BoardError::OverlappingPieces { square });
         }
@@ -30,21 +30,21 @@ impl BoardBuilder {
         Ok(self)
     }
 
-    pub fn set_side_to_move(mut self, color: Color) -> Self {
+    pub fn set_side_to_move(&mut self, color: Color) -> &mut Self {
         self.game_state.side_to_move = color;
         self
     }
 
     pub fn set_castling_rights(
-        mut self,
+        &mut self,
         color: Color,
         rights: aether_types::CastlingRights,
-    ) -> Self {
+    ) -> &mut Self {
         self.game_state.castling_rights[color as usize] = rights;
         self
     }
 
-    pub fn set_en_passant(mut self, square: Option<Square>) -> Result<Self> {
+    pub fn set_en_passant(&mut self, square: Option<Square>) -> Result<&mut Self> {
         if let Some(sq) = square {
             // Validate en passant square
             let expected_rank = match self.game_state.side_to_move {
