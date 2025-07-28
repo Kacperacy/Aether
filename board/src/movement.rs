@@ -35,8 +35,10 @@ impl Board {
                 self.remove_piece(to);
             }
             self.place_piece(to, piece, color);
+            self.change_side_to_move();
             return Some((piece, color));
         }
+
         None
     }
 }

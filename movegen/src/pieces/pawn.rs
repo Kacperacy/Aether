@@ -97,3 +97,12 @@ pub fn get_pawn_moves(sq: Square, color: Color, occupied: BitBoard) -> BitBoard 
 
     moves
 }
+
+/// True if `sq` is the promotion rank for `color`.
+#[inline(always)]
+pub fn is_promotion_rank(sq: Square, color: Color) -> bool {
+    match color {
+        Color::White => sq.rank() == Rank::Eight,
+        Color::Black => sq.rank() == Rank::One,
+    }
+}

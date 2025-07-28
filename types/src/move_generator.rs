@@ -1,8 +1,18 @@
 use crate::{BoardQuery, Move};
 
-pub trait MoveGen {
-    fn pseudo_legal<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
-    fn legal<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
-    fn captures<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
-    fn quiet_moves<T: BoardQuery>(&self, board: &T, moves: &mut Vec<Move>);
+/// Public move-generation interface.
+///
+/// `T` is any board type that implements [`BoardQuery`] (currently `Board`).
+pub trait MoveGen<T: BoardQuery> {
+    /// Fills `moves` with all pseudo-legal moves for `board`.
+    fn pseudo_legal(&self, board: &T, moves: &mut Vec<Move>);
+
+    /// Fills `moves` with only legal moves (king not left in check).
+    fn legal(&self, board: &T, moves: &mut Vec<Move>);
+
+    /// Captures only.
+    fn captures(&self, board: &T, moves: &mut Vec<Move>);
+
+    /// Quiet (non-capture, non-EP, non-castle) moves only.
+    fn quiet_moves(&self, board: &T, moves: &mut Vec<Move>);
 }

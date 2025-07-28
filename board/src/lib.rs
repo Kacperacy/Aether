@@ -24,6 +24,19 @@ pub struct Board {
     zobrist_hash: u64,
 }
 
+// Trait for board operations
+pub trait BoardOps {
+    fn make_move(&mut self, mv: aether_types::Move) -> Result<()>;
+    fn unmake_move(&mut self, mv: aether_types::Move) -> Result<()>;
+}
+
+// Trait for mutable board operations
+pub trait BoardMut {
+    fn set_piece(&mut self, square: Square, piece: Piece, color: Color);
+    fn remove_piece(&mut self, square: Square);
+    fn clear_board(&mut self);
+}
+
 impl Board {
     pub fn new() -> Result<Self> {
         BoardBuilder::new().build()
@@ -70,6 +83,11 @@ impl Board {
 
     pub fn invalidate_cache(&mut self) {
         self.cache.invalidate_check_cache();
+    }
+
+    pub fn change_side_to_move(&mut self) {
+        self.game_state.side_to_move = self.game_state.side_to_move.opponent();
+        self.invalidate_cache();
     }
 }
 
@@ -130,19 +148,6 @@ impl Default for Board {
     }
 }
 
-// Trait for board operations
-pub trait BoardOps {
-    fn make_move(&mut self, mv: aether_types::Move) -> Result<()>;
-    fn unmake_move(&mut self, mv: aether_types::Move) -> Result<()>;
-}
-
-// Trait for mutable board operations
-pub trait BoardMut {
-    fn set_piece(&mut self, square: Square, piece: Piece, color: Color);
-    fn remove_piece(&mut self, square: Square);
-    fn clear_board(&mut self);
-}
-
 impl BoardMut for Board {
     fn set_piece(&mut self, square: Square, piece: Piece, color: Color) {
         self.pieces[color as usize][piece as usize] |= square.bitboard();
@@ -177,9 +182,9 @@ impl Board {
     pub fn as_ascii(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
-        writeln!(out, " +---+---+---+---+---+---+---+---+").unwrap();
+        write!(out, "\n").unwrap();
         for rank in (0..8).rev() {
-            write!(out, "{} |", rank + 1).unwrap();
+            write!(out, "{}", rank + 1).unwrap();
             for file in 0..8 {
                 let sq = Square::new(File::from_index(file), Rank::new(rank));
                 let ch = self.piece_at(sq).map_or('.', |(p, c)| {
@@ -190,11 +195,11 @@ impl Board {
                         ch
                     }
                 });
-                write!(out, " {ch} |").unwrap();
+                write!(out, " {ch}").unwrap();
             }
-            writeln!(out, "\n +---+---+---+---+---+---+---+---+").unwrap();
+            write!(out, "\n").unwrap();
         }
-        writeln!(out, "   a   b   c   d   e   f   g   h").unwrap();
+        writeln!(out, "  A B C D E F G H").unwrap();
         out
     }
 }

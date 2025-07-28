@@ -194,6 +194,16 @@ impl BitBoard {
         let square = Square::from_index(self.0.trailing_zeros() as i8);
         Some(square)
     }
+
+    pub fn pop_lsb(&mut self) -> Option<Square> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let square = self.next_square()?;
+        *self -= square.bitboard();
+        Some(square)
+    }
 }
 
 impl Iterator for BitBoard {

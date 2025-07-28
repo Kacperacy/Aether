@@ -60,6 +60,21 @@ impl Move {
         self
     }
 
+    pub fn with_piece(mut self, piece: Piece) -> Self {
+        self.piece = piece;
+        self
+    }
+
+    pub fn with_capture(mut self, piece: Piece) -> Self {
+        self.capture = Some(piece);
+        self
+    }
+
+    pub fn with_flags(mut self, flags: MoveFlags) -> Self {
+        self.flags = flags;
+        self
+    }
+
     pub fn is_capture(&self) -> bool {
         self.capture.is_some()
     }
