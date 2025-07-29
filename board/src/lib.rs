@@ -10,7 +10,7 @@ mod zobrist;
 pub use builder::BoardBuilder;
 pub use fen::{FenOps, STARTING_POSITION_FEN};
 
-use aether_types::{BitBoard, BoardQuery, Color, File, Piece, Rank, Square};
+use aether_types::{BitBoard, BoardQuery, Color, File, MoveState, Piece, Rank, Square};
 use cache::BoardCache;
 use error::*;
 use game_state::GameState;
@@ -22,6 +22,8 @@ pub struct Board {
     game_state: GameState,
     cache: BoardCache,
     zobrist_hash: u64,
+    /// Stack to store move states for unmake operations
+    move_history: Vec<MoveState>,
 }
 
 // Trait for board operations
@@ -60,21 +62,6 @@ impl Board {
 
     pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
         NonZeroU64::new(self.zobrist_hash)
-    }
-
-    pub fn update_zobrist_incremental(
-        &mut self,
-        _piece: Piece,
-        _color: Color,
-        _from: Square,
-        _to: Square,
-    ) {
-        // Incremental zobrist update - remove from old square, add to new square
-        // self.zobrist_hash ^= zobrist::piece_hash(piece, color, from);
-        // self.zobrist_hash ^= zobrist::piece_hash(piece, color, to);
-
-        // not implemented yet
-        self.zobrist_hash = 0; // Placeholder for now
     }
 
     fn update_cache(&mut self) {

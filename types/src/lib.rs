@@ -8,6 +8,7 @@ mod move_generator;
 pub mod piece;
 pub mod rank;
 pub mod square;
+pub mod zobrist_keys;
 
 pub use bitboard::*;
 pub use board_query::*;
@@ -19,3 +20,5 @@ pub use move_generator::*;
 pub use piece::*;
 pub use rank::*;
 pub use square::*;
+
+pub type Result<T> = std::result::Result<T, &'static str>;

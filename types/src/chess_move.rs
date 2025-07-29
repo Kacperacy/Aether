@@ -1,4 +1,4 @@
-use crate::{Piece, Square};
+use crate::{CastlingRights, Color, Piece, Square};
 use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Move {
@@ -15,6 +15,20 @@ pub struct MoveFlags {
     pub is_castle: bool,
     pub is_en_passant: bool,
     pub is_double_pawn_push: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct MoveState {
+    pub captured_piece: Option<(Piece, Color)>,
+    pub mv_from: Square,
+    pub mv_to: Square,
+    pub promotion: Option<Piece>,
+
+    /* game-state members */
+    pub old_zobrist_hash: u64,
+    pub old_en_passant: Option<Square>,
+    pub old_castling_rights: [CastlingRights; 2], // [color][side]
+    pub old_halfmove_clock: u16,
 }
 
 impl Display for Move {

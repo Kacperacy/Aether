@@ -23,7 +23,7 @@ members = [
     "engine",
     "uci",
     "cli"
-]
+, "perft"]
 
 [workspace.dependencies]
 # External dependencies

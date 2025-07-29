@@ -72,6 +72,7 @@ impl BoardBuilder {
             game_state: self.game_state,
             cache,
             zobrist_hash,
+            move_history: Vec::new(),
         })
     }
 

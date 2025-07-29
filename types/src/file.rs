@@ -125,4 +125,8 @@ impl File {
             Self::H => BitBoard(0x4040404040404040),
         }
     }
+
+    pub const fn to_index(self) -> i8 {
+        self as i8
+    }
 }

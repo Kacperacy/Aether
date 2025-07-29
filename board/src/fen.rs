@@ -269,9 +269,9 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse halfmove clock
-    fn parse_halfmove_clock(&self) -> Result<u8> {
+    fn parse_halfmove_clock(&self) -> Result<u16> {
         self.fields[4]
-            .parse::<u8>()
+            .parse::<u16>()
             .map_err(|_| BoardError::FenParsingError {
                 message: format!("Invalid halfmove clock: {}", self.fields[4]),
             })

@@ -5,7 +5,7 @@ pub struct GameState {
     pub side_to_move: Color,
     pub castling_rights: [CastlingRights; 2],
     pub en_passant_square: Option<Square>,
-    pub halfmove_clock: u8,
+    pub halfmove_clock: u16,
     pub fullmove_number: u16,
 }
 
