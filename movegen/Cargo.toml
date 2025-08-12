@@ -3,6 +3,15 @@ name = "movegen"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+codegen = ["rand"]
+
 [dependencies]
 aether-types = { workspace = true }
-rand = { workspace = true }
+rand = { workspace = true, optional = true }
+
+[[bin]]
+name = "gen_magics"
+path = "src/bin/gen_magics.rs"
+required-features = ["codegen"]

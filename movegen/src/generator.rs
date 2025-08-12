@@ -1,7 +1,7 @@
-use aether_types::{BitBoard, BoardQuery, Color, Move, MoveFlags, MoveGen, Piece, Square};
+use crate::attacks::attackers_to_square_with_occ;
 use crate::magic::{get_bishop_attacks, get_queen_attacks, get_rook_attacks};
 use crate::pieces::{get_king_moves, get_knight_moves, get_pawn_attacks, get_pawn_moves};
-use crate::attacks::attackers_to_square_with_occ;
+use aether_types::{BitBoard, BoardQuery, Color, Move, MoveFlags, MoveGen, Piece, Square};
 
 /// Minimal move generator (incremental implementation).
 #[derive(Debug, Default, Clone, Copy)]
@@ -13,7 +13,11 @@ impl Generator {
     }
 
     #[inline]
-    fn build_occupancies<T: BoardQuery>(&self, board: &T, stm: Color) -> (BitBoard, BitBoard, BitBoard) {
+    fn build_occupancies<T: BoardQuery>(
+        &self,
+        board: &T,
+        stm: Color,
+    ) -> (BitBoard, BitBoard, BitBoard) {
         let mut occ = BitBoard::EMPTY;
         let mut own = BitBoard::EMPTY;
         let mut opp = BitBoard::EMPTY;
@@ -32,23 +36,48 @@ impl Generator {
     }
 
     #[inline]
-    fn push_move(moves: &mut Vec<Move>, from: Square, to: Square, piece: Piece, capture: Option<Piece>, flags: MoveFlags, promotion: Option<Piece>) {
+    fn push_move(
+        moves: &mut Vec<Move>,
+        from: Square,
+        to: Square,
+        piece: Piece,
+        capture: Option<Piece>,
+        flags: MoveFlags,
+        promotion: Option<Piece>,
+    ) {
         let mut mv = Move::new(from, to).with_piece(piece).with_flags(flags);
-        if let Some(cap) = capture { mv = mv.with_capture(cap); }
-        if let Some(p) = promotion { mv = mv.with_promotion(p); }
+        if let Some(cap) = capture {
+            mv = mv.with_capture(cap);
+        }
+        if let Some(p) = promotion {
+            mv = mv.with_promotion(p);
+        }
         moves.push(mv);
     }
 
     #[inline]
-    fn gen_pawn_moves<T: BoardQuery>(&self, board: &T, from: Square, stm: Color, occ: BitBoard, opp: BitBoard, moves: &mut Vec<Move>) {
+    fn gen_pawn_moves<T: BoardQuery>(
+        &self,
+        board: &T,
+        from: Square,
+        stm: Color,
+        occ: BitBoard,
+        opp: BitBoard,
+        moves: &mut Vec<Move>,
+    ) {
         use Piece::*;
         // Quiet pushes (including double)
         let mut pushes = get_pawn_moves(from, stm, occ);
         while let Some(to) = pushes.pop_lsb() {
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
             let delta_rank = (to.rank() as i8) - (from.rank() as i8);
-            let is_double = (stm == Color::White && delta_rank == 2) || (stm == Color::Black && delta_rank == -2);
-            let flags = MoveFlags { is_castle: false, is_en_passant: false, is_double_pawn_push: is_double };
+            let is_double = (stm == Color::White && delta_rank == 2)
+                || (stm == Color::Black && delta_rank == -2);
+            let flags = MoveFlags {
+                is_castle: false,
+                is_en_passant: false,
+                is_double_pawn_push: is_double,
+            };
             if is_promo {
                 for promo in [Knight, Bishop, Rook, Queen] {
                     Self::push_move(moves, from, to, Pawn, None, flags, Some(promo));
@@ -60,7 +89,11 @@ impl Generator {
 
         // Normal captures
         let mut attacks = get_pawn_attacks(from, stm) & opp;
-        let capture_flags = MoveFlags { is_castle: false, is_en_passant: false, is_double_pawn_push: false };
+        let capture_flags = MoveFlags {
+            is_castle: false,
+            is_en_passant: false,
+            is_double_pawn_push: false,
+        };
         while let Some(to) = attacks.pop_lsb() {
             let cap_piece = board.piece_at(to).map(|(p, _)| p);
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
@@ -77,7 +110,11 @@ impl Generator {
         if let Some(ep) = board.en_passant_square() {
             // EP target must be one of pawn attack squares from 'from'. Also EP square is empty.
             if get_pawn_attacks(from, stm).has(ep) {
-                let flags = MoveFlags { is_castle: false, is_en_passant: true, is_double_pawn_push: false };
+                let flags = MoveFlags {
+                    is_castle: false,
+                    is_en_passant: true,
+                    is_double_pawn_push: false,
+                };
                 // Captured piece is always a pawn
                 Self::push_move(moves, from, ep, Pawn, Some(Pawn), flags, None);
             }
@@ -85,17 +122,40 @@ impl Generator {
     }
 
     #[inline]
-    fn gen_knight_moves<T: BoardQuery>(&self, board: &T, from: Square, occ: BitBoard, own: BitBoard, moves: &mut Vec<Move>) {
+    fn gen_knight_moves<T: BoardQuery>(
+        &self,
+        board: &T,
+        from: Square,
+        occ: BitBoard,
+        own: BitBoard,
+        moves: &mut Vec<Move>,
+    ) {
         let mut targets = get_knight_moves(from) & !own;
-        let flags = MoveFlags { is_castle: false, is_en_passant: false, is_double_pawn_push: false };
+        let flags = MoveFlags {
+            is_castle: false,
+            is_en_passant: false,
+            is_double_pawn_push: false,
+        };
         while let Some(to) = targets.pop_lsb() {
-            let cap_piece = if occ.has(to) { board.piece_at(to).map(|(p, _)| p) } else { None };
+            let cap_piece = if occ.has(to) {
+                board.piece_at(to).map(|(p, _)| p)
+            } else {
+                None
+            };
             Self::push_move(moves, from, to, Piece::Knight, cap_piece, flags, None);
         }
     }
 
     #[inline]
-    fn gen_slider_moves<T: BoardQuery>(&self, board: &T, from: Square, piece: Piece, occ: BitBoard, own: BitBoard, moves: &mut Vec<Move>) {
+    fn gen_slider_moves<T: BoardQuery>(
+        &self,
+        board: &T,
+        from: Square,
+        piece: Piece,
+        occ: BitBoard,
+        own: BitBoard,
+        moves: &mut Vec<Move>,
+    ) {
         let attacks = match piece {
             Piece::Bishop => get_bishop_attacks(from, occ),
             Piece::Rook => get_rook_attacks(from, occ),
@@ -103,26 +163,53 @@ impl Generator {
             _ => BitBoard::EMPTY,
         } & !own;
         let mut targets = attacks;
-        let flags = MoveFlags { is_castle: false, is_en_passant: false, is_double_pawn_push: false };
+        let flags = MoveFlags {
+            is_castle: false,
+            is_en_passant: false,
+            is_double_pawn_push: false,
+        };
         while let Some(to) = targets.pop_lsb() {
-            let cap_piece = if occ.has(to) { board.piece_at(to).map(|(p, _)| p) } else { None };
+            let cap_piece = if occ.has(to) {
+                board.piece_at(to).map(|(p, _)| p)
+            } else {
+                None
+            };
             Self::push_move(moves, from, to, piece, cap_piece, flags, None);
         }
     }
 
     #[inline]
-    fn gen_king_moves<T: BoardQuery>(&self, board: &T, from: Square, occ: BitBoard, own: BitBoard, moves: &mut Vec<Move>) {
+    fn gen_king_moves<T: BoardQuery>(
+        &self,
+        board: &T,
+        from: Square,
+        occ: BitBoard,
+        own: BitBoard,
+        moves: &mut Vec<Move>,
+    ) {
         let mut targets = get_king_moves(from) & !own;
-        let normal_flags = MoveFlags { is_castle: false, is_en_passant: false, is_double_pawn_push: false };
+        let normal_flags = MoveFlags {
+            is_castle: false,
+            is_en_passant: false,
+            is_double_pawn_push: false,
+        };
         while let Some(to) = targets.pop_lsb() {
-            let cap_piece = if occ.has(to) { board.piece_at(to).map(|(p, _)| p) } else { None };
+            let cap_piece = if occ.has(to) {
+                board.piece_at(to).map(|(p, _)| p)
+            } else {
+                None
+            };
             Self::push_move(moves, from, to, Piece::King, cap_piece, normal_flags, None);
         }
 
         // Castling
         if let Some((_, color)) = board.piece_at(from) {
             let opp = color.opponent();
-            let castle_flags = MoveFlags { is_castle: true, is_en_passant: false, is_double_pawn_push: false };
+            let castle_flags = MoveFlags {
+                is_castle: true,
+                is_en_passant: false,
+                is_double_pawn_push: false,
+            };
             // Short castle (king side)
             if board.can_castle_short(color) {
                 let (e, f, g) = match color {
@@ -169,11 +256,15 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
 
         for &sq in Square::all().iter() {
             if let Some((piece, color)) = board.piece_at(sq) {
-                if color != stm { continue; }
+                if color != stm {
+                    continue;
+                }
                 match piece {
                     Piece::Pawn => self.gen_pawn_moves(board, sq, stm, occ, opp, moves),
                     Piece::Knight => self.gen_knight_moves(board, sq, occ, own, moves),
-                    Piece::Bishop | Piece::Rook | Piece::Queen => self.gen_slider_moves(board, sq, piece, occ, own, moves),
+                    Piece::Bishop | Piece::Rook | Piece::Queen => {
+                        self.gen_slider_moves(board, sq, piece, occ, own, moves)
+                    }
                     Piece::King => self.gen_king_moves(board, sq, occ, own, moves),
                 }
             }
@@ -221,7 +312,11 @@ impl PieceMap {
             b[0] | b[1] | b[2] | b[3] | b[4] | b[5],
         ];
         let occ = color_occ[0] | color_occ[1];
-        Self { pieces, color_occ, occ }
+        Self {
+            pieces,
+            color_occ,
+            occ,
+        }
     }
 }
 

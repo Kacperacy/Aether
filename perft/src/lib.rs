@@ -1,5 +1,15 @@
+//! Perft crate
+//!
+//! Responsibilities:
+//! - Provide correctness and performance tests for move generation.
+//! - Offer simple perft counting utilities and states that implement `BoardQuery`.
+//! - Used in development and CI to validate `movegen` implementations.
+//!
+//! This crate should remain test-focused and avoid engine/search coupling beyond
+//! consuming the public APIs of `aether-types`, `board`, and `movegen`.
+
 use aether_types::{BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square};
-use movegen::{attacks::attackers_to_square_with_occ, Generator};
+use movegen::{Generator, attacks::attackers_to_square_with_occ};
 
 #[derive(Clone, Debug)]
 pub struct PerftState {
@@ -26,8 +36,14 @@ impl PerftState {
             occ: BitBoard::EMPTY,
             side: board.side_to_move(),
             ep: board.en_passant_square(),
-            castle_short: [board.can_castle_short(Color::White), board.can_castle_short(Color::Black)],
-            castle_long: [board.can_castle_long(Color::White), board.can_castle_long(Color::Black)],
+            castle_short: [
+                board.can_castle_short(Color::White),
+                board.can_castle_short(Color::Black),
+            ],
+            castle_long: [
+                board.can_castle_long(Color::White),
+                board.can_castle_long(Color::Black),
+            ],
         };
         s.recompute_occupancies();
         s
@@ -41,6 +57,7 @@ impl PerftState {
         self.occ = self.color_occ[0] | self.color_occ[1];
     }
 
+    #[allow(dead_code)]
     fn remove_piece_at(&mut self, sq: Square) -> Option<(Piece, Color)> {
         let bb = BitBoard::from_square(sq);
         for color in [Color::White, Color::Black] {
@@ -56,6 +73,7 @@ impl PerftState {
         None
     }
 
+    #[allow(dead_code)]
     fn place_piece(&mut self, sq: Square, piece: Piece, color: Color) {
         self.pieces[color as usize][piece as usize] |= BitBoard::from_square(sq);
     }
@@ -165,8 +183,14 @@ impl PerftState {
 
 impl BoardQuery for PerftState {
     fn piece_at(&self, sq: Square) -> Option<(Piece, Color)> {
-        if !self.occ.has(sq) { return None; }
-        let color = if self.color_occ[Color::White as usize].has(sq) { Color::White } else { Color::Black };
+        if !self.occ.has(sq) {
+            return None;
+        }
+        let color = if self.color_occ[Color::White as usize].has(sq) {
+            Color::White
+        } else {
+            Color::Black
+        };
         for piece in Piece::all() {
             if self.pieces[color as usize][piece as usize].has(sq) {
                 return Some((piece, color));

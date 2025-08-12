@@ -2,7 +2,7 @@ use board::{Board, FenOps};
 use perft::perft_count;
 
 // CPW Position 3 (rook+pawns endgame)
-// FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  
+// FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -
 // Expected nodes: d1=14, d2=191, d3=2812, d4=43238, d5=674624, d6=11030083
 
 const POS3_FEN: &str = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -";

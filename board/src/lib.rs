@@ -1,3 +1,13 @@
+//! Board crate
+//!
+//! Responsibilities:
+//! - Provide a concrete board representation implementing `aether_types::BoardQuery`.
+//! - Manage board state, FEN parsing, make/unmake moves, castling/en-passant, and Zobrist hashing.
+//! - Maintain lightweight caches used by consumers (e.g., movegen, search).
+//!
+//! This crate should not depend on higher-level policy (search/eval). Keep APIs stable and
+//! data-oriented to avoid dependency cycles.
+
 mod builder;
 mod cache;
 mod check;
@@ -23,6 +33,7 @@ pub struct Board {
     cache: BoardCache,
     zobrist_hash: u64,
     /// Stack to store move states for unmake operations
+    #[allow(dead_code)]
     move_history: Vec<MoveState>,
 }
 
