@@ -43,7 +43,6 @@ impl Default for BoardCache {
 }
 
 fn combine_piece_boards(piece_bbs: [BitBoard; 6]) -> BitBoard {
-    piece_bbs
-        .into_iter()
-        .fold(BitBoard::EMPTY, |acc, bb| acc | bb)
+    let [p0, p1, p2, p3, p4, p5] = piece_bbs;
+    p0 | p1 | p2 | p3 | p4 | p5
 }

@@ -101,7 +101,7 @@ impl BoardQuery for Board {
     }
 
     fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
-        self.attackers_to_square(square, by_color).is_empty()
+        !self.attackers_to_square(square, by_color).is_empty()
     }
 
     fn get_king_square(&self, color: Color) -> Option<Square> {

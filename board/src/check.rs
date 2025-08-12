@@ -1,8 +1,5 @@
-use aether_types::{BitBoard, BoardQuery, Color, Piece, Square};
-use movegen::{
-    magic::{get_bishop_attacks, get_rook_attacks},
-    pieces::{get_king_moves, knight::get_knight_attacks, pawn::get_pawn_attacks_to_square},
-};
+use aether_types::{BitBoard, BoardQuery, Color, Square};
+use movegen::attacks::attackers_to_square_with_occ;
 
 use crate::Board;
 
@@ -20,17 +17,6 @@ impl Board {
     pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
         let occ = self.cache.occupied;
         let their = &self.pieces[color as usize];
-
-        [
-            get_pawn_attacks_to_square(sq, color) & their[Piece::Pawn as usize],
-            get_knight_attacks(sq) & their[Piece::Knight as usize],
-            get_bishop_attacks(sq, occ)
-                & (their[Piece::Bishop as usize] | their[Piece::Queen as usize]),
-            get_rook_attacks(sq, occ)
-                & (their[Piece::Rook as usize] | their[Piece::Queen as usize]),
-            get_king_moves(sq) & their[Piece::King as usize],
-        ]
-        .into_iter()
-        .fold(BitBoard::new(), |acc, bb| acc | bb)
+        attackers_to_square_with_occ(sq, color, occ, their)
     }
 }

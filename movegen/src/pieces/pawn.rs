@@ -50,18 +50,20 @@ pub fn get_pawn_attacks_to_square(sq: Square, color: Color) -> BitBoard {
 
     match color {
         Color::White => {
-            if let Some(target) = sq.offset(-1, 1) {
-                attacks |= BitBoard::from_square(target);
-            }
-            if let Some(target) = sq.offset(1, 1) {
-                attacks |= BitBoard::from_square(target);
-            }
-        }
-        Color::Black => {
+            // Squares from which a white pawn would attack sq are one rank below
             if let Some(target) = sq.offset(-1, -1) {
                 attacks |= BitBoard::from_square(target);
             }
             if let Some(target) = sq.offset(1, -1) {
+                attacks |= BitBoard::from_square(target);
+            }
+        }
+        Color::Black => {
+            // Squares from which a black pawn would attack sq are one rank above
+            if let Some(target) = sq.offset(-1, 1) {
+                attacks |= BitBoard::from_square(target);
+            }
+            if let Some(target) = sq.offset(1, 1) {
                 attacks |= BitBoard::from_square(target);
             }
         }
