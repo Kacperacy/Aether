@@ -44,9 +44,3 @@ cargo test -p perft
 # or run the Criterion benchmark
 cargo bench -p perft
 ```
-
-## Contributing
-
-- Keep lower-level crates dependency-light (see layering in ARCHITECTURE.md).
-- Prefer adding shared types/traits to `aether-types`.
-- Document new modules with rustdoc.
