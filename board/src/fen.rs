@@ -9,7 +9,12 @@
 //! 5. Halfmove clock (moves since last pawn move or capture)
 //! 6. Fullmove number (increments after Black's move)
 
-use crate::{Board, BoardBuilder, BoardError, Result};
+use crate::error::BoardError::*;
+use crate::error::FenError;
+use crate::error::FenError::{
+    InvalidEmptySquareCount, InvalidPieceCharacter, InvalidRankSquares, TooManySquaresInRank,
+};
+use crate::{Board, BoardBuilder, Result};
 use aether_types::{BoardQuery, CastlingRights, Color, File, Piece, Rank, Square};
 use std::str::FromStr;
 
@@ -37,18 +42,14 @@ impl<'a> FenParser<'a> {
     pub fn new(fen: &'a str) -> Result<Self> {
         let trimmed = fen.trim();
         if trimmed.is_empty() {
-            return Err(BoardError::FenParsingError {
-                message: "Empty FEN string".to_string(),
-            });
+            return Err(FenParsingError(FenError::EmptyFen));
         }
 
         let fields: Vec<&str> = trimmed.split_whitespace().collect();
 
         // FEN must have at least the board field, others can be defaulted
         if fields.is_empty() {
-            return Err(BoardError::FenParsingError {
-                message: "FEN must contain at least piece placement field".to_string(),
-            });
+            return Err(FenParsingError(FenError::EmptyFields));
         }
 
         // Ensure we have exactly 6 fields, padding with defaults if necessary
@@ -65,9 +66,7 @@ impl<'a> FenParser<'a> {
         }
 
         if complete_fields.len() > 6 {
-            return Err(BoardError::FenParsingError {
-                message: "FEN contains too many fields".to_string(),
-            });
+            return Err(FenParsingError(FenError::TooManyFields));
         }
 
         Ok(FenParser {
@@ -114,9 +113,9 @@ impl<'a> FenParser<'a> {
         let ranks: Vec<&str> = placement.split('/').collect();
 
         if ranks.len() != 8 {
-            return Err(BoardError::FenParsingError {
-                message: format!("Expected 8 ranks, found {}", ranks.len()),
-            });
+            return Err(FenParsingError(FenError::WrongAmountOfRanks {
+                amount: ranks.len(),
+            }));
         }
 
         for (rank_index, rank_str) in ranks.iter().enumerate() {
@@ -125,18 +124,18 @@ impl<'a> FenParser<'a> {
 
             for ch in rank_str.chars() {
                 if file_index >= 8 {
-                    return Err(BoardError::FenParsingError {
-                        message: format!("Too many squares in rank {}", rank_index + 1),
-                    });
+                    return Err(FenParsingError(TooManySquaresInRank {
+                        rank: Rank::new(rank_index as i8),
+                    }));
                 }
 
                 if ch.is_ascii_digit() {
                     // Empty squares
                     let empty_count = ch.to_digit(10).unwrap() as i8;
                     if !(1..=8).contains(&empty_count) {
-                        return Err(BoardError::FenParsingError {
-                            message: format!("Invalid empty square count: {empty_count}"),
-                        });
+                        return Err(FenParsingError(InvalidEmptySquareCount {
+                            count: empty_count as usize,
+                        }));
                     }
                     file_index += empty_count;
                 } else {
@@ -151,13 +150,10 @@ impl<'a> FenParser<'a> {
             }
 
             if file_index != 8 {
-                return Err(BoardError::FenParsingError {
-                    message: format!(
-                        "Rank {} has {} squares, expected 8",
-                        rank_index + 1,
-                        file_index
-                    ),
-                });
+                return Err(FenParsingError(InvalidRankSquares {
+                    rank: Rank::new(rank_index as i8),
+                    amount: file_index as usize,
+                }));
             }
         }
 
@@ -179,11 +175,7 @@ impl<'a> FenParser<'a> {
             'r' => (Piece::Rook, Color::Black),
             'q' => (Piece::Queen, Color::Black),
             'k' => (Piece::King, Color::Black),
-            _ => {
-                return Err(BoardError::FenParsingError {
-                    message: format!("Invalid piece character: {ch}"),
-                });
-            }
+            _ => return Err(FenParsingError(InvalidPieceCharacter { ch })),
         };
         Ok((piece, color))
     }
@@ -193,9 +185,9 @@ impl<'a> FenParser<'a> {
         match self.fields[1] {
             "w" => Ok(Color::White),
             "b" => Ok(Color::Black),
-            _ => Err(BoardError::FenParsingError {
-                message: format!("Invalid side to move: {}", self.fields[1]),
-            }),
+            _ => Err(FenParsingError(FenError::InvalidSideToMove {
+                side: self.fields[1].to_string(),
+            })),
         }
     }
 
@@ -219,11 +211,7 @@ impl<'a> FenParser<'a> {
                 // Support Chess960 castling rights
                 'A'..='H' => white_rights.long = Some(File::from_str(&ch.to_string()).unwrap()),
                 'a'..='h' => black_rights.long = Some(File::from_str(&ch.to_string()).unwrap()),
-                _ => {
-                    return Err(BoardError::FenParsingError {
-                        message: format!("Invalid castling right: {ch}"),
-                    });
-                }
+                _ => return Err(FenParsingError(FenError::InvalidCastlingRights { ch })),
             }
         }
 
@@ -239,9 +227,9 @@ impl<'a> FenParser<'a> {
         }
 
         if en_passant_str.len() != 2 {
-            return Err(BoardError::FenParsingError {
-                message: format!("Invalid en passant square format: {en_passant_str}"),
-            });
+            return Err(FenParsingError(FenError::InvalidEnPassantSquare {
+                en_passant_str: en_passant_str.to_string(),
+            }));
         }
 
         match Square::from_str(en_passant_str) {
@@ -253,37 +241,36 @@ impl<'a> FenParser<'a> {
                 };
 
                 if square.rank() != expected_rank {
-                    return Err(BoardError::FenParsingError {
-                        message: format!(
-                            "En passant square {square} is not on expected rank {expected_rank}"
-                        ),
-                    });
+                    return Err(FenParsingError(FenError::InvalidEnPassantRank {
+                        square,
+                        rank: expected_rank,
+                    }));
                 }
 
                 Ok(Some(square))
             }
-            Err(_) => Err(BoardError::FenParsingError {
-                message: format!("Invalid en passant square: {en_passant_str}"),
-            }),
+            Err(_) => Err(FenParsingError(FenError::InvalidEnPassantSquare {
+                en_passant_str: en_passant_str.to_string(),
+            })),
         }
     }
 
     /// Parse halfmove clock
     fn parse_halfmove_clock(&self) -> Result<u16> {
-        self.fields[4]
-            .parse::<u16>()
-            .map_err(|_| BoardError::FenParsingError {
-                message: format!("Invalid halfmove clock: {}", self.fields[4]),
+        self.fields[4].parse::<u16>().map_err(|_| {
+            FenParsingError(FenError::InvalidHalfmoveClock {
+                clock: self.fields[4].to_string(),
             })
+        })
     }
 
     /// Parse fullmove number
     fn parse_fullmove_number(&self) -> Result<u16> {
-        let fullmove = self.fields[5]
-            .parse::<u16>()
-            .map_err(|_| BoardError::FenParsingError {
-                message: format!("Invalid fullmove number: {}", self.fields[5]),
-            })?;
+        let fullmove = self.fields[5].parse::<u16>().map_err(|_| {
+            FenParsingError(FenError::InvalidFullmoveNumber {
+                number: self.fields[5].to_string(),
+            })
+        })?;
 
         // Ensure fullmove number is at least 1
         if fullmove == 0 { Ok(1) } else { Ok(fullmove) }

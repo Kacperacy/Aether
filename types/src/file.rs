@@ -26,7 +26,7 @@ pub const ALL_FILES: [File; 8] = [
 ];
 
 impl FromStr for File {
-    type Err = ();
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -38,7 +38,7 @@ impl FromStr for File {
             "f" => Ok(Self::F),
             "g" => Ok(Self::G),
             "h" => Ok(Self::H),
-            _ => Err(()),
+            _ => Err("Invalid file"),
         }
     }
 }

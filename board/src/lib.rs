@@ -101,10 +101,13 @@ impl BoardQuery for Board {
             Color::Black
         };
 
-        Piece::all()
-            .into_iter()
-            .find(|&p| self.pieces[color as usize][p as usize].has(square))
-            .map(|p| (p, color))
+        for (i, piece_bb) in self.pieces[color as usize].iter().enumerate() {
+            if piece_bb.has(square) {
+                return Some((Piece::all()[i], color));
+            }
+        }
+
+        None
     }
 
     fn is_square_occupied(&self, square: Square) -> bool {

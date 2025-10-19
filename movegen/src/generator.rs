@@ -68,7 +68,7 @@ impl Generator {
         use Piece::*;
         // Quiet pushes (including double)
         let mut pushes = get_pawn_moves(from, stm, occ);
-        while let Some(to) = pushes.pop_lsb() {
+        while let Some(to) = pushes.next() {
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
             let delta_rank = (to.rank() as i8) - (from.rank() as i8);
             let is_double = (stm == Color::White && delta_rank == 2)
@@ -94,7 +94,7 @@ impl Generator {
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = attacks.pop_lsb() {
+        while let Some(to) = attacks.next() {
             let cap_piece = board.piece_at(to).map(|(p, _)| p);
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
             if is_promo {
@@ -136,7 +136,7 @@ impl Generator {
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.pop_lsb() {
+        while let Some(to) = targets.next() {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {
@@ -168,7 +168,7 @@ impl Generator {
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.pop_lsb() {
+        while let Some(to) = targets.next() {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {
@@ -193,7 +193,7 @@ impl Generator {
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.pop_lsb() {
+        while let Some(to) = targets.next() {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {

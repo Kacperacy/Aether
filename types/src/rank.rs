@@ -26,7 +26,7 @@ pub const ALL_RANKS: [Rank; 8] = [
 ];
 
 impl FromStr for Rank {
-    type Err = ();
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -38,7 +38,7 @@ impl FromStr for Rank {
             "6" => Ok(Self::Six),
             "7" => Ok(Self::Seven),
             "8" => Ok(Self::Eight),
-            _ => Err(()),
+            _ => Err("Invalid rank"),
         }
     }
 }

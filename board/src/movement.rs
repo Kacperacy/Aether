@@ -23,13 +23,12 @@ impl Board {
             Color::Black
         };
         // Find piece for that color
-        for piece in Piece::all() {
-            if self.pieces[color as usize][piece as usize].has(square) {
-                // Clear piece and update caches
-                self.pieces[color as usize][piece as usize] &= !bb;
+        for (i, piece_bb) in self.pieces[color as usize].iter().enumerate() {
+            if piece_bb.has(square) {
+                self.pieces[color as usize][i] &= !bb;
                 self.cache.color_combined[color as usize] &= !bb;
                 self.cache.occupied &= !bb;
-                return Some((piece, color));
+                return Some((Piece::all()[i], color));
             }
         }
         None

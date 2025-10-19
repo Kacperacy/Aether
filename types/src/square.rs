@@ -28,19 +28,16 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 ];
 
 impl FromStr for Square {
-    type Err = ();
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut chars = s.chars();
-        let file = chars.next().ok_or(())?;
-        let rank = chars.next().ok_or(())?;
-        if chars.next().is_some() {
-            return Err(());
+        if s.len() != 2 {
+            return Err("Invalid square length");
         }
-        Ok(Square::new(
-            File::from_str(&file.to_string())?,
-            Rank::from_str(&rank.to_string())?,
-        ))
+
+        let file = File::from_str(&s[0..1]).map_err(|_| "Invalid file character (must be a-h)")?;
+        let rank = Rank::from_str(&s[1..2]).map_err(|_| "Invalid rank character (must be 1-8)")?;
+        Ok(Square::new(file, rank))
     }
 }
 
