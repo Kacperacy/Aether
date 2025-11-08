@@ -10,10 +10,12 @@
 mod alpha_beta;
 mod move_ordering;
 mod search_info;
+mod transposition_table;
 
 pub use alpha_beta::AlphaBetaSearcher;
-pub use move_ordering::{MoveOrderer, SimpleMoveOrderer};
+pub use move_ordering::{AdvancedMoveOrderer, MoveOrderer, SimpleMoveOrderer};
 pub use search_info::{SearchInfo, SearchLimits, SearchResult};
+pub use transposition_table::{EntryType, TTEntry, TranspositionTable};
 
 use aether_types::{BoardQuery, Move};
 use eval::Evaluator;

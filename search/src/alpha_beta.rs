@@ -1,4 +1,7 @@
-use crate::{MoveOrderer, SearchInfo, SearchLimits, SearchResult, Searcher, SimpleMoveOrderer};
+use crate::{
+    transposition_table::{EntryType, TranspositionTable},
+    MoveOrderer, SearchInfo, SearchLimits, SearchResult, Searcher, SimpleMoveOrderer,
+};
 use aether_types::{BoardQuery, Move, MoveGen};
 use board::{Board, BoardOps};
 use eval::{mated_in, Evaluator, Score, SimpleEvaluator, MATE_SCORE};
@@ -12,10 +15,12 @@ use std::time::Instant;
 /// - Iterative deepening
 /// - Move ordering
 /// - Principal variation collection
+/// - Transposition table
 pub struct AlphaBetaSearcher<E = SimpleEvaluator, O = SimpleMoveOrderer> {
     evaluator: E,
     move_orderer: O,
     generator: Generator,
+    tt: TranspositionTable,
     info: SearchInfo,
     should_stop: bool,
     start_time: Option<Instant>,
@@ -28,6 +33,20 @@ impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
             evaluator: SimpleEvaluator::new(),
             move_orderer: SimpleMoveOrderer::new(),
             generator: Generator,
+            tt: TranspositionTable::default_size(),
+            info: SearchInfo::new(),
+            should_stop: false,
+            start_time: None,
+        }
+    }
+
+    /// Create a new alpha-beta searcher with custom TT size (in MB)
+    pub fn with_tt_size(tt_size_mb: usize) -> Self {
+        Self {
+            evaluator: SimpleEvaluator::new(),
+            move_orderer: SimpleMoveOrderer::new(),
+            generator: Generator,
+            tt: TranspositionTable::new(tt_size_mb),
             info: SearchInfo::new(),
             should_stop: false,
             start_time: None,
@@ -42,6 +61,7 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             evaluator,
             move_orderer,
             generator: Generator,
+            tt: TranspositionTable::default_size(),
             info: SearchInfo::new(),
             should_stop: false,
             start_time: None,
@@ -76,6 +96,9 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
     /// Main alpha-beta search with iterative deepening
     fn iterative_deepening(&mut self, board: &Board, limits: &SearchLimits) -> SearchResult {
+        // Start new search (increment TT age)
+        self.tt.new_search();
+
         let mut best_move = None;
         let mut best_score = -MATE_SCORE;
         let mut best_pv = Vec::new();
@@ -139,6 +162,7 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 self.info.time_elapsed = start.elapsed();
                 self.info.calculate_nps();
             }
+            self.info.hash_full = self.tt.hash_full();
         }
 
         SearchResult::with_info(best_move, best_score, best_pv, self.info.clone())
@@ -177,6 +201,42 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             return self.quiescence(board, alpha, beta);
         }
 
+        // Get zobrist hash for TT lookup
+        let hash = board.zobrist_hash().map(|h| h.get()).unwrap_or(0);
+        let original_alpha = alpha;
+
+        // Probe transposition table
+        if let Some(tt_entry) = self.tt.probe(hash) {
+            // Only use TT entry if searched to at least the same depth
+            if tt_entry.depth >= depth {
+                match tt_entry.entry_type {
+                    EntryType::Exact => {
+                        // Exact score - use it directly
+                        if let Some(best_move) = tt_entry.best_move {
+                            pv.clear();
+                            pv.push(best_move);
+                        }
+                        return tt_entry.score;
+                    }
+                    EntryType::LowerBound => {
+                        // Score is at least this good
+                        alpha = alpha.max(tt_entry.score);
+                    }
+                    EntryType::UpperBound => {
+                        // Score is at most this good
+                        if tt_entry.score <= alpha {
+                            return alpha;
+                        }
+                    }
+                }
+
+                // Check for beta cutoff
+                if alpha >= beta {
+                    return alpha;
+                }
+            }
+        }
+
         // Generate legal moves
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);
@@ -195,9 +255,19 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         }
 
         // Order moves for better alpha-beta pruning
+        // Try TT move first if available
+        if let Some(tt_entry) = self.tt.probe(hash) {
+            if let Some(tt_move) = tt_entry.best_move {
+                // Move TT move to front
+                if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
+                    moves.swap(0, pos);
+                }
+            }
+        }
         self.move_orderer.order_moves(&mut moves);
 
         let mut best_score = -MATE_SCORE;
+        let mut best_move = None;
         let mut local_pv = Vec::new();
 
         // Search all moves
@@ -223,6 +293,7 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             // Update best score
             if score > best_score {
                 best_score = score;
+                best_move = Some(mv);
 
                 // Update PV
                 local_pv.clear();
@@ -240,6 +311,18 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 break; // Prune remaining moves
             }
         }
+
+        // Determine entry type for TT
+        let entry_type = if best_score <= original_alpha {
+            EntryType::UpperBound // All moves failed low
+        } else if best_score >= beta {
+            EntryType::LowerBound // Beta cutoff
+        } else {
+            EntryType::Exact // PV node
+        };
+
+        // Store in transposition table
+        self.tt.store(hash, best_move, best_score, depth, entry_type);
 
         // Copy local PV to output
         pv.clear();
