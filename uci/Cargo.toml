@@ -3,7 +3,14 @@ name = "uci"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "aether-uci"
+path = "src/main.rs"
+
 [dependencies]
 aether-types = { workspace = true }
 board = { workspace = true }
+movegen = { workspace = true }
+search = { workspace = true }
+eval = { workspace = true }
 engine = { workspace = true }

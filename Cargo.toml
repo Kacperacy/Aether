@@ -22,8 +22,10 @@ members = [
     "eval",
     "engine",
     "uci",
-    "cli"
-, "perft"]
+    "cli",
+    "perft",
+    "opening"
+]
 
 [workspace.dependencies]
 # External dependencies
@@ -40,6 +42,7 @@ eval = { path = "./eval" }
 engine = { path = "./engine" }
 uci = { path = "./uci" }
 cli = { path = "./cli" }
+opening = { path = "./opening" }
 
 [dev-dependencies]
 criterion = { workspace = true }
