@@ -21,6 +21,9 @@ pub enum BoardError {
     #[error("Invalid en passant square: {square:?}")]
     InvalidEnPassantSquare { square: Square },
 
+    #[error("Invalid move: {reason}")]
+    InvalidMove { reason: String },
+
     #[error("FEN parsing error: {0}")]
     FenParsingError(#[from] FenError),
 }

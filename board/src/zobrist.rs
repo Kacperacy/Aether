@@ -60,4 +60,9 @@ impl Board {
     pub fn refresh_zobrist_hash(&mut self) {
         self.zobrist_hash = self.calculate_zobrist_hash();
     }
+
+    /// Compute zobrist hash from current position (alias for calculate_zobrist_hash)
+    pub fn compute_zobrist_hash(&self) -> u64 {
+        self.calculate_zobrist_hash()
+    }
 }
