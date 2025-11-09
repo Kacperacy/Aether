@@ -104,9 +104,23 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         // Store time limit for checking during search
         self.time_limit = limits.time;
 
-        let mut best_move = None;
+        // CRITICAL: Generate legal moves FIRST and set a default best_move
+        // This ensures we ALWAYS have a move to play, even if time runs out during depth 1
+        let mut moves = Vec::new();
+        self.generator.legal(board, &mut moves);
+        self.move_orderer.order_moves(&mut moves);
+
+        let mut best_move = if !moves.is_empty() {
+            Some(moves[0]) // Safe default: first ordered move
+        } else {
+            None // No legal moves (checkmate/stalemate) - will return 0000
+        };
         let mut best_score = -MATE_SCORE;
-        let mut best_pv = Vec::new();
+        let mut best_pv = if !moves.is_empty() {
+            vec![moves[0]]
+        } else {
+            Vec::new()
+        };
 
         let max_depth = limits.depth.unwrap_or(64);
 
