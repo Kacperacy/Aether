@@ -7,14 +7,14 @@
 #   -Level         Poziom Stockfish (0-20, domyślnie 5)
 #   -Games         Liczba gier (domyślnie 100)
 #   -TimeControl   Time control (domyślnie "40/60+0.6")
-#   -Concurrency   Liczba równoległych gier (domyślnie 1)
+#   -Concurrency   Liczba równoległych gier (domyślnie 8)
 #   -Output        Plik wyjściowy PGN
 
 param(
     [int]$Level = 5,
     [int]$Games = 100,
     [string]$TimeControl = "40/60+0.6",
-    [int]$Concurrency = 1,
+    [int]$Concurrency = 8,
     [string]$Output = ""
 )
 
@@ -79,6 +79,7 @@ $Rounds = [math]::Floor($Games / 2)
     -engine cmd="$AetherPath" name="Aether" proto=uci option."Move Overhead"=100 `
     -engine cmd="$StockfishPath" name="Stockfish-L$Level" proto=uci option."Skill Level"=$Level `
     -each tc="$TimeControl" `
+    -openings file="$PSScriptRoot\openings.epd" format=epd order=random `
     -rounds $Rounds `
     -games 2 `
     -repeat `

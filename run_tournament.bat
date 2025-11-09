@@ -43,6 +43,7 @@ cutechess-cli ^
     -engine cmd="%AETHER_PATH%" name="Aether" proto=uci option."Move Overhead"=100 ^
     -engine cmd="stockfish.exe" name="Stockfish-L%LEVEL%" proto=uci option."Skill Level"=%LEVEL% ^
     -each tc="%TIME_CONTROL%" ^
+    -openings file="%~dp0openings.epd" format=epd order=random ^
     -rounds %ROUNDS% ^
     -games 2 ^
     -repeat ^

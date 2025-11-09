@@ -17,6 +17,7 @@ cutechess-cli \
     -engine cmd="stockfish" name="Stockfish-L${STOCKFISH_LEVEL}" proto=uci \
         option."Skill Level"=$STOCKFISH_LEVEL \
     -each tc="$TIME_CONTROL" \
+    -openings file="$(pwd)/openings.epd" format=epd order=random \
     -rounds 1 \
     -pgnout "$OUTPUT" \
     -debug

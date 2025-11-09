@@ -8,7 +8,7 @@
 #   --level N        Poziom Stockfish (0-20, domyślnie 5)
 #   --games N        Liczba gier (domyślnie 100)
 #   --tc TIME        Time control (domyślnie "40/60+0.6" = 60s na 40 ruchów + 0.6s increment)
-#   --concurrency N  Liczba równoległych gier (domyślnie 1)
+#   --concurrency N  Liczba równoległych gier (domyślnie 8)
 #   --output FILE    Plik wyjściowy PGN (domyślnie results_TIMESTAMP.pgn)
 
 set -e
@@ -17,7 +17,7 @@ set -e
 STOCKFISH_LEVEL=5
 GAMES=100
 TIME_CONTROL="40/60+0.6"  # 60s na 40 ruchów + 0.6s increment (symuluje 5+3 na Lichess)
-CONCURRENCY=1
+CONCURRENCY=8
 OUTPUT_FILE=""
 STOCKFISH_PATH=$(which stockfish 2>/dev/null || echo "stockfish")
 AETHER_PATH="$(pwd)/target/release/aether"
@@ -103,6 +103,7 @@ cutechess-cli \
     -engine cmd="$STOCKFISH_PATH" name="Stockfish-L${STOCKFISH_LEVEL}" proto=uci \
         option."Skill Level"=$STOCKFISH_LEVEL \
     -each tc="$TIME_CONTROL" \
+    -openings file="$(pwd)/openings.epd" format=epd order=random \
     -rounds $ROUNDS \
     -games 2 \
     -repeat \

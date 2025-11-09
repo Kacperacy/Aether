@@ -18,6 +18,7 @@ $AetherPath = "$PSScriptRoot\target\release\aether.exe"
     -engine cmd="$AetherPath" name="Aether" proto=uci option."Move Overhead"=100 `
     -engine cmd="stockfish.exe" name="Stockfish-L$Level" proto=uci option."Skill Level"=$Level `
     -each tc="$TimeControl" `
+    -openings file="$PSScriptRoot\openings.epd" format=epd order=random `
     -rounds 1 `
     -pgnout "$Output" `
     -debug

@@ -8,5 +8,5 @@ echo ""
     --level 5 \
     --games 10 \
     --tc "10+0.1" \
-    --concurrency 2 \
+    --concurrency 8 \
     --output quick_test.pgn

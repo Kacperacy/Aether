@@ -9,7 +9,7 @@ foreach ($Level in 3, 5, 7) {
     Write-Host "  Testowanie przeciwko poziomowi $Level" -ForegroundColor Green
     Write-Host "=====================================" -ForegroundColor Green
     
-    .\run_tournament.ps1 -Level $Level -Games 100 -TimeControl "40/60+0.6" -Concurrency 2 -Output "full_test_level$Level.pgn"
+    .\run_tournament.ps1 -Level $Level -Games 100 -TimeControl "40/60+0.6" -Concurrency 8 -Output "full_test_level$Level.pgn"
     
     Write-Host ""
     Write-Host "Zakończono testy dla poziomu $Level" -ForegroundColor Yellow

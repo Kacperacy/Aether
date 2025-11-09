@@ -20,10 +20,11 @@ cutechess-cli ^
     -engine cmd="%AETHER_PATH%" name="Aether" proto=uci option."Move Overhead"=100 ^
     -engine cmd="stockfish.exe" name="Stockfish-L5" proto=uci option."Skill Level"=5 ^
     -each tc="10+0.1" ^
+    -openings file="%~dp0openings.epd" format=epd order=random ^
     -rounds 5 ^
     -games 2 ^
     -repeat ^
-    -concurrency 2 ^
+    -concurrency 8 ^
     -pgnout "%OUTPUT%" ^
     -ratinginterval 10 ^
     -recover

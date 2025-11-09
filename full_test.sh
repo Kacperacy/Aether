@@ -13,7 +13,7 @@ for level in 3 5 7; do
         --level $level \
         --games 100 \
         --tc "40/60+0.6" \
-        --concurrency 2 \
+        --concurrency 8 \
         --output "full_test_level${level}.pgn"
     
     echo ""
