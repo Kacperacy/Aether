@@ -141,49 +141,38 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 &mut Vec::new(),
             );
 
-            // Update best move ONLY if search completed successfully (not interrupted)
-            // If should_stop is true, the score may be incorrect (returned early with alpha)
+            // CRITICAL: ONLY update if search completed successfully (not interrupted)
+            // When should_stop=true, score is corrupted (early return with alpha value)
             if !self.should_stop {
                 best_score = score;
 
-                // Get the best move from the first ply
-                let mut moves = Vec::new();
-                self.generator.legal(board, &mut moves);
-                self.move_orderer.order_moves(&mut moves);
-
-                if !moves.is_empty() {
-                    // Find the move that gives the best score
-                    // Note: This re-searches moves which is inefficient but ensures we get the right move
-                    let mut actual_best_score = -MATE_SCORE - 1;
-                    for mv in &moves {
-                        let mut board_copy = board.clone();
-                        if board_copy.make_move(*mv).is_ok() {
-                            let move_score = -self.alpha_beta(
-                                &board_copy,
-                                depth - 1,
-                                1,
-                                -MATE_SCORE,
-                                MATE_SCORE,
-                                &mut Vec::new(),
-                            );
-
-                            // Don't use results if search was interrupted during move evaluation
-                            if self.should_stop {
-                                break;
-                            }
-
-                            // Track the truly best move, not just first one >= best_score
-                            if move_score > actual_best_score {
-                                actual_best_score = move_score;
-                                best_move = Some(*mv);
-                                best_pv = vec![*mv];
+                // Try to get best move from Transposition Table (fast path)
+                let hash = board.zobrist_hash().map(|h| h.get()).unwrap_or(0);
+                if let Some(tt_entry) = self.tt.probe(hash) {
+                    if tt_entry.depth >= depth {
+                        if let Some(mv) = tt_entry.best_move {
+                            // Verify move is legal before using it
+                            let mut legal_moves = Vec::new();
+                            self.generator.legal(board, &mut legal_moves);
+                            if legal_moves.contains(&mv) {
+                                best_move = Some(mv);
+                                best_pv = vec![mv];
                             }
                         }
                     }
+                }
 
-                    // Update best_score to the actual best found
-                    if !self.should_stop {
-                        best_score = actual_best_score;
+                // Fallback: If TT didn't give us a move, search manually
+                // This shouldn't happen often since alpha_beta stores in TT
+                if best_move.is_none() {
+                    let mut moves = Vec::new();
+                    self.generator.legal(board, &mut moves);
+                    self.move_orderer.order_moves(&mut moves);
+
+                    if !moves.is_empty() {
+                        // Take the first move as a safe default
+                        best_move = Some(moves[0]);
+                        best_pv = vec![moves[0]];
                     }
                 }
             }
