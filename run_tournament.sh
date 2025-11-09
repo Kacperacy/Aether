@@ -139,10 +139,8 @@ if [ -f "$OUTPUT_FILE" ]; then
     echo ""
 
     if [ $TOTAL_GAMES -gt 0 ]; then
-        # Approximate 50-50 split of colors between engines
-        AETHER_SCORE=$(echo "scale=1; (($WHITE_WINS + $BLACK_WINS) / 2 + $DRAWS * 0.5) / $TOTAL_GAMES * 100" | bc 2>/dev/null || echo "N/A")
-        echo "Przybliżony wynik Aethera: ~${AETHER_SCORE}%"
-        echo "(Dokładny wynik wymaga analizy PGN - użyj analyze_results.sh)"
+        echo "UWAGA: Powyższe statystyki nie pokazują wyniku per silnik."
+        echo "Użyj: ./analyze_results.sh \"$OUTPUT_FILE\" aby zobaczyć szczegółowe wyniki Aethera."
     fi
 fi
 echo ""
