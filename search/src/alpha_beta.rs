@@ -109,6 +109,18 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 break;
             }
 
+            // Don't start a new depth if we've used more than 50% of allocated time
+            // (to prevent last iteration from roughly doubling total search time)
+            if let Some(max_time) = limits.time {
+                if let Some(start) = self.start_time {
+                    let elapsed = start.elapsed();
+                    let half_time = max_time / 2;
+                    if elapsed > half_time {
+                        break;
+                    }
+                }
+            }
+
             self.info.depth = depth;
             self.info.selective_depth = depth;
 
