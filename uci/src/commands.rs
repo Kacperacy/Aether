@@ -107,9 +107,20 @@ impl GoCommand {
         }
 
         if let Some(time) = time_left {
-            // Simple time management: use 1/30 of remaining time + increment
-            let moves_to_go = self.movestogo.unwrap_or(30);
-            let time_per_move = (time / moves_to_go as u64) + increment;
+            // Improved time management based on increment
+            let (divisor, inc_fraction) = if increment > 0 {
+                // With increment: more aggressive, expect fewer moves
+                // Use 1/20-1/25 of time + 75% of increment
+                (20, 75)
+            } else {
+                // Without increment: conservative, expect more moves
+                // Use 1/35-1/40 of time
+                (35, 0)
+            };
+
+            let base_time = time / divisor;
+            let inc_bonus = (increment * inc_fraction) / 100;
+            let time_per_move = base_time + inc_bonus;
 
             // Apply move overhead
             let adjusted_time = time_per_move.saturating_sub(move_overhead_ms);
