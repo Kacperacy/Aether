@@ -24,6 +24,7 @@ pub struct AlphaBetaSearcher<E = SimpleEvaluator, O = SimpleMoveOrderer> {
     info: SearchInfo,
     should_stop: bool,
     start_time: Option<Instant>,
+    time_limit: Option<std::time::Duration>,
 }
 
 impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
@@ -37,6 +38,7 @@ impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
             info: SearchInfo::new(),
             should_stop: false,
             start_time: None,
+            time_limit: None,
         }
     }
 
@@ -50,6 +52,7 @@ impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
             info: SearchInfo::new(),
             should_stop: false,
             start_time: None,
+            time_limit: None,
         }
     }
 }
@@ -65,6 +68,7 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             info: SearchInfo::new(),
             should_stop: false,
             start_time: None,
+            time_limit: None,
         }
     }
 
@@ -96,6 +100,9 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
     fn iterative_deepening(&mut self, board: &Board, limits: &SearchLimits) -> SearchResult {
         // Start new search (increment TT age)
         self.tt.new_search();
+
+        // Store time limit for checking during search
+        self.time_limit = limits.time;
 
         let mut best_move = None;
         let mut best_score = -MATE_SCORE;
@@ -200,6 +207,24 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         pv: &mut Vec<Move>,
     ) -> Score {
         self.info.nodes += 1;
+
+        // Check if we should stop search (time limit exceeded)
+        // Check every 4096 nodes for performance
+        if self.info.nodes % 4096 == 0 {
+            if let Some(max_time) = self.time_limit {
+                if let Some(start) = self.start_time {
+                    if start.elapsed() >= max_time {
+                        self.should_stop = true;
+                        return alpha; // Return current alpha as best guess
+                    }
+                }
+            }
+        }
+
+        // If stop flag is set, return immediately
+        if self.should_stop {
+            return alpha;
+        }
 
         // Update selective depth
         if ply > self.info.selective_depth {
