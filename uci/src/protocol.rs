@@ -25,11 +25,12 @@ pub fn run_uci_loop() -> io::Result<()> {
             UciCommand::Uci => {
                 send_response(&format!("id name {} {}", ENGINE_NAME, ENGINE_VERSION));
                 send_response(&format!("id author {}", ENGINE_AUTHOR));
-                
+
                 // Send options
                 send_response("option name Hash type spin default 64 min 1 max 1024");
+                send_response("option name Move Overhead type spin default 10 min 0 max 5000");
                 send_response("option name Threads type spin default 1 min 1 max 128");
-                
+
                 send_response("uciok");
             }
             
@@ -63,7 +64,7 @@ pub fn run_uci_loop() -> io::Result<()> {
             }
             
             UciCommand::SetOption { name, value } => {
-                match name.to_lowercase().as_str() {
+                match name.to_lowercase().replace(" ", "").as_str() {
                     "hash" => {
                         if let Some(val_str) = value {
                             match val_str.parse::<usize>() {
@@ -75,6 +76,19 @@ pub fn run_uci_loop() -> io::Result<()> {
                             }
                         } else {
                             send_info("Hash option requires a value");
+                        }
+                    }
+                    "moveoverhead" => {
+                        if let Some(val_str) = value {
+                            match val_str.parse::<u64>() {
+                                Ok(overhead) => {
+                                    engine.set_move_overhead(overhead);
+                                    send_info(&format!("Move overhead set to {} ms", overhead));
+                                }
+                                Err(_) => send_info(&format!("Invalid move overhead: {}", val_str)),
+                            }
+                        } else {
+                            send_info("Move Overhead option requires a value");
                         }
                     }
                     "threads" => {

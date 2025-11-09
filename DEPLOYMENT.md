@@ -71,6 +71,7 @@ engine:
   ponder: false
   uci_options:
     Hash: 256                        # MB of memory for transposition table
+    Move Overhead: 200               # ms to reserve for network latency (recommended: 100-300 for Lichess)
     # Threads: 1                     # Not yet implemented
 
 challenge:
@@ -118,7 +119,7 @@ If you want to integrate with a custom GUI or platform:
 | `position` | Set position | `position startpos moves e2e4 e7e5` |
 | `go` | Start search | `go depth 10` |
 | `stop` | Stop search (sets stop flag) | `stop` |
-| `setoption` | Set engine option | `setoption name Hash value 256` |
+| `setoption` | Set engine option | `setoption name Hash value 256`<br>`setoption name Move Overhead value 200` |
 | `quit` | Exit engine | `quit` |
 
 #### Position Command
@@ -158,6 +159,9 @@ go nodes 1000000
 ```bash
 # Set hash table size (1-1024 MB)
 setoption name Hash value 256
+
+# Set move overhead for network latency (0-5000 ms)
+setoption name Move Overhead value 200
 ```
 
 ## Performance Tuning
@@ -175,6 +179,27 @@ Configure via:
 ```bash
 setoption name Hash value 256
 ```
+
+### Move Overhead
+
+Move Overhead reserves time before each move to compensate for network/GUI latency. This is **critical for online play** to avoid time losses.
+
+**Recommended settings:**
+
+- **Local GUIs (Arena, ChessBase)**: 10-30 ms (default: 10 ms)
+- **Lichess (good connection)**: 100-150 ms
+- **Lichess (unstable connection)**: 200-300 ms
+- **High latency platforms**: 300-500 ms
+
+Configure via:
+```bash
+setoption name Move Overhead value 200
+```
+
+**How it works:**
+- If the engine calculates 5000ms for a move with 200ms overhead, it will only search for 4800ms
+- This ensures the move is sent before time expires, accounting for network delays
+- Without proper overhead, the engine may lose on time even when winning
 
 ### Expected Performance
 

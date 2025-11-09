@@ -83,28 +83,37 @@ pub struct GoCommand {
 
 impl GoCommand {
     /// Calculate search time for the given side
-    pub fn calculate_time(&self, is_white: bool) -> Option<Duration> {
+    ///
+    /// # Arguments
+    /// * `is_white` - Whether white is to move
+    /// * `move_overhead_ms` - Time to reserve for GUI/network latency (milliseconds)
+    pub fn calculate_time(&self, is_white: bool, move_overhead_ms: u64) -> Option<Duration> {
         let time_left = if is_white {
             self.wtime
         } else {
             self.btime
         };
-        
+
         let increment = if is_white {
             self.winc.unwrap_or(0)
         } else {
             self.binc.unwrap_or(0)
         };
-        
+
         if let Some(movetime) = self.movetime {
-            return Some(Duration::from_millis(movetime));
+            // Apply move overhead to movetime
+            let adjusted_time = movetime.saturating_sub(move_overhead_ms);
+            return Some(Duration::from_millis(adjusted_time.max(1)));
         }
-        
+
         if let Some(time) = time_left {
             // Simple time management: use 1/30 of remaining time + increment
             let moves_to_go = self.movestogo.unwrap_or(30);
             let time_per_move = (time / moves_to_go as u64) + increment;
-            Some(Duration::from_millis(time_per_move))
+
+            // Apply move overhead
+            let adjusted_time = time_per_move.saturating_sub(move_overhead_ms);
+            Some(Duration::from_millis(adjusted_time.max(1)))
         } else {
             None
         }

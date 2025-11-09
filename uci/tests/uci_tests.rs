@@ -112,6 +112,30 @@ fn test_parse_setoption_hash() {
 }
 
 #[test]
+fn test_parse_setoption_move_overhead() {
+    let cmd = parse_uci_command("setoption name Move Overhead value 100");
+    match cmd {
+        UciCommand::SetOption { name, value } => {
+            assert_eq!(name, "Move Overhead");
+            assert_eq!(value, Some("100".to_string()));
+        }
+        _ => panic!("Expected SetOption command"),
+    }
+}
+
+#[test]
+fn test_parse_setoption_moveoverhead_no_space() {
+    let cmd = parse_uci_command("setoption name MoveOverhead value 200");
+    match cmd {
+        UciCommand::SetOption { name, value } => {
+            assert_eq!(name, "MoveOverhead");
+            assert_eq!(value, Some("200".to_string()));
+        }
+        _ => panic!("Expected SetOption command"),
+    }
+}
+
+#[test]
 fn test_parse_unknown_command() {
     let cmd = parse_uci_command("invalidcommand");
     match cmd {
@@ -132,7 +156,7 @@ fn test_go_command_calculate_time_white() {
         ..Default::default()
     };
 
-    let time = go_cmd.calculate_time(true).unwrap();
+    let time = go_cmd.calculate_time(true, 0).unwrap(); // No overhead
     // Should allocate some time based on remaining time and increment
     assert!(time.as_millis() > 0);
     assert!(time.as_millis() < 60000); // Less than total time
@@ -145,7 +169,7 @@ fn test_go_command_calculate_time_movetime() {
         ..Default::default()
     };
 
-    let time = go_cmd.calculate_time(true).unwrap();
+    let time = go_cmd.calculate_time(true, 0).unwrap(); // No overhead
     assert_eq!(time.as_millis(), 5000);
 }
 
@@ -156,5 +180,66 @@ fn test_go_command_no_time_returns_none() {
         ..Default::default()
     };
 
-    assert!(go_cmd.calculate_time(true).is_none());
+    assert!(go_cmd.calculate_time(true, 0).is_none());
+}
+
+#[test]
+fn test_move_overhead_applied_to_movetime() {
+    let go_cmd = GoCommand {
+        movetime: Some(5000), // 5 seconds
+        ..Default::default()
+    };
+
+    let time_no_overhead = go_cmd.calculate_time(true, 0).unwrap();
+    let time_with_overhead = go_cmd.calculate_time(true, 100).unwrap();
+
+    // With 100ms overhead, should get 100ms less search time
+    assert_eq!(time_no_overhead.as_millis() - 100, time_with_overhead.as_millis());
+}
+
+#[test]
+fn test_move_overhead_applied_to_time_control() {
+    let go_cmd = GoCommand {
+        wtime: Some(60000), // 1 minute
+        btime: Some(60000),
+        winc: Some(1000),  // 1 second increment
+        binc: Some(1000),
+        ..Default::default()
+    };
+
+    let time_no_overhead = go_cmd.calculate_time(true, 0).unwrap();
+    let time_with_overhead = go_cmd.calculate_time(true, 200).unwrap();
+
+    // With 200ms overhead, should get 200ms less search time
+    assert_eq!(time_no_overhead.as_millis() - 200, time_with_overhead.as_millis());
+}
+
+#[test]
+fn test_move_overhead_minimum_time() {
+    let go_cmd = GoCommand {
+        movetime: Some(50), // Very short time (50ms)
+        ..Default::default()
+    };
+
+    // Even with large overhead, should get at least 1ms
+    let time_with_large_overhead = go_cmd.calculate_time(true, 1000).unwrap();
+    assert_eq!(time_with_large_overhead.as_millis(), 1);
+}
+
+#[test]
+fn test_move_overhead_black_time() {
+    let go_cmd = GoCommand {
+        wtime: Some(60000),
+        btime: Some(30000), // Black has half the time
+        winc: Some(1000),
+        binc: Some(500),   // Black has half the increment
+        ..Default::default()
+    };
+
+    let white_time = go_cmd.calculate_time(true, 100).unwrap();
+    let black_time = go_cmd.calculate_time(false, 100).unwrap();
+
+    // Both should have overhead applied
+    // Black should have less time due to less time and increment
+    assert!(black_time.as_millis() < white_time.as_millis());
 }

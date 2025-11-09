@@ -12,6 +12,7 @@ pub struct UciEngine {
     searcher: AlphaBetaSearcher,
     generator: Generator,
     hash_size_mb: usize, // Current TT size
+    move_overhead_ms: u64, // Move overhead in milliseconds (for online play)
 }
 
 impl UciEngine {
@@ -25,6 +26,7 @@ impl UciEngine {
             searcher: AlphaBetaSearcher::with_tt_size(64), // 64 MB transposition table
             generator: Generator,
             hash_size_mb: 64,
+            move_overhead_ms: 10, // Default 10ms overhead
         })
     }
     
@@ -69,14 +71,17 @@ impl UciEngine {
     pub fn go(&mut self, go_cmd: GoCommand) {
         // Calculate search limits
         let mut limits = SearchLimits::default();
-        
+
         if go_cmd.infinite {
             limits = SearchLimits::infinite();
         } else if let Some(depth) = go_cmd.depth {
             limits.depth = Some(depth);
         } else if let Some(nodes) = go_cmd.nodes {
             limits.nodes = Some(nodes);
-        } else if let Some(time) = go_cmd.calculate_time(self.board.side_to_move() == aether_types::Color::White) {
+        } else if let Some(time) = go_cmd.calculate_time(
+            self.board.side_to_move() == aether_types::Color::White,
+            self.move_overhead_ms
+        ) {
             limits.time = Some(time);
         } else {
             // Default: depth 6
@@ -123,6 +128,22 @@ impl UciEngine {
             self.hash_size_mb = size_mb;
             self.searcher = AlphaBetaSearcher::with_tt_size(size_mb);
         }
+    }
+
+    /// Set move overhead (in milliseconds)
+    ///
+    /// Move overhead is the time reserved before each move to account for
+    /// GUI/network latency. This is crucial for online play (e.g., Lichess).
+    /// Typical values: 10ms (local), 100-300ms (online).
+    pub fn set_move_overhead(&mut self, overhead_ms: u64) {
+        if overhead_ms <= 5000 { // Max 5 seconds overhead
+            self.move_overhead_ms = overhead_ms;
+        }
+    }
+
+    /// Get current move overhead setting
+    pub fn move_overhead(&self) -> u64 {
+        self.move_overhead_ms
     }
 
     /// Stop current search

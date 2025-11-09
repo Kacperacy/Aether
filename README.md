@@ -7,7 +7,7 @@ A fast, modular chess engine written in Rust with a clean architecture and stron
 ## Features
 
 - **Complete UCI Protocol Support** - Compatible with chess GUIs (Arena, ChessBase, Lichess)
-- **UCI Options** - Hash table size configuration (1-1024 MB)
+- **UCI Options** - Hash table size (1-1024 MB), Move Overhead for online play (0-5000 ms)
 - **Alpha-Beta Search** with iterative deepening and quiescence search
 - **Transposition Table** - 5-10x speedup through position caching
 - **Move Ordering** - MVV-LVA, killer moves, and history heuristic
@@ -114,12 +114,14 @@ Then configure your chess GUI to use the `aether-uci` binary.
 - `go [depth N | movetime MS | wtime MS btime MS winc MS binc MS]` - Start search
 - `stop` - Stop current search (sets stop flag)
 - `setoption name Hash value <MB>` - Set transposition table size (1-1024 MB)
+- `setoption name Move Overhead value <MS>` - Set move overhead for latency compensation (0-5000 ms)
 - `quit` - Exit engine
 
 **Example:**
 ```bash
 uci
 setoption name Hash value 256
+setoption name Move Overhead value 200
 position startpos moves e2e4 e7e5
 go depth 10
 ```
