@@ -95,30 +95,37 @@ impl OpeningBook {
     
     /// Add common opening theory
     fn add_default_openings(&mut self) {
-        // Starting position hash - we'll use 0 as placeholder
-        // In real usage, you'd compute actual Zobrist hashes
-        let start_hash = 0u64;
-        
-        // Common opening moves from starting position
-        self.add_move(start_hash, "e2e4".to_string(), 100, Some("King's Pawn".to_string()));
-        self.add_move(start_hash, "d2d4".to_string(), 90, Some("Queen's Pawn".to_string()));
-        self.add_move(start_hash, "g1f3".to_string(), 70, Some("Réti Opening".to_string()));
-        self.add_move(start_hash, "c2c4".to_string(), 60, Some("English Opening".to_string()));
-        self.add_move(start_hash, "e2e3".to_string(), 30, Some("Van't Kruijs Opening".to_string()));
-        self.add_move(start_hash, "b2b3".to_string(), 20, Some("Nimzowitsch-Larsen Attack".to_string()));
-        
+        // Compute actual Zobrist hashes for positions
+        use board::{Board, FenOps};
+
+        // Starting position
+        if let Ok(start_board) = Board::starting_position() {
+            let start_hash = start_board.compute_zobrist_hash();
+
+            // Common opening moves from starting position
+            self.add_move(start_hash, "e2e4".to_string(), 100, Some("King's Pawn".to_string()));
+            self.add_move(start_hash, "d2d4".to_string(), 90, Some("Queen's Pawn".to_string()));
+            self.add_move(start_hash, "g1f3".to_string(), 70, Some("Réti Opening".to_string()));
+            self.add_move(start_hash, "c2c4".to_string(), 60, Some("English Opening".to_string()));
+            self.add_move(start_hash, "e2e3".to_string(), 30, Some("Van't Kruijs Opening".to_string()));
+            self.add_move(start_hash, "b2b3".to_string(), 20, Some("Nimzowitsch-Larsen Attack".to_string()));
+        }
+
         // After 1.e4 e5
-        // Hash would be different, using placeholder
-        let e4e5_hash = 1u64;
-        self.add_move(e4e5_hash, "g1f3".to_string(), 100, Some("King's Knight".to_string()));
-        self.add_move(e4e5_hash, "f1c4".to_string(), 70, Some("Bishop's Opening".to_string()));
-        self.add_move(e4e5_hash, "b1c3".to_string(), 50, Some("Vienna Game".to_string()));
-        
+        if let Ok(e4e5_fen) = Board::from_fen("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2") {
+            let e4e5_hash = e4e5_fen.compute_zobrist_hash();
+            self.add_move(e4e5_hash, "g1f3".to_string(), 100, Some("King's Knight".to_string()));
+            self.add_move(e4e5_hash, "f1c4".to_string(), 70, Some("Bishop's Opening".to_string()));
+            self.add_move(e4e5_hash, "b1c3".to_string(), 50, Some("Vienna Game".to_string()));
+        }
+
         // After 1.d4 d5
-        let d4d5_hash = 2u64;
-        self.add_move(d4d5_hash, "c2c4".to_string(), 100, Some("Queen's Gambit".to_string()));
-        self.add_move(d4d5_hash, "g1f3".to_string(), 80, Some("Queen's Pawn Game".to_string()));
-        self.add_move(d4d5_hash, "c1f4".to_string(), 40, Some("London System".to_string()));
+        if let Ok(d4d5_fen) = Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq d6 0 2") {
+            let d4d5_hash = d4d5_fen.compute_zobrist_hash();
+            self.add_move(d4d5_hash, "c2c4".to_string(), 100, Some("Queen's Gambit".to_string()));
+            self.add_move(d4d5_hash, "g1f3".to_string(), 80, Some("Queen's Pawn Game".to_string()));
+            self.add_move(d4d5_hash, "c1f4".to_string(), 40, Some("London System".to_string()));
+        }
     }
 }
 
@@ -202,13 +209,18 @@ mod tests {
     
     #[test]
     fn test_default_book() {
+        use board::{Board, FenOps};
+
         let book = OpeningBook::default_book();
         assert!(!book.is_empty());
-        
+
         // Should have starting position moves
-        let moves = book.get_moves(0);
-        assert!(moves.is_some());
-        assert!(!moves.unwrap().is_empty());
+        if let Ok(start_board) = Board::starting_position() {
+            let start_hash = start_board.compute_zobrist_hash();
+            let moves = book.get_moves(start_hash);
+            assert!(moves.is_some());
+            assert!(!moves.unwrap().is_empty());
+        }
     }
     
     #[test]

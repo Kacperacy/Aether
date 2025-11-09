@@ -14,3 +14,4 @@ movegen = { workspace = true }
 search = { workspace = true }
 eval = { workspace = true }
 engine = { workspace = true }
+opening = { workspace = true }

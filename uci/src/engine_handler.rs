@@ -4,6 +4,7 @@ use crate::{commands::GoCommand, send_bestmove, send_hashfull, send_info, send_s
 use aether_types::{BoardQuery, MoveGen};
 use board::{Board, BoardOps, FenOps};
 use movegen::Generator;
+use opening::OpeningBook;
 use search::{AlphaBetaSearcher, SearchLimits, Searcher};
 
 /// UCI Engine state
@@ -11,6 +12,7 @@ pub struct UciEngine {
     board: Board,
     searcher: AlphaBetaSearcher,
     generator: Generator,
+    opening_book: OpeningBook,
     hash_size_mb: usize, // Current TT size
     move_overhead_ms: u64, // Move overhead in milliseconds (for online play)
 }
@@ -25,6 +27,7 @@ impl UciEngine {
             board,
             searcher: AlphaBetaSearcher::with_tt_size(64), // 64 MB transposition table
             generator: Generator,
+            opening_book: OpeningBook::default_book(),
             hash_size_mb: 64,
             move_overhead_ms: 10, // Default 10ms overhead
         })
@@ -53,22 +56,51 @@ impl UciEngine {
     fn make_move(&mut self, move_str: &str) -> Result<(), String> {
         let mut legal_moves = Vec::new();
         self.generator.legal(&self.board, &mut legal_moves);
-        
+
         // Find matching move
         let matching_move = legal_moves
             .iter()
             .find(|m| m.to_string() == move_str)
             .copied()
             .ok_or_else(|| format!("Illegal move: {}", move_str))?;
-        
+
         self.board.make_move(matching_move)
             .map_err(|e| format!("Failed to make move: {}", e))?;
-        
+
         Ok(())
+    }
+
+    /// Try to get a move from the opening book
+    fn try_book_move(&self) -> Option<String> {
+        // Get board hash
+        let hash = self.board.compute_zobrist_hash();
+
+        // Query the book
+        if let Some(book_move) = self.opening_book.pick_move(hash) {
+            // Verify the move is legal
+            let mut legal_moves = Vec::new();
+            self.generator.legal(&self.board, &mut legal_moves);
+
+            let is_legal = legal_moves.iter().any(|m| m.to_string() == book_move);
+
+            if is_legal {
+                send_info(&format!("Book move: {}", book_move));
+                return Some(book_move);
+            }
+        }
+
+        None
     }
     
     /// Start search
     pub fn go(&mut self, go_cmd: GoCommand) {
+        // Try opening book first
+        if let Some(book_move) = self.try_book_move() {
+            // Send book move immediately (no search needed)
+            send_bestmove(&book_move, None);
+            return;
+        }
+
         // Calculate search limits
         let mut limits = SearchLimits::default();
 
@@ -90,13 +122,13 @@ impl UciEngine {
             // Default: depth 6
             limits.depth = Some(6);
         }
-        
-        send_info(&format!("Starting search with limits: depth={:?}, time={:?}, nodes={:?}", 
+
+        send_info(&format!("Starting search with limits: depth={:?}, time={:?}, nodes={:?}",
             limits.depth, limits.time, limits.nodes));
-        
+
         // Search
         let result = self.searcher.search(&self.board, &limits);
-        
+
         // Send final info
         let pv_strings: Vec<String> = result.pv.iter().map(|m| m.to_string()).collect();
         send_search_info(
@@ -108,9 +140,9 @@ impl UciEngine {
             result.info.time_elapsed.as_millis() as u64,
             &pv_strings,
         );
-        
+
         send_hashfull(result.info.hash_full);
-        
+
         // Send best move
         if let Some(best_move) = result.best_move {
             let ponder = result.pv.get(1).map(|m| m.to_string());
