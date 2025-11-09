@@ -17,8 +17,8 @@ if not exist "%AETHER_PATH%" (
 )
 
 cutechess-cli ^
-    -engine cmd="%AETHER_PATH%" name="Aether" option."Move Overhead"=100 ^
-    -engine cmd="stockfish.exe" name="Stockfish-L5" option."Skill Level"=5 ^
+    -engine cmd="%AETHER_PATH%" name="Aether" proto=uci option."Move Overhead"=100 ^
+    -engine cmd="stockfish.exe" name="Stockfish-L5" proto=uci option."Skill Level"=5 ^
     -each tc="10+0.1" ^
     -rounds 5 ^
     -games 2 ^

@@ -98,9 +98,9 @@ ROUNDS=$((GAMES / 2))
 
 # Uruchom turniej
 cutechess-cli \
-    -engine cmd="$AETHER_PATH" name="Aether" \
+    -engine cmd="$AETHER_PATH" name="Aether" proto=uci \
         option."Move Overhead"=100 \
-    -engine cmd="$STOCKFISH_PATH" name="Stockfish-L${STOCKFISH_LEVEL}" \
+    -engine cmd="$STOCKFISH_PATH" name="Stockfish-L${STOCKFISH_LEVEL}" proto=uci \
         option."Skill Level"=$STOCKFISH_LEVEL \
     -each tc="$TIME_CONTROL" \
     -rounds $ROUNDS \

@@ -15,8 +15,8 @@ $Output = "single_game_${Timestamp}.pgn"
 $AetherPath = "$PSScriptRoot\target\release\aether.exe"
 
 & cutechess-cli `
-    -engine cmd="$AetherPath" name="Aether" option."Move Overhead"=100 `
-    -engine cmd="stockfish.exe" name="Stockfish-L$Level" option."Skill Level"=$Level `
+    -engine cmd="$AetherPath" name="Aether" proto=uci option."Move Overhead"=100 `
+    -engine cmd="stockfish.exe" name="Stockfish-L$Level" proto=uci option."Skill Level"=$Level `
     -each tc="$TimeControl" `
     -rounds 1 `
     -pgnout "$Output" `
