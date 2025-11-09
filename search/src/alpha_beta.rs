@@ -1,6 +1,6 @@
 use crate::{
     transposition_table::{EntryType, TranspositionTable},
-    MoveOrderer, SearchInfo, SearchLimits, SearchResult, Searcher, SimpleMoveOrderer,
+    AdvancedMoveOrderer, MoveOrderer, SearchInfo, SearchLimits, SearchResult, Searcher,
 };
 use aether_types::{BoardQuery, Move, MoveGen};
 use board::{Board, BoardOps};
@@ -13,10 +13,12 @@ use std::time::Instant;
 /// This searcher uses the alpha-beta pruning algorithm to efficiently
 /// search the game tree. It supports:
 /// - Iterative deepening
-/// - Move ordering
+/// - Move ordering with killer moves and history heuristic
 /// - Principal variation collection
 /// - Transposition table
-pub struct AlphaBetaSearcher<E = SimpleEvaluator, O = SimpleMoveOrderer> {
+/// - Late Move Reductions (LMR)
+/// - Null Move Pruning
+pub struct AlphaBetaSearcher<E = SimpleEvaluator, O = AdvancedMoveOrderer> {
     evaluator: E,
     move_orderer: O,
     generator: Generator,
@@ -27,12 +29,12 @@ pub struct AlphaBetaSearcher<E = SimpleEvaluator, O = SimpleMoveOrderer> {
     time_limit: Option<std::time::Duration>,
 }
 
-impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
+impl AlphaBetaSearcher<SimpleEvaluator, AdvancedMoveOrderer> {
     /// Create a new alpha-beta searcher with default evaluator and move orderer
     pub fn new() -> Self {
         Self {
             evaluator: SimpleEvaluator::new(),
-            move_orderer: SimpleMoveOrderer::new(),
+            move_orderer: AdvancedMoveOrderer::new(),
             generator: Generator,
             tt: TranspositionTable::default_size(),
             info: SearchInfo::new(),
@@ -46,7 +48,7 @@ impl AlphaBetaSearcher<SimpleEvaluator, SimpleMoveOrderer> {
     pub fn with_tt_size(tt_size_mb: usize) -> Self {
         Self {
             evaluator: SimpleEvaluator::new(),
-            move_orderer: SimpleMoveOrderer::new(),
+            move_orderer: AdvancedMoveOrderer::new(),
             generator: Generator,
             tt: TranspositionTable::new(tt_size_mb),
             info: SearchInfo::new(),
@@ -323,21 +325,49 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
         // Order moves for better alpha-beta pruning
         // Try TT move first if available
-        if let Some(tt_entry) = self.tt.probe(hash)
-            && let Some(tt_move) = tt_entry.best_move {
-                // Move TT move to front
-                if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
-                    moves.swap(0, pos);
-                }
+        let tt_move = if let Some(tt_entry) = self.tt.probe(hash) {
+            tt_entry.best_move
+        } else {
+            None
+        };
+
+        if let Some(tt_move) = tt_move {
+            // Move TT move to front
+            if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
+                moves.swap(0, pos);
             }
-        self.move_orderer.order_moves(&mut moves);
+        }
+        self.move_orderer.order_moves_at_ply(&mut moves, ply as usize);
 
         let mut best_score = -MATE_SCORE;
         let mut best_move = None;
         let mut local_pv = Vec::new();
 
+        // Null Move Pruning (if not in check and depth > 2)
+        let in_check = if let Some(king_sq) = board.get_king_square(board.side_to_move()) {
+            board.is_square_attacked(king_sq, board.side_to_move().opponent())
+        } else {
+            false
+        };
+
+        if depth >= 3 && !in_check && ply > 0 {
+            // Try null move (pass turn to opponent)
+            let null_score = -self.alpha_beta(
+                board,
+                depth.saturating_sub(3), // R=2 reduction
+                ply + 1,
+                -beta,
+                -beta + 1, // Null window
+                &mut Vec::new(),
+            );
+
+            if null_score >= beta {
+                return beta; // Null move cutoff
+            }
+        }
+
         // Search all moves
-        for mv in moves {
+        for (move_idx, mv) in moves.into_iter().enumerate() {
             let mut board_copy = board.clone();
 
             // Make move
@@ -345,16 +375,51 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 continue;
             }
 
-            // Recursive search
             let mut child_pv = Vec::new();
-            let score = -self.alpha_beta(
-                &board_copy,
-                depth - 1,
-                ply + 1,
-                -beta,
-                -alpha,
-                &mut child_pv,
-            );
+            let mut score;
+
+            // Late Move Reductions (LMR)
+            // After searching first few moves at full depth, reduce remaining moves
+            let is_pv_node = move_idx == 0 && tt_move.is_some();
+            let is_tactical = mv.capture.is_some() || mv.promotion.is_some() || mv.flags.is_castle;
+
+            if move_idx >= 4 && depth >= 3 && !is_pv_node && !is_tactical && !in_check {
+                // Reduce depth for later quiet moves
+                let reduction = if move_idx >= 8 { 2 } else { 1 };
+                let reduced_depth = depth.saturating_sub(1 + reduction);
+
+                // Search with reduced depth
+                score = -self.alpha_beta(
+                    &board_copy,
+                    reduced_depth,
+                    ply + 1,
+                    -alpha - 1,
+                    -alpha, // Null window
+                    &mut child_pv,
+                );
+
+                // If reduced search beats alpha, re-search at full depth
+                if score > alpha {
+                    score = -self.alpha_beta(
+                        &board_copy,
+                        depth - 1,
+                        ply + 1,
+                        -beta,
+                        -alpha,
+                        &mut child_pv,
+                    );
+                }
+            } else {
+                // Full-depth search
+                score = -self.alpha_beta(
+                    &board_copy,
+                    depth - 1,
+                    ply + 1,
+                    -beta,
+                    -alpha,
+                    &mut child_pv,
+                );
+            }
 
             // Update best score
             if score > best_score {
@@ -370,10 +435,19 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             // Update alpha
             if score > alpha {
                 alpha = score;
+
+                // Update history heuristic for good moves
+                if mv.capture.is_none() {
+                    self.move_orderer.update_history(mv, depth);
+                }
             }
 
             // Beta cutoff
             if alpha >= beta {
+                // Store killer move (non-captures only)
+                if mv.capture.is_none() {
+                    self.move_orderer.store_killer(mv, ply as usize);
+                }
                 break; // Prune remaining moves
             }
         }

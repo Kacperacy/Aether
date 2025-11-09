@@ -9,10 +9,14 @@
 
 mod piece_square_tables;
 mod king_safety;
+mod mobility;
+mod pawn_structure;
 
 use aether_types::{BoardQuery, Color, Square};
 pub use piece_square_tables::PIECE_SQUARE_TABLES;
 pub use king_safety::evaluate_king_safety;
+pub use mobility::evaluate_mobility;
+pub use pawn_structure::evaluate_pawn_structure;
 
 /// Evaluation score in centipawns (100 = 1 pawn)
 pub type Score = i32;
@@ -105,7 +109,17 @@ impl Evaluator for SimpleEvaluator {
         let black_king_safety = king_safety::evaluate_king_safety(board, Color::Black);
         let king_safety_diff = white_king_safety - black_king_safety;
 
-        let total = material + positional + king_safety_diff;
+        // Calculate mobility for both sides
+        let white_mobility = mobility::evaluate_mobility(board, Color::White);
+        let black_mobility = mobility::evaluate_mobility(board, Color::Black);
+        let mobility_diff = white_mobility - black_mobility;
+
+        // Calculate pawn structure for both sides
+        let white_pawns = pawn_structure::evaluate_pawn_structure(board, Color::White);
+        let black_pawns = pawn_structure::evaluate_pawn_structure(board, Color::Black);
+        let pawn_structure_diff = white_pawns - black_pawns;
+
+        let total = material + positional + king_safety_diff + mobility_diff + pawn_structure_diff;
 
         // Return score from perspective of side to move
         match board.side_to_move() {

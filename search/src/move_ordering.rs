@@ -19,9 +19,34 @@ pub trait MoveOrderer {
     /// Higher scores should be searched first
     fn score_move(&self, mv: &Move) -> i32;
 
+    /// Score a move with ply information (for killer moves)
+    fn score_move_at_ply(&self, mv: &Move, _ply: usize) -> i32 {
+        self.score_move(mv)
+    }
+
     /// Order a list of moves in-place (best moves first)
     fn order_moves(&self, moves: &mut [Move]) {
         moves.sort_by_key(|mv| -self.score_move(mv));
+    }
+
+    /// Order a list of moves at a specific ply (for killer move context)
+    fn order_moves_at_ply(&self, moves: &mut [Move], ply: usize) {
+        moves.sort_by_key(|mv| -self.score_move_at_ply(mv, ply));
+    }
+
+    /// Notify that a move caused a beta cutoff
+    fn store_killer(&mut self, _mv: Move, _ply: usize) {
+        // Default implementation does nothing
+    }
+
+    /// Update history heuristic for a move
+    fn update_history(&mut self, _mv: Move, _depth: u8) {
+        // Default implementation does nothing
+    }
+
+    /// Clear search-specific data between games
+    fn clear(&mut self) {
+        // Default implementation does nothing
     }
 }
 
@@ -198,12 +223,15 @@ impl Default for AdvancedMoveOrderer {
 
 impl MoveOrderer for AdvancedMoveOrderer {
     fn score_move(&self, mv: &Move) -> i32 {
+        self.score_move_at_ply(mv, 0)
+    }
+
+    fn score_move_at_ply(&self, mv: &Move, ply: usize) -> i32 {
         let mut score = self.base_orderer.score_move(mv);
 
         // Killer moves bonus (only for non-captures)
         if mv.capture.is_none() {
-            // Check killer moves at ply 0 for now (will need ply parameter in real search)
-            if self.is_killer(mv, 0) {
+            if self.is_killer(mv, ply) {
                 score += 9000;
             }
 
@@ -212,6 +240,18 @@ impl MoveOrderer for AdvancedMoveOrderer {
         }
 
         score
+    }
+
+    fn store_killer(&mut self, mv: Move, ply: usize) {
+        self.store_killer(mv, ply);
+    }
+
+    fn update_history(&mut self, mv: Move, depth: u8) {
+        self.update_history(mv, depth);
+    }
+
+    fn clear(&mut self) {
+        self.clear();
     }
 }
 
