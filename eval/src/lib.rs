@@ -8,9 +8,11 @@
 //! Typical consumers: `search`, `engine`, benchmarking tools.
 
 mod piece_square_tables;
+mod king_safety;
 
 use aether_types::{BoardQuery, Color, Square};
 pub use piece_square_tables::PIECE_SQUARE_TABLES;
+pub use king_safety::evaluate_king_safety;
 
 /// Evaluation score in centipawns (100 = 1 pawn)
 pub type Score = i32;
@@ -98,7 +100,12 @@ impl Evaluator for SimpleEvaluator {
         let material = self.material_balance(board);
         let positional = self.positional_value(board);
 
-        let total = material + positional;
+        // Calculate king safety for both sides
+        let white_king_safety = king_safety::evaluate_king_safety(board, Color::White);
+        let black_king_safety = king_safety::evaluate_king_safety(board, Color::Black);
+        let king_safety_diff = white_king_safety - black_king_safety;
+
+        let total = material + positional + king_safety_diff;
 
         // Return score from perspective of side to move
         match board.side_to_move() {
