@@ -209,14 +209,14 @@ setoption name Move Overhead value 200
 
 ### Time Management
 
-The engine uses an **adaptive time management algorithm** that dynamically adjusts based on remaining time:
+The engine uses an **conservative adaptive time management algorithm** that prevents time losses in online play:
 
 **With Increment (e.g., 5+3, 3+2):**
 
-Adapts time allocation based on clock:
-- **>180s (early game)**: Uses 1/22 of time + full increment (~16.4s for 5+3)
-- **60-180s (mid game)**: Uses 1/17 of time + full increment (~11.6s for 5+3)
-- **<60s (time trouble)**: Uses 1/12 of time + full increment (~7.0s for 5+3)
+Adapts time allocation based on remaining clock (very conservative to prevent time losses):
+- **>180s (early game)**: Uses 1/40 of time + full increment (~10.3s for 5+3, ~7.3s net)
+- **60-180s (mid game)**: Uses 1/30 of time + full increment (~8.0s for 5+3, ~5.0s net)
+- **<60s (time trouble)**: Uses 1/20 of time + full increment (~6.0s for 1min, ~3.0s net)
 
 **Without Increment (e.g., 5+0, 3+0):**
 - Uses 1/30 of remaining time (~10s for 5+0)
@@ -224,13 +224,17 @@ Adapts time allocation based on clock:
 
 **Algorithm:**
 ```rust
-divisor = if time > 180s { 22 } else if time > 60s { 17 } else { 12 }
+divisor = if time > 180s { 40 } else if time > 60s { 30 } else { 20 }
 time_per_move = (remaining_time / divisor) + increment - move_overhead
 ```
 
-**Targeting:** ~2-3s net time usage per move (slightly more than increment for stronger play).
+**Targeting:** ~3-7s net time usage per move (conservative to prevent time losses on Lichess).
 
-This balanced approach ensures strong play without time trouble. For exact control, override with `go movetime`.
+**Example for 5+3:**
+- After 32 moves: ~179s remaining (safe margin)
+- Net usage: ~7s early game, ~5s mid game, ~3s time trouble
+
+This conservative approach prioritizes avoiding time losses over maximum search depth. For exact control, override with `go movetime`.
 
 ## Monitoring and Debugging
 
