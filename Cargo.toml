@@ -24,7 +24,8 @@ members = [
     "uci",
     "cli",
     "perft",
-    "opening"
+    "opening",
+    "benches"
 ]
 
 [workspace.dependencies]

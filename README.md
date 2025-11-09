@@ -185,6 +185,47 @@ Depth 4: 197,281 nodes
 Depth 5: 4,865,609 nodes
 ```
 
+### Benchmarks
+
+Run comprehensive performance benchmarks:
+
+```bash
+cargo bench -p benches
+```
+
+The benchmark suite measures:
+- **Board operations** - make_move, unmake_move, FEN parsing
+- **Move generation** - pseudo-legal and legal move generation
+- **Evaluation** - position scoring with piece-square tables
+- **Transposition table** - store, probe hit/miss performance
+- **Move ordering** - simple and advanced ordering strategies
+- **Search** - alpha-beta search at various depths
+
+Example benchmark results (may vary by hardware):
+```
+board_operations/make_move       time: [45.2 ns 45.8 ns 46.4 ns]
+move_generation/startpos         time: [2.1 µs 2.2 µs 2.3 µs]
+evaluation/startpos              time: [892 ns 901 ns 911 ns]
+transposition_table/tt_probe_hit time: [12.3 ns 12.5 ns 12.7 ns]
+search/depth_5/startpos          time: [421 ms 428 ms 435 ms]
+```
+
+### Integration Tests
+
+Run integration tests that verify end-to-end functionality:
+
+```bash
+cargo test --test integration_test
+```
+
+Integration tests cover:
+- Complete game workflow (playing moves, evaluating positions)
+- Search in tactical positions
+- Make/unmake move consistency
+- Evaluation symmetry
+- Pawn promotion and en passant
+- Transposition table effectiveness
+
 ## Configuration
 
 ### Transposition Table Size
