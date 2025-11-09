@@ -9,7 +9,7 @@ mod commands;
 mod engine_handler;
 mod protocol;
 
-pub use commands::{GoCommand, UciCommand};
+pub use commands::{parse_uci_command, GoCommand, UciCommand};
 pub use engine_handler::UciEngine;
 pub use protocol::run_uci_loop;
 

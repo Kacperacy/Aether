@@ -11,6 +11,7 @@ pub struct UciEngine {
     board: Board,
     searcher: AlphaBetaSearcher,
     generator: Generator,
+    hash_size_mb: usize, // Current TT size
 }
 
 impl UciEngine {
@@ -18,11 +19,12 @@ impl UciEngine {
     pub fn new() -> Result<Self, String> {
         let board = Board::starting_position()
             .map_err(|e| format!("Failed to create starting position: {}", e))?;
-        
+
         Ok(Self {
             board,
             searcher: AlphaBetaSearcher::with_tt_size(64), // 64 MB transposition table
             generator: Generator,
+            hash_size_mb: 64,
         })
     }
     
@@ -113,6 +115,23 @@ impl UciEngine {
     /// Reset for new game
     pub fn new_game(&mut self) {
         self.board = Board::starting_position().expect("Failed to create starting position");
+    }
+
+    /// Set hash table size (in MB)
+    pub fn set_hash_size(&mut self, size_mb: usize) {
+        if size_mb != self.hash_size_mb && size_mb > 0 && size_mb <= 1024 {
+            self.hash_size_mb = size_mb;
+            self.searcher = AlphaBetaSearcher::with_tt_size(size_mb);
+        }
+    }
+
+    /// Stop current search
+    ///
+    /// Note: Current implementation uses synchronous search, so this cannot
+    /// interrupt an ongoing search. For production use with Lichess, this should
+    /// be implemented using async search or a stop flag checked during search.
+    pub fn stop(&mut self) {
+        self.searcher.stop();
     }
 }
 

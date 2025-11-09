@@ -54,9 +54,8 @@ pub fn run_uci_loop() -> io::Result<()> {
             }
             
             UciCommand::Stop => {
-                // For now, we don't support stopping mid-search
-                // In a full implementation, this would signal the searcher to stop
-                send_info("Stop command received (not implemented)");
+                engine.stop();
+                send_info("Stop command received");
             }
             
             UciCommand::Quit => {
@@ -64,7 +63,27 @@ pub fn run_uci_loop() -> io::Result<()> {
             }
             
             UciCommand::SetOption { name, value } => {
-                send_info(&format!("Setting option {} = {:?} (not implemented)", name, value));
+                match name.to_lowercase().as_str() {
+                    "hash" => {
+                        if let Some(val_str) = value {
+                            match val_str.parse::<usize>() {
+                                Ok(size) => {
+                                    engine.set_hash_size(size);
+                                    send_info(&format!("Hash size set to {} MB", size));
+                                }
+                                Err(_) => send_info(&format!("Invalid hash size: {}", val_str)),
+                            }
+                        } else {
+                            send_info("Hash option requires a value");
+                        }
+                    }
+                    "threads" => {
+                        send_info("Threads option not yet implemented (single-threaded engine)");
+                    }
+                    _ => {
+                        send_info(&format!("Unknown option: {}", name));
+                    }
+                }
             }
             
             UciCommand::Unknown(cmd) => {

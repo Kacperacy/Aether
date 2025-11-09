@@ -9,12 +9,13 @@
 //! - Move ordering
 //! - Search performance
 
-use aether_types::{BoardQuery, Color, MoveGen, Piece, Square};
+use aether_types::{BoardQuery, Color, MoveGen, Square};
 use board::{Board, BoardOps, FenOps};
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use eval::{Evaluator, SimpleEvaluator};
 use movegen::Generator;
-use search::{AlphaBetaSearcher, SearchLimits, Searcher, TranspositionTable};
+use search::{AlphaBetaSearcher, MoveOrderer, SearchLimits, Searcher, TranspositionTable};
+use std::hint::black_box;
 
 // ============================================================================
 // Board Operations Benchmarks
@@ -32,7 +33,8 @@ fn bench_make_unmake_move(c: &mut Criterion) {
         group.bench_function("make_move", |b| {
             b.iter(|| {
                 let mut board_clone = black_box(board.clone());
-                black_box(board_clone.make_move(*first_move).unwrap());
+                let _: () = board_clone.make_move(*first_move).unwrap();
+                black_box(());
             })
         });
 
@@ -40,7 +42,8 @@ fn bench_make_unmake_move(c: &mut Criterion) {
             b.iter(|| {
                 let mut board_clone = black_box(board.clone());
                 board_clone.make_move(*first_move).unwrap();
-                black_box(board_clone.unmake_move(*first_move).unwrap());
+                let _: () = board_clone.unmake_move(*first_move).unwrap();
+                black_box(());
             })
         });
     }
@@ -90,7 +93,11 @@ fn bench_move_generation(c: &mut Criterion) {
     for (name, fen) in positions {
         let board = Board::from_fen(fen).unwrap();
         group.bench_function(BenchmarkId::new("generate_all_moves", name), |b| {
-            b.iter(|| black_box(move_gen.generate_moves(&board)))
+            b.iter(|| {
+                let mut moves = Vec::new();
+                move_gen.legal(&board, &mut moves);
+                black_box(moves)
+            })
         });
     }
 
@@ -136,24 +143,25 @@ fn bench_transposition_table(c: &mut Criterion) {
 
     group.bench_function("tt_store", |b| {
         b.iter(|| {
-            black_box(tt.store(
+            tt.store(
                 test_hash,
                 None,
                 100,
                 5,
                 search::EntryType::Exact,
-            ))
+            );
+            black_box(())
         })
     });
 
     tt.store(test_hash, None, 100, 5, search::EntryType::Exact);
 
     group.bench_function("tt_probe_hit", |b| {
-        b.iter(|| black_box(tt.probe(test_hash)))
+        b.iter(|| black_box(tt.probe(test_hash).copied()))
     });
 
     group.bench_function("tt_probe_miss", |b| {
-        b.iter(|| black_box(tt.probe(test_hash + 1)))
+        b.iter(|| black_box(tt.probe(test_hash + 1).copied()))
     });
 
     group.finish();
@@ -209,7 +217,8 @@ fn bench_move_ordering(c: &mut Criterion) {
         b.iter(|| {
             let mut moves_clone = black_box(moves.clone());
             let orderer = search::SimpleMoveOrderer::new();
-            black_box(orderer.order_moves(&mut moves_clone));
+            let _: () = orderer.order_moves(&mut moves_clone);
+            black_box(());
         })
     });
 
@@ -217,7 +226,8 @@ fn bench_move_ordering(c: &mut Criterion) {
         b.iter(|| {
             let mut moves_clone = black_box(moves.clone());
             let orderer = search::AdvancedMoveOrderer::new();
-            black_box(orderer.order_moves(&mut moves_clone));
+            let _: () = orderer.order_moves(&mut moves_clone);
+            black_box(());
         })
     });
 
