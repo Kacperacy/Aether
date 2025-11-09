@@ -33,7 +33,6 @@ pub struct Board {
     cache: BoardCache,
     zobrist_hash: u64,
     /// Stack to store move states for unmake operations
-    #[allow(dead_code)]
     move_history: Vec<MoveState>,
 }
 
@@ -183,7 +182,7 @@ impl Board {
     pub fn as_ascii(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
-        write!(out, "\n").unwrap();
+        writeln!(out).unwrap();
         for rank in (0..8).rev() {
             write!(out, "{}", rank + 1).unwrap();
             for file in 0..8 {
@@ -198,7 +197,7 @@ impl Board {
                 });
                 write!(out, " {ch}").unwrap();
             }
-            write!(out, "\n").unwrap();
+            writeln!(out).unwrap();
         }
         writeln!(out, "  A B C D E F G H").unwrap();
         out

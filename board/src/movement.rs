@@ -78,7 +78,7 @@ impl BoardOps for Board {
             promotion: mv.promotion,
             old_zobrist_hash: self.zobrist_hash,
             old_en_passant: self.game_state.en_passant_square,
-            old_castling_rights: self.game_state.castling_rights.clone(),
+            old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
         };
 
@@ -95,7 +95,7 @@ impl BoardOps for Board {
                     "Piece mismatch: expected {:?} {:?}, found {:?} {:?}",
                     mv.piece, stm, moving_piece.0, moving_piece.1
                 )
-            }.into());
+            });
         }
 
         let mut captured_piece = None;
@@ -126,13 +126,13 @@ impl BoardOps for Board {
                 if rook != Piece::Rook || rook_color != stm {
                     return Err(crate::BoardError::InvalidMove {
                         reason: format!("Invalid rook for castling at {}", rook_from)
-                    }.into());
+                    });
                 }
                 self.place_piece(rook_to, Piece::Rook, stm);
             } else {
                 return Err(crate::BoardError::InvalidMove {
                     reason: format!("No rook found at {} for castling", rook_from)
-                }.into());
+                });
             }
         } else if mv.flags.is_en_passant {
             // En passant: remove the captured pawn
@@ -286,44 +286,39 @@ impl Board {
     /// Removes rights when king or rooks move.
     fn update_castling_rights_after_move(&mut self, from: Square, to: Square) {
         // Check if king moved
-        if let Some((piece, color)) = self.piece_at(to) {
-            if piece == Piece::King {
+        if let Some((piece, color)) = self.piece_at(to)
+            && piece == Piece::King {
                 // King moved - remove all castling rights for this color
                 self.game_state.castling_rights[color as usize].short = None;
                 self.game_state.castling_rights[color as usize].long = None;
             }
-        }
 
         // Check if rook moved from initial square
         for color in [Color::White, Color::Black] {
             let back_rank = if color == Color::White { Rank::new(0) } else { Rank::new(7) };
 
             // Check kingside rook
-            if let Some(kingside_file) = self.game_state.castling_rights[color as usize].short {
-                if from == Square::new(kingside_file, back_rank) {
+            if let Some(kingside_file) = self.game_state.castling_rights[color as usize].short
+                && from == Square::new(kingside_file, back_rank) {
                     self.game_state.castling_rights[color as usize].short = None;
                 }
-            }
 
             // Check queenside rook
-            if let Some(queenside_file) = self.game_state.castling_rights[color as usize].long {
-                if from == Square::new(queenside_file, back_rank) {
+            if let Some(queenside_file) = self.game_state.castling_rights[color as usize].long
+                && from == Square::new(queenside_file, back_rank) {
                     self.game_state.castling_rights[color as usize].long = None;
                 }
-            }
 
             // Check if rook was captured (remove castling rights for that rook)
-            if let Some(kingside_file) = self.game_state.castling_rights[color as usize].short {
-                if to == Square::new(kingside_file, back_rank) {
+            if let Some(kingside_file) = self.game_state.castling_rights[color as usize].short
+                && to == Square::new(kingside_file, back_rank) {
                     self.game_state.castling_rights[color as usize].short = None;
                 }
-            }
 
-            if let Some(queenside_file) = self.game_state.castling_rights[color as usize].long {
-                if to == Square::new(queenside_file, back_rank) {
+            if let Some(queenside_file) = self.game_state.castling_rights[color as usize].long
+                && to == Square::new(queenside_file, back_rank) {
                     self.game_state.castling_rights[color as usize].long = None;
                 }
-            }
         }
     }
 }

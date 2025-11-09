@@ -467,7 +467,7 @@ mod tests {
         ];
 
         for fen in &test_fens {
-            let board = Board::from_fen(fen).expect(&format!("Failed to parse FEN: {}", fen));
+            let board = Board::from_fen(fen).unwrap_or_else(|_| panic!("Failed to parse FEN: {}", fen));
             let generated_fen = board.to_fen();
             let reparsed_board =
                 Board::from_fen(&generated_fen).expect("Failed to parse generated FEN");

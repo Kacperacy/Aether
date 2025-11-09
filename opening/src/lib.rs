@@ -47,7 +47,7 @@ impl OpeningBook {
         
         self.positions
             .entry(hash)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(book_move);
     }
     
@@ -75,12 +75,12 @@ impl OpeningBook {
         // Pick weighted random
         // For simplicity, just pick the highest weight move
         // In a full implementation, use rand crate for true randomness
-        let best_move = moves
+        
+        
+        moves
             .iter()
             .max_by_key(|m| m.weight)
-            .map(|m| m.mv.clone());
-        
-        best_move
+            .map(|m| m.mv.clone())
     }
     
     /// Get number of positions in book
@@ -208,7 +208,7 @@ mod tests {
         // Should have starting position moves
         let moves = book.get_moves(0);
         assert!(moves.is_some());
-        assert!(moves.unwrap().len() > 0);
+        assert!(!moves.unwrap().is_empty());
     }
     
     #[test]

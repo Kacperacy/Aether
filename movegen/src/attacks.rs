@@ -6,7 +6,7 @@ use aether_types::{BitBoard, Color, Piece, Square};
 
 /// Shared low-level attack/occupancy helpers used across crates.
 /// Centralizing these avoids duplication and keeps attack logic consistent.
-
+///
 /// Returns a bitboard of pieces (of `color`) that attack `sq`, using the provided
 /// board occupancy `occ` and that color's piece bitboards `their`.
 #[inline]

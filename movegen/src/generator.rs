@@ -67,8 +67,8 @@ impl Generator {
     ) {
         use Piece::*;
         // Quiet pushes (including double)
-        let mut pushes = get_pawn_moves(from, stm, occ);
-        while let Some(to) = pushes.next() {
+        let pushes = get_pawn_moves(from, stm, occ);
+        for to in pushes {
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
             let delta_rank = (to.rank() as i8) - (from.rank() as i8);
             let is_double = (stm == Color::White && delta_rank == 2)
@@ -88,13 +88,13 @@ impl Generator {
         }
 
         // Normal captures
-        let mut attacks = get_pawn_attacks(from, stm) & opp;
+        let attacks = get_pawn_attacks(from, stm) & opp;
         let capture_flags = MoveFlags {
             is_castle: false,
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = attacks.next() {
+        for to in attacks {
             let cap_piece = board.piece_at(to).map(|(p, _)| p);
             let is_promo = crate::pieces::pawn::is_promotion_rank(to, stm);
             if is_promo {
@@ -130,13 +130,13 @@ impl Generator {
         own: BitBoard,
         moves: &mut Vec<Move>,
     ) {
-        let mut targets = get_knight_moves(from) & !own;
+        let targets = get_knight_moves(from) & !own;
         let flags = MoveFlags {
             is_castle: false,
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.next() {
+        for to in targets {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {
@@ -162,13 +162,13 @@ impl Generator {
             Piece::Queen => get_queen_attacks(from, occ),
             _ => BitBoard::EMPTY,
         } & !own;
-        let mut targets = attacks;
+        let targets = attacks;
         let flags = MoveFlags {
             is_castle: false,
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.next() {
+        for to in targets {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {
@@ -187,13 +187,13 @@ impl Generator {
         own: BitBoard,
         moves: &mut Vec<Move>,
     ) {
-        let mut targets = get_king_moves(from) & !own;
+        let targets = get_king_moves(from) & !own;
         let normal_flags = MoveFlags {
             is_castle: false,
             is_en_passant: false,
             is_double_pawn_push: false,
         };
-        while let Some(to) = targets.next() {
+        for to in targets {
             let cap_piece = if occ.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {

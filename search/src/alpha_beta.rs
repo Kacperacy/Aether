@@ -75,21 +75,19 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         }
 
         // Check node limit
-        if let Some(max_nodes) = limits.nodes {
-            if self.info.nodes >= max_nodes {
+        if let Some(max_nodes) = limits.nodes
+            && self.info.nodes >= max_nodes {
                 return true;
             }
-        }
 
         // Check time limit
-        if let Some(max_time) = limits.time {
-            if let Some(start) = self.start_time {
+        if let Some(max_time) = limits.time
+            && let Some(start) = self.start_time {
                 let elapsed = start.elapsed();
                 if elapsed >= max_time {
                     return true;
                 }
             }
-        }
 
         false
     }
@@ -256,14 +254,13 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
         // Order moves for better alpha-beta pruning
         // Try TT move first if available
-        if let Some(tt_entry) = self.tt.probe(hash) {
-            if let Some(tt_move) = tt_entry.best_move {
+        if let Some(tt_entry) = self.tt.probe(hash)
+            && let Some(tt_move) = tt_entry.best_move {
                 // Move TT move to front
                 if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
                     moves.swap(0, pos);
                 }
             }
-        }
         self.move_orderer.order_moves(&mut moves);
 
         let mut best_score = -MATE_SCORE;

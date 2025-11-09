@@ -162,9 +162,9 @@ impl PerftState {
             }
         }
         // If captured opponent rook on its original squares, update their rights
-        if !mv.flags.is_en_passant {
-            if let Some(cap) = mv.capture {
-                if cap == Piece::Rook {
+        if !mv.flags.is_en_passant
+            && let Some(cap) = mv.capture
+                && cap == Piece::Rook {
                     match (self.side, mv.to) {
                         (Color::White, Square::H8) => self.castle_short[them] = false,
                         (Color::White, Square::A8) => self.castle_long[them] = false,
@@ -173,8 +173,6 @@ impl PerftState {
                         _ => {}
                     }
                 }
-            }
-        }
 
         // Switch side
         self.side = self.side.opponent();

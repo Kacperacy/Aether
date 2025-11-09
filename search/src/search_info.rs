@@ -1,3 +1,10 @@
+//! Search information and result types.
+//!
+//! This module defines the data structures used to:
+//! - Configure search limits (`SearchLimits`)
+//! - Track real-time search statistics (`SearchInfo`)
+//! - Return search results (`SearchResult`)
+
 use aether_types::Move;
 use eval::Score;
 use std::time::Duration;

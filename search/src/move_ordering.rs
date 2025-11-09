@@ -1,3 +1,13 @@
+//! Move ordering strategies for alpha-beta search.
+//!
+//! Move ordering is critical for alpha-beta search efficiency. Better move
+//! ordering leads to more cutoffs and dramatically faster search.
+//!
+//! This module provides:
+//! - `MoveOrderer` trait for pluggable ordering strategies
+//! - `SimpleMoveOrderer` with MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
+//! - `AdvancedMoveOrderer` with killer moves and history heuristic
+
 use aether_types::{Move, Piece};
 
 /// Trait for move ordering strategies

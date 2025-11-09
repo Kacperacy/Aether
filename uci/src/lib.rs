@@ -85,7 +85,8 @@ mod tests {
     #[test]
     fn test_constants() {
         assert_eq!(ENGINE_NAME, "Aether");
-        assert!(!ENGINE_VERSION.is_empty());
-        assert!(!ENGINE_AUTHOR.is_empty());
+        assert_eq!(ENGINE_AUTHOR, "Kacper Maciołek");
+        // ENGINE_VERSION comes from CARGO_PKG_VERSION at compile time
+        assert!(ENGINE_VERSION.contains('.'), "Version should have dots");
     }
 }

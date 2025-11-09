@@ -41,6 +41,7 @@ pub enum UciCommand {
 
 /// Parameters for the "go" command
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct GoCommand {
     /// Search for this many moves
     pub searchmoves: Vec<String>,
@@ -79,24 +80,6 @@ pub struct GoCommand {
     pub infinite: bool,
 }
 
-impl Default for GoCommand {
-    fn default() -> Self {
-        Self {
-            searchmoves: Vec::new(),
-            ponder: false,
-            wtime: None,
-            btime: None,
-            winc: None,
-            binc: None,
-            movestogo: None,
-            depth: None,
-            nodes: None,
-            mate: None,
-            movetime: None,
-            infinite: false,
-        }
-    }
-}
 
 impl GoCommand {
     /// Calculate search time for the given side

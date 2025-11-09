@@ -77,8 +77,8 @@ pub fn get_pawn_moves(sq: Square, color: Color, occupied: BitBoard) -> BitBoard 
 
     // Single push
     let push_offset = if color == Color::White { 1 } else { -1 };
-    if let Some(single_push) = sq.offset(0, push_offset) {
-        if !occupied.has(single_push) {
+    if let Some(single_push) = sq.offset(0, push_offset)
+        && !occupied.has(single_push) {
             moves |= BitBoard::from_square(single_push);
 
             // Double push from starting rank
@@ -87,15 +87,12 @@ pub fn get_pawn_moves(sq: Square, color: Color, occupied: BitBoard) -> BitBoard 
             } else {
                 Rank::Seven
             };
-            if sq.rank() == starting_rank {
-                if let Some(double_push) = sq.offset(0, push_offset * 2) {
-                    if !occupied.has(double_push) {
+            if sq.rank() == starting_rank
+                && let Some(double_push) = sq.offset(0, push_offset * 2)
+                    && !occupied.has(double_push) {
                         moves |= BitBoard::from_square(double_push);
                     }
-                }
-            }
         }
-    }
 
     moves
 }

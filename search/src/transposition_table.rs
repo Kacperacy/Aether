@@ -1,3 +1,15 @@
+//! Transposition table implementation.
+//!
+//! The transposition table (TT) is a hash table that stores previously searched
+//! positions to avoid redundant work. This is one of the most important optimizations
+//! in chess engines, typically providing a 5-10x speedup.
+//!
+//! Key features:
+//! - Zobrist hashing for position identification
+//! - Replacement strategy based on depth and age
+//! - Stores exact scores, lower bounds (beta cutoffs), and upper bounds (fail-lows)
+//! - Age-based entry replacement for recent positions
+
 use aether_types::Move;
 use eval::Score;
 
