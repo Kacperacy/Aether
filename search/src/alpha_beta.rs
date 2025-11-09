@@ -141,7 +141,8 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 &mut Vec::new(),
             );
 
-            // Update best move if search wasn't stopped
+            // Update best move ONLY if search completed successfully (not interrupted)
+            // If should_stop is true, the score may be incorrect (returned early with alpha)
             if !self.should_stop {
                 best_score = score;
 
@@ -152,10 +153,12 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
                 if !moves.is_empty() {
                     // Find the move that gives the best score
+                    // Note: This re-searches moves which is inefficient but ensures we get the right move
+                    let mut actual_best_score = -MATE_SCORE - 1;
                     for mv in &moves {
                         let mut board_copy = board.clone();
                         if board_copy.make_move(*mv).is_ok() {
-                            let score = -self.alpha_beta(
+                            let move_score = -self.alpha_beta(
                                 &board_copy,
                                 depth - 1,
                                 1,
@@ -164,12 +167,23 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                                 &mut Vec::new(),
                             );
 
-                            if score >= best_score {
-                                best_move = Some(*mv);
-                                best_pv = vec![*mv];
+                            // Don't use results if search was interrupted during move evaluation
+                            if self.should_stop {
                                 break;
                             }
+
+                            // Track the truly best move, not just first one >= best_score
+                            if move_score > actual_best_score {
+                                actual_best_score = move_score;
+                                best_move = Some(*mv);
+                                best_pv = vec![*mv];
+                            }
                         }
+                    }
+
+                    // Update best_score to the actual best found
+                    if !self.should_stop {
+                        best_score = actual_best_score;
                     }
                 }
             }
