@@ -76,13 +76,16 @@ impl UciEngine {
             limits = SearchLimits::infinite();
         } else if let Some(depth) = go_cmd.depth {
             limits.depth = Some(depth);
+            limits.time = None;  // Clear time limit when depth is specified
         } else if let Some(nodes) = go_cmd.nodes {
             limits.nodes = Some(nodes);
+            limits.depth = None;  // Clear depth limit when nodes are specified
         } else if let Some(time) = go_cmd.calculate_time(
             self.board.side_to_move() == aether_types::Color::White,
             self.move_overhead_ms
         ) {
             limits.time = Some(time);
+            limits.depth = None;  // Clear depth limit when using time control!
         } else {
             // Default: depth 6
             limits.depth = Some(6);
