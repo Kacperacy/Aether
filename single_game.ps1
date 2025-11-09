@@ -12,7 +12,7 @@ Write-Host ""
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $Output = "single_game_${Timestamp}.pgn"
 
-$AetherPath = "$PSScriptRoot\target\release\aether-uci.exe"
+$AetherPath = "$PSScriptRoot\target\release\aether.exe"
 
 & cutechess-cli `
     -engine cmd="$AetherPath" name="Aether" option."Move Overhead"=100 `

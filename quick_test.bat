@@ -6,7 +6,7 @@ echo  Szybki test Aether vs Stockfish
 echo ========================================
 echo.
 
-set AETHER_PATH=%~dp0target\release\aether-uci.exe
+set AETHER_PATH=%~dp0target\release\aether.exe
 set OUTPUT=quick_test.pgn
 
 if not exist "%AETHER_PATH%" (

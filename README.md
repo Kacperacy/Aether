@@ -34,7 +34,7 @@ A fast, modular chess engine written in Rust with a clean architecture and stron
 cargo build --release -p uci
 
 # Test the engine
-echo -e "uci\nisready\nposition startpos\ngo depth 5\nquit" | ./target/release/aether-uci
+echo -e "uci\nisready\nposition startpos\ngo depth 5\nquit" | ./target/release/aether
 
 # Deploy to Lichess (see DEPLOYMENT.md for details)
 ```
@@ -101,10 +101,10 @@ cargo clippy --workspace --all-targets
 Run the UCI interface to connect with chess GUIs:
 
 ```bash
-cargo run --release --bin aether-uci
+cargo run --release --bin aether
 ```
 
-Then configure your chess GUI to use the `aether-uci` binary.
+Then configure your chess GUI to use the `aether` binary.
 
 **Supported UCI Commands:**
 - `uci` - Initialize UCI mode

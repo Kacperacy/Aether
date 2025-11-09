@@ -12,7 +12,7 @@ if "%LEVEL%"=="" set LEVEL=5
 if "%GAMES%"=="" set GAMES=100
 if "%TIME_CONTROL%"=="" set TIME_CONTROL=40/60+0.6
 
-set AETHER_PATH=%~dp0target\release\aether-uci.exe
+set AETHER_PATH=%~dp0target\release\aether.exe
 set ROUNDS=%GAMES%
 set /a ROUNDS=%GAMES%/2
 

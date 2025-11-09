@@ -20,7 +20,7 @@ TIME_CONTROL="40/60+0.6"  # 60s na 40 ruchów + 0.6s increment (symuluje 5+3 na 
 CONCURRENCY=1
 OUTPUT_FILE=""
 STOCKFISH_PATH=$(which stockfish 2>/dev/null || echo "stockfish")
-AETHER_PATH="$(pwd)/target/release/aether-uci"
+AETHER_PATH="$(pwd)/target/release/aether"
 
 # Parsowanie argumentów
 while [[ $# -gt 0 ]]; do

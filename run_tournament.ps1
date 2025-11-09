@@ -25,7 +25,7 @@ function Write-Color {
 }
 
 # Ścieżki do silników
-$AetherPath = "$PSScriptRoot\target\release\aether-uci.exe"
+$AetherPath = "$PSScriptRoot\target\release\aether.exe"
 $StockfishPath = "stockfish.exe"  # Zakładamy że jest w PATH
 
 # Sprawdź czy cutechess-cli jest zainstalowany

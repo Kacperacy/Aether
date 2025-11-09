@@ -17,7 +17,7 @@ This guide explains how to deploy Aether as a bot on Lichess or other chess plat
 # Build the UCI binary in release mode (optimized)
 cargo build --release -p uci
 
-# The binary will be at: target/release/aether-uci
+# The binary will be at: target/release/aether
 ```
 
 ### 2. Verify UCI Protocol
@@ -26,7 +26,7 @@ Test that the UCI protocol works correctly:
 
 ```bash
 # Start the engine
-./target/release/aether-uci
+./target/release/aether
 
 # Type these commands (one per line):
 uci
@@ -66,7 +66,7 @@ token: "YOUR_LICHESS_API_TOKEN"    # Get from https://lichess.org/account/oauth/
 url: "https://lichess.org/"
 engine:
   dir: "../Aether/target/release"   # Path to UCI binary directory
-  name: "aether-uci"                 # Binary name
+  name: "aether"                 # Binary name
   protocol: "uci"
   ponder: false
   uci_options:
@@ -276,7 +276,7 @@ bestmove e2e4
 cargo build --release -p uci
 
 # Run
-./target/release/aether-uci
+./target/release/aether
 ```
 
 ### macOS
@@ -286,7 +286,7 @@ cargo build --release -p uci
 cargo build --release -p uci
 
 # Run
-./target/release/aether-uci
+./target/release/aether
 ```
 
 ### Windows
@@ -296,7 +296,7 @@ cargo build --release -p uci
 cargo build --release -p uci
 
 # Run
-.\target\release\aether-uci.exe
+.\target\release\aether.exe
 ```
 
 ## Production Checklist

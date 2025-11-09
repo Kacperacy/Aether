@@ -12,7 +12,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT="single_game_${TIMESTAMP}.pgn"
 
 cutechess-cli \
-    -engine cmd="$(pwd)/target/release/aether-uci" name="Aether" \
+    -engine cmd="$(pwd)/target/release/aether" name="Aether" \
         option."Move Overhead"=100 \
     -engine cmd="stockfish" name="Stockfish-L${STOCKFISH_LEVEL}" \
         option."Skill Level"=$STOCKFISH_LEVEL \

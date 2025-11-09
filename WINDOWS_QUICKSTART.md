@@ -49,7 +49,7 @@ cd C:\path\to\Aether
 cargo build --release
 ```
 
-Poczekaj 2-5 minut. Binarka będzie w: `target\release\aether-uci.exe`
+Poczekaj 2-5 minut. Binarka będzie w: `target\release\aether.exe`
 
 ### 4️⃣ Odblokuj wykonywanie skryptów PowerShell
 
@@ -181,7 +181,7 @@ Po uruchomieniu `quick_test.ps1`:
 =========================================
   Turniej: Aether vs Stockfish
 =========================================
-Aether:           ...\aether-uci.exe
+Aether:           ...\aether.exe
 Stockfish:        stockfish.exe (poziom 5)
 Liczba gier:      10
 Time control:     10+0.1
@@ -233,7 +233,7 @@ Wynik Aether: 45.0%
 - [ ] Rust zainstalowany (`cargo --version` działa)
 - [ ] cutechess-cli zainstalowany (`cutechess-cli --version` działa)
 - [ ] Stockfish zainstalowany (`stockfish.exe` uruchamia się)
-- [ ] Aether zbudowany (`target\release\aether-uci.exe` istnieje)
+- [ ] Aether zbudowany (`target\release\aether.exe` istnieje)
 - [ ] PowerShell ExecutionPolicy ustawiony
 - [ ] `quick_test.ps1` lub `quick_test.bat` działa
 

@@ -257,7 +257,7 @@ cargo clean
 cargo build --release
 
 # Sprawdź czy działa
-echo -e "uci\nquit" | ./target/release/aether-uci
+echo -e "uci\nquit" | ./target/release/aether
 ```
 
 ### Zbyt wolne testy
@@ -274,7 +274,7 @@ echo -e "uci\nquit" | ./target/release/aether-uci
 ### Opening book
 ```bash
 cutechess-cli \
-    -engine cmd=aether-uci \
+    -engine cmd=aether \
     -engine cmd=stockfish \
     -openings file=openings.pgn format=pgn order=random \
     -each tc=5+3 \
@@ -284,7 +284,7 @@ cutechess-cli \
 ### Zapis szczegółowych logów
 ```bash
 cutechess-cli \
-    -engine cmd=aether-uci \
+    -engine cmd=aether \
     -engine cmd=stockfish \
     -each tc=5+3 \
     -rounds 50 \
@@ -296,7 +296,7 @@ cutechess-cli \
 ### Testowanie z różnymi ustawieniami
 ```bash
 cutechess-cli \
-    -engine cmd=aether-uci option."Move Overhead"=200 option."Hash"=128 \
+    -engine cmd=aether option."Move Overhead"=200 option."Hash"=128 \
     -engine cmd=stockfish option."Skill Level"=5 \
     -each tc=5+3 \
     -rounds 50

@@ -68,7 +68,7 @@ cd path\to\Aether
 cargo build --release
 ```
 
-Binarka będzie w: `target\release\aether-uci.exe`
+Binarka będzie w: `target\release\aether.exe`
 
 ## Dostępne skrypty PowerShell
 
@@ -332,7 +332,7 @@ cargo build --release
 ### Własna konfiguracja cutechess-cli
 
 ```powershell
-$AetherPath = ".\target\release\aether-uci.exe"
+$AetherPath = ".\target\release\aether.exe"
 $StockfishPath = "C:\Tools\stockfish\stockfish.exe"
 
 cutechess-cli `
@@ -351,7 +351,7 @@ cutechess-cli `
 
 ```powershell
 cutechess-cli `
-    -engine cmd=".\target\release\aether-uci.exe" `
+    -engine cmd=".\target\release\aether.exe" `
     -engine cmd="stockfish.exe" option."Skill Level"=5 `
     -openings file="openings.pgn" format=pgn order=random `
     -each tc=5+3 `
@@ -367,7 +367,7 @@ foreach ($Overhead in 50, 100, 150, 200) {
     Write-Host "Testing Move Overhead: $Overhead ms" -ForegroundColor Cyan
 
     cutechess-cli `
-        -engine cmd=".\target\release\aether-uci.exe" option."Move Overhead"=$Overhead `
+        -engine cmd=".\target\release\aether.exe" option."Move Overhead"=$Overhead `
         -engine cmd="stockfish.exe" option."Skill Level"=5 `
         -each tc="5+3" `
         -rounds 20 `
@@ -444,7 +444,7 @@ W razie problemów:
 | Funkcja | Linux | Windows |
 |---------|-------|---------|
 | Skrypty | `.sh` (bash) | `.ps1` (PowerShell) |
-| Binarka | `aether-uci` | `aether-uci.exe` |
+| Binarka | `aether` | `aether.exe` |
 | Separator ścieżek | `/` | `\` |
 | Execution policy | brak | Wymaga ustawienia |
 | PATH separator | `:` | `;` |
