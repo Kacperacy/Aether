@@ -109,8 +109,8 @@ echo ""
 
 # Procent punktów
 if [ $AETHER_GAMES -gt 0 ]; then
-    POINTS=$(echo "scale=1; $TOTAL_WINS + $TOTAL_DRAWS * 0.5" | bc)
-    PERCENTAGE=$(echo "scale=1; $POINTS / $AETHER_GAMES * 100" | bc)
+    POINTS=$(awk "BEGIN {printf \"%.1f\", $TOTAL_WINS + $TOTAL_DRAWS * 0.5}")
+    PERCENTAGE=$(awk "BEGIN {printf \"%.1f\", ($TOTAL_WINS + $TOTAL_DRAWS * 0.5) / $AETHER_GAMES * 100}")
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "  WYNIK: $POINTS / $AETHER_GAMES pkt ($PERCENTAGE%)"
@@ -119,19 +119,20 @@ if [ $AETHER_GAMES -gt 0 ]; then
 
     # Oszacowanie siły (dla Stockfish level 5 ≈ 1550 ELO)
     echo "Ocena siły gry:"
-    if (( $(echo "$PERCENTAGE >= 75" | bc -l) )); then
+    PERC_INT=$(awk "BEGIN {printf \"%.0f\", $PERCENTAGE}")
+    if [ $PERC_INT -ge 75 ]; then
         echo "  ★★★★★ Dominacja ($PERCENTAGE%)"
         echo "  Szacunkowe ELO: ~1750+ (znacznie silniejszy od SF5)"
-    elif (( $(echo "$PERCENTAGE >= 60" | bc -l) )); then
+    elif [ $PERC_INT -ge 60 ]; then
         echo "  ★★★★☆ Silny ($PERCENTAGE%)"
         echo "  Szacunkowe ELO: ~1650-1750 (silniejszy od SF5)"
-    elif (( $(echo "$PERCENTAGE >= 55" | bc -l) )); then
+    elif [ $PERC_INT -ge 55 ]; then
         echo "  ★★★☆☆ Dobry ($PERCENTAGE%)"
         echo "  Szacunkowe ELO: ~1600-1650 (lekka przewaga nad SF5)"
-    elif (( $(echo "$PERCENTAGE >= 45" | bc -l) )); then
+    elif [ $PERC_INT -ge 45 ]; then
         echo "  ★★★☆☆ Równy ($PERCENTAGE%)"
         echo "  Szacunkowe ELO: ~1500-1600 (podobny do SF5)"
-    elif (( $(echo "$PERCENTAGE >= 30" | bc -l) )); then
+    elif [ $PERC_INT -ge 30 ]; then
         echo "  ★★☆☆☆ Słabszy ($PERCENTAGE%)"
         echo "  Szacunkowe ELO: ~1350-1500 (słabszy od SF5)"
     else
@@ -153,12 +154,12 @@ if [ $AETHER_GAMES -gt 0 ]; then
     BLACK_GAMES=$((AETHER_BLACK_WINS + AETHER_BLACK_DRAWS + AETHER_BLACK_LOSSES))
 
     if [ $WHITE_GAMES -gt 0 ]; then
-        WHITE_SCORE=$(echo "scale=1; ($AETHER_WHITE_WINS + $AETHER_WHITE_DRAWS * 0.5) / $WHITE_GAMES * 100" | bc)
+        WHITE_SCORE=$(awk "BEGIN {printf \"%.1f\", ($AETHER_WHITE_WINS + $AETHER_WHITE_DRAWS * 0.5) / $WHITE_GAMES * 100}")
         echo "Wynik białymi: $WHITE_SCORE% ($AETHER_WHITE_WINS-$AETHER_WHITE_DRAWS-$AETHER_WHITE_LOSSES)"
     fi
 
     if [ $BLACK_GAMES -gt 0 ]; then
-        BLACK_SCORE=$(echo "scale=1; ($AETHER_BLACK_WINS + $AETHER_BLACK_DRAWS * 0.5) / $BLACK_GAMES * 100" | bc)
+        BLACK_SCORE=$(awk "BEGIN {printf \"%.1f\", ($AETHER_BLACK_WINS + $AETHER_BLACK_DRAWS * 0.5) / $BLACK_GAMES * 100}")
         echo "Wynik czarnymi: $BLACK_SCORE% ($AETHER_BLACK_WINS-$AETHER_BLACK_DRAWS-$AETHER_BLACK_LOSSES)"
     fi
     echo ""
