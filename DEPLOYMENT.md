@@ -209,25 +209,28 @@ setoption name Move Overhead value 200
 
 ### Time Management
 
-The engine uses an **adaptive time management algorithm** that adjusts based on game type:
+The engine uses an **adaptive time management algorithm** that dynamically adjusts based on remaining time:
 
 **With Increment (e.g., 5+3, 3+2):**
-- Uses 1/20 of remaining time + 75% of increment
-- More aggressive, expects ~20-25 moves
-- Example 5+3: ~17 seconds/move early game
+
+Adapts time allocation based on clock:
+- **>180s (early game)**: Uses 1/22 of time + full increment (~16.4s for 5+3)
+- **60-180s (mid game)**: Uses 1/17 of time + full increment (~11.6s for 5+3)
+- **<60s (time trouble)**: Uses 1/12 of time + full increment (~7.0s for 5+3)
 
 **Without Increment (e.g., 5+0, 3+0):**
-- Uses 1/35 of remaining time
-- Conservative, expects ~35-40 moves
-- Example 5+0: ~8.5 seconds/move early game
+- Uses 1/30 of remaining time (~10s for 5+0)
+- Conservative approach for safety
 
 **Algorithm:**
-```
-time_per_move = (remaining_time / divisor) + (increment × 0.75)
-divisor = 20 (with increment) or 35 (without)
+```rust
+divisor = if time > 180s { 22 } else if time > 60s { 17 } else { 12 }
+time_per_move = (remaining_time / divisor) + increment - move_overhead
 ```
 
-This ensures the engine uses time efficiently while maintaining safety margins. For critical games, you can override with `go movetime` for exact time control.
+**Targeting:** ~2-3s net time usage per move (slightly more than increment for stronger play).
+
+This balanced approach ensures strong play without time trouble. For exact control, override with `go movetime`.
 
 ## Monitoring and Debugging
 

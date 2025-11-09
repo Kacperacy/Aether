@@ -107,20 +107,24 @@ impl GoCommand {
         }
 
         if let Some(time) = time_left {
-            // Improved time management based on increment
-            let (divisor, inc_fraction) = if increment > 0 {
-                // With increment: more aggressive, expect fewer moves
-                // Use 1/20-1/25 of time + 75% of increment
-                (20, 75)
+            // Balanced adaptive time management for increment games
+            // Targets ~2-3s net usage per move (increment + ~1-2s from base time)
+            let time_per_move = if increment > 0 {
+                // Adaptive divisor based on remaining time
+                let base_divisor = if time > 180000 {
+                    22  // Early game: use 1/22 of time (~13.6s for 5min)
+                } else if time > 60000 {
+                    17  // Mid game: use 1/17 of time (~8.8s for 2.5min)
+                } else {
+                    12  // Time trouble: use 1/12 of time (~4.2s for 50s)
+                };
+                let base_time = time / base_divisor;
+                // Use full increment for better play
+                base_time + increment
             } else {
-                // Without increment: conservative, expect more moves
-                // Use 1/35-1/40 of time
-                (35, 0)
+                // Without increment: conservative approach
+                time / 30
             };
-
-            let base_time = time / divisor;
-            let inc_bonus = (increment * inc_fraction) / 100;
-            let time_per_move = base_time + inc_bonus;
 
             // Apply move overhead
             let adjusted_time = time_per_move.saturating_sub(move_overhead_ms);
