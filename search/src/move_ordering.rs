@@ -243,15 +243,18 @@ impl MoveOrderer for AdvancedMoveOrderer {
     }
 
     fn store_killer(&mut self, mv: Move, ply: usize) {
-        self.store_killer(mv, ply);
+        // Call the inherent method on AdvancedMoveOrderer
+        AdvancedMoveOrderer::store_killer(self, mv, ply);
     }
 
     fn update_history(&mut self, mv: Move, depth: u8) {
-        self.update_history(mv, depth);
+        // Call the inherent method on AdvancedMoveOrderer
+        AdvancedMoveOrderer::update_history(self, mv, depth);
     }
 
     fn clear(&mut self) {
-        self.clear();
+        // Call the inherent method on AdvancedMoveOrderer
+        AdvancedMoveOrderer::clear(self);
     }
 }
 

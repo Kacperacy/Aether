@@ -343,28 +343,16 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         let mut best_move = None;
         let mut local_pv = Vec::new();
 
-        // Null Move Pruning (if not in check and depth > 2)
+        // Check if in check (needed for LMR decisions)
         let in_check = if let Some(king_sq) = board.get_king_square(board.side_to_move()) {
             board.is_square_attacked(king_sq, board.side_to_move().opponent())
         } else {
             false
         };
 
-        if depth >= 3 && !in_check && ply > 0 {
-            // Try null move (pass turn to opponent)
-            let null_score = -self.alpha_beta(
-                board,
-                depth.saturating_sub(3), // R=2 reduction
-                ply + 1,
-                -beta,
-                -beta + 1, // Null window
-                &mut Vec::new(),
-            );
-
-            if null_score >= beta {
-                return beta; // Null move cutoff
-            }
-        }
+        // TODO: Null Move Pruning disabled - requires Board::make_null_move() method
+        // Null move pruning would try passing turn to opponent to test if position is so good
+        // that even giving opponent a free move doesn't help them
 
         // Search all moves
         for (move_idx, mv) in moves.into_iter().enumerate() {
