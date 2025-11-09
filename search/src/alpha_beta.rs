@@ -364,50 +364,22 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             }
 
             let mut child_pv = Vec::new();
-            let mut score;
 
+            // TEMPORARILY DISABLED: Debugging performance regression
             // Late Move Reductions (LMR)
             // After searching first few moves at full depth, reduce remaining moves
-            let is_pv_node = move_idx == 0 && tt_move.is_some();
-            let is_tactical = mv.capture.is_some() || mv.promotion.is_some() || mv.flags.is_castle;
+            // let is_pv_node = move_idx == 0 && tt_move.is_some();
+            // let is_tactical = mv.capture.is_some() || mv.promotion.is_some() || mv.flags.is_castle;
 
-            if move_idx >= 4 && depth >= 3 && !is_pv_node && !is_tactical && !in_check {
-                // Reduce depth for later quiet moves
-                let reduction = if move_idx >= 8 { 2 } else { 1 };
-                let reduced_depth = depth.saturating_sub(1 + reduction);
-
-                // Search with reduced depth
-                score = -self.alpha_beta(
-                    &board_copy,
-                    reduced_depth,
-                    ply + 1,
-                    -alpha - 1,
-                    -alpha, // Null window
-                    &mut child_pv,
-                );
-
-                // If reduced search beats alpha, re-search at full depth
-                if score > alpha {
-                    score = -self.alpha_beta(
-                        &board_copy,
-                        depth - 1,
-                        ply + 1,
-                        -beta,
-                        -alpha,
-                        &mut child_pv,
-                    );
-                }
-            } else {
-                // Full-depth search
-                score = -self.alpha_beta(
-                    &board_copy,
-                    depth - 1,
-                    ply + 1,
-                    -beta,
-                    -alpha,
-                    &mut child_pv,
-                );
-            }
+            // Full-depth search for all moves
+            let score = -self.alpha_beta(
+                &board_copy,
+                depth - 1,
+                ply + 1,
+                -beta,
+                -alpha,
+                &mut child_pv,
+            );
 
             // Update best score
             if score > best_score {
