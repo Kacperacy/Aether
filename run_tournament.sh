@@ -120,20 +120,29 @@ echo "Wyniki zapisane w: $OUTPUT_FILE"
 echo ""
 echo "Analiza wyników:"
 if [ -f "$OUTPUT_FILE" ]; then
-    AETHER_WINS=$(grep -c '1-0.*Aether' "$OUTPUT_FILE" || echo 0)
-    STOCKFISH_WINS=$(grep -c '0-1.*Aether' "$OUTPUT_FILE" || echo 0)
-    # Dla draw może być 1/2-1/2
-    DRAWS=$(grep -c '1/2-1/2' "$OUTPUT_FILE" || echo 0)
-    
-    echo "Wygrane Aether:     $AETHER_WINS"
-    echo "Wygrane Stockfish:  $STOCKFISH_WINS"
+    # Count all games that finished
+    TOTAL_GAMES=$(grep -c '^\[Result' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+
+    # Count 1-0 results (White wins)
+    WHITE_WINS=$(grep -c '\[Result "1-0"\]' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+
+    # Count 0-1 results (Black wins)
+    BLACK_WINS=$(grep -c '\[Result "0-1"\]' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+
+    # Count draws
+    DRAWS=$(grep -c '\[Result "1/2-1/2"\]' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+
+    echo "Rozegrane gry:      $TOTAL_GAMES"
+    echo "Wygrane białe:      $WHITE_WINS"
+    echo "Wygrane czarne:     $BLACK_WINS"
     echo "Remisy:             $DRAWS"
     echo ""
-    
-    TOTAL=$((AETHER_WINS + STOCKFISH_WINS + DRAWS))
-    if [ $TOTAL -gt 0 ]; then
-        AETHER_SCORE=$(echo "scale=1; ($AETHER_WINS + $DRAWS * 0.5) / $TOTAL * 100" | bc)
-        echo "Wynik Aether: ${AETHER_SCORE}%"
+
+    if [ $TOTAL_GAMES -gt 0 ]; then
+        # Approximate 50-50 split of colors between engines
+        AETHER_SCORE=$(echo "scale=1; (($WHITE_WINS + $BLACK_WINS) / 2 + $DRAWS * 0.5) / $TOTAL_GAMES * 100" | bc 2>/dev/null || echo "N/A")
+        echo "Przybliżony wynik Aethera: ~${AETHER_SCORE}%"
+        echo "(Dokładny wynik wymaga analizy PGN - użyj analyze_results.sh)"
     fi
 fi
 echo ""

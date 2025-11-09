@@ -199,6 +199,21 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
             self.info.hash_full = self.tt.hash_full();
         }
 
+        // FINAL SANITY CHECK: Ensure we have a best_move if any legal moves exist
+        // This should NEVER trigger, but provides ultimate safety net
+        if best_move.is_none() {
+            let mut emergency_moves = Vec::new();
+            self.generator.legal(board, &mut emergency_moves);
+
+            if !emergency_moves.is_empty() {
+                // CRITICAL BUG: We have legal moves but no best_move!
+                // This indicates a serious logic error in iterative deepening
+                // Use first move as emergency fallback
+                best_move = Some(emergency_moves[0]);
+                best_pv = vec![emergency_moves[0]];
+            }
+        }
+
         SearchResult::with_info(best_move, best_score, best_pv, self.info.clone())
     }
 

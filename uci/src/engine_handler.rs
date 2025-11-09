@@ -148,7 +148,27 @@ impl UciEngine {
             let ponder = result.pv.get(1).map(|m| m.to_string());
             send_bestmove(&best_move.to_string(), ponder.as_deref());
         } else {
-            send_bestmove("0000", None); // No legal moves
+            // CRITICAL ERROR: No legal moves found
+            // This should NEVER happen in a normal game (GUI ends game before this)
+            // Log diagnostic information
+            send_info("ERROR: Search returned no best move!");
+            send_info(&format!("Position FEN: {}", self.board.to_fen()));
+
+            // Check if there are actually any legal moves
+            let mut legal_moves = Vec::new();
+            self.generator.legal(&self.board, &mut legal_moves);
+            send_info(&format!("Legal moves count: {}", legal_moves.len()));
+
+            if !legal_moves.is_empty() {
+                // BUG: We have legal moves but search didn't return one!
+                // Use first legal move as emergency fallback
+                send_info(&format!("EMERGENCY: Using first legal move: {}", legal_moves[0]));
+                send_bestmove(&legal_moves[0].to_string(), None);
+            } else {
+                // No legal moves (checkmate or stalemate)
+                send_info("No legal moves available (checkmate/stalemate)");
+                send_bestmove("0000", None);
+            }
         }
     }
     
