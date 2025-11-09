@@ -11,6 +11,9 @@ codegen = ["rand"]
 aether-types = { workspace = true }
 rand = { workspace = true, optional = true }
 
+[dev-dependencies]
+board = { path = "../board" }
+
 [[bin]]
 name = "gen_magics"
 path = "src/bin/gen_magics.rs"
