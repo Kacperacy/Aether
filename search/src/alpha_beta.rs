@@ -225,143 +225,121 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         SearchResult::with_info(best_move, best_score, best_pv, self.info.clone())
     }
 
-    /// Alpha-beta negamax search
+    /// Checks if search should stop due to time limits or should_stop flag.
     ///
-    /// # Arguments
-    /// * `board` - Current board position
-    /// * `depth` - Remaining depth to search
-    /// * `ply` - Current ply from root (for mate distance)
-    /// * `alpha` - Lower bound
-    /// * `beta` - Upper bound
-    /// * `pv` - Principal variation output
-    ///
-    /// # Returns
-    /// Score from the perspective of the side to move
-    fn alpha_beta(
-        &mut self,
-        board: &Board,
-        depth: u8,
-        ply: u8,
-        mut alpha: Score,
-        beta: Score,
-        pv: &mut Vec<Move>,
-    ) -> Score {
-        self.info.nodes += 1;
+    /// Returns `true` if search should stop, `false` if it should continue.
+    fn check_search_limits(&mut self) -> bool {
+        // If stop flag is already set, return immediately
+        if self.should_stop {
+            return true;
+        }
 
-        // Check if we should stop search (time limit exceeded)
-        // Check periodically for performance
+        // Check time limit periodically for performance
         if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
             if let Some(max_time) = self.time_limit {
                 if let Some(start) = self.start_time {
                     if start.elapsed() >= max_time {
                         self.should_stop = true;
-                        return alpha; // Return current alpha as best guess
+                        return true;
                     }
                 }
             }
         }
 
-        // If stop flag is set, return immediately
-        if self.should_stop {
-            return alpha;
+        false
+    }
+
+    /// Attempts to get a score from the transposition table and update bounds.
+    ///
+    /// Returns `Some(score)` if TT provides an immediate answer, `None` if search must continue.
+    fn try_tt_cutoff(
+        &mut self,
+        hash: u64,
+        depth: u8,
+        alpha: Score,
+        beta: Score,
+        pv: &mut Vec<Move>,
+    ) -> Option<Score> {
+        let tt_entry = self.tt.probe(hash)?;
+
+        // Only use TT entry if searched to at least the same depth
+        if tt_entry.depth < depth {
+            return None;
         }
 
-        // Update selective depth
-        if ply > self.info.selective_depth {
-            self.info.selective_depth = ply;
-        }
-
-        // Terminal node: evaluate position
-        if depth == 0 {
-            return self.quiescence(board, alpha, beta);
-        }
-
-        // Get zobrist hash for TT lookup
-        let hash = board.zobrist_hash().map(|h| h.get()).unwrap_or(0);
-        let original_alpha = alpha;
-
-        // Probe transposition table
-        if let Some(tt_entry) = self.tt.probe(hash) {
-            // Only use TT entry if searched to at least the same depth
-            if tt_entry.depth >= depth {
-                match tt_entry.entry_type {
-                    EntryType::Exact => {
-                        // Exact score - use it directly
-                        if let Some(best_move) = tt_entry.best_move {
-                            pv.clear();
-                            pv.push(best_move);
-                        }
-                        return tt_entry.score;
-                    }
-                    EntryType::LowerBound => {
-                        // Score is at least this good
-                        alpha = alpha.max(tt_entry.score);
-                    }
-                    EntryType::UpperBound => {
-                        // Score is at most this good
-                        if tt_entry.score <= alpha {
-                            return alpha;
-                        }
-                    }
+        match tt_entry.entry_type {
+            EntryType::Exact => {
+                // Exact score - use it directly
+                if let Some(best_move) = tt_entry.best_move {
+                    pv.clear();
+                    pv.push(best_move);
                 }
-
-                // Check for beta cutoff
-                if alpha >= beta {
-                    return alpha;
+                Some(tt_entry.score)
+            }
+            EntryType::LowerBound => {
+                // Score is at least this good
+                if tt_entry.score >= beta {
+                    Some(tt_entry.score)
+                } else {
+                    None
+                }
+            }
+            EntryType::UpperBound => {
+                // Score is at most this good
+                if tt_entry.score <= alpha {
+                    Some(tt_entry.score)
+                } else {
+                    None
                 }
             }
         }
+    }
 
-        // Generate legal moves
-        let mut moves = Vec::new();
-        self.generator.legal(board, &mut moves);
+    /// Detects if the position is checkmate or stalemate.
+    ///
+    /// Returns `Some(score)` if game is over, `None` if there are legal moves.
+    fn detect_checkmate_or_stalemate(&self, board: &Board, ply: u8) -> Option<Score> {
+        // Check if in check
+        let king_square = board.get_king_square(board.side_to_move())?;
+        let in_check = board.is_square_attacked(king_square, board.side_to_move().opponent());
 
-        // Checkmate or stalemate
-        if moves.is_empty() {
-            // Check if in check
-            let king_square = board.get_king_square(board.side_to_move());
-            if let Some(king_sq) = king_square {
-                let in_check = board.is_square_attacked(king_sq, board.side_to_move().opponent());
-                if in_check {
-                    return mated_in(ply as i32); // Checkmate
-                }
-            }
-            return 0; // Stalemate
-        }
-
-        // Order moves for better alpha-beta pruning
-        // Try TT move first if available
-        let tt_move = if let Some(tt_entry) = self.tt.probe(hash) {
-            tt_entry.best_move
+        if in_check {
+            Some(mated_in(ply as i32)) // Checkmate
         } else {
-            None
-        };
+            Some(0) // Stalemate
+        }
+    }
 
-        if let Some(tt_move) = tt_move {
-            // Move TT move to front
-            if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
-                moves.swap(0, pos);
+    /// Orders moves for search, prioritizing TT move if available.
+    fn order_moves_for_search(&mut self, moves: &mut Vec<Move>, hash: u64, ply: usize) {
+        // Try TT move first if available
+        if let Some(tt_entry) = self.tt.probe(hash) {
+            if let Some(tt_move) = tt_entry.best_move {
+                // Move TT move to front
+                if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
+                    moves.swap(0, pos);
+                }
             }
         }
-        self.move_orderer.order_moves_at_ply(&mut moves, ply as usize);
 
+        self.move_orderer.order_moves_at_ply(moves, ply);
+    }
+
+    /// Searches all moves at this node and returns (best_score, best_move, pv).
+    fn search_moves_at_node(
+        &mut self,
+        board: &Board,
+        moves: Vec<Move>,
+        depth: u8,
+        ply: u8,
+        mut alpha: Score,
+        beta: Score,
+    ) -> (Score, Option<Move>, Vec<Move>) {
         let mut best_score = -MATE_SCORE;
         let mut best_move = None;
         let mut local_pv = Vec::new();
 
-        // TODO: Check if in check (needed for LMR decisions when re-enabled)
-        let _in_check = if let Some(king_sq) = board.get_king_square(board.side_to_move()) {
-            board.is_square_attacked(king_sq, board.side_to_move().opponent())
-        } else {
-            false
-        };
-
-        // TODO: Null Move Pruning disabled - requires Board::make_null_move() method
-        // Null move pruning would try passing turn to opponent to test if position is so good
-        // that even giving opponent a free move doesn't help them
-
-        // Search all moves
-        for (_move_idx, mv) in moves.into_iter().enumerate() {
+        for mv in moves {
             let mut board_copy = board.clone();
 
             // Make move
@@ -369,15 +347,8 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 continue;
             }
 
+            // Recursive search
             let mut child_pv = Vec::new();
-
-            // TEMPORARILY DISABLED: Debugging performance regression
-            // Late Move Reductions (LMR)
-            // After searching first few moves at full depth, reduce remaining moves
-            // let is_pv_node = move_idx == 0 && tt_move.is_some();
-            // let is_tactical = mv.capture.is_some() || mv.promotion.is_some() || mv.flags.is_castle;
-
-            // Full-depth search for all moves
             let score = -self.alpha_beta(
                 &board_copy,
                 depth - 1,
@@ -417,6 +388,82 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 break; // Prune remaining moves
             }
         }
+
+        (best_score, best_move, local_pv)
+    }
+
+    /// Alpha-beta negamax search
+    ///
+    /// # Arguments
+    /// * `board` - Current board position
+    /// * `depth` - Remaining depth to search
+    /// * `ply` - Current ply from root (for mate distance)
+    /// * `alpha` - Lower bound
+    /// * `beta` - Upper bound
+    /// * `pv` - Principal variation output
+    ///
+    /// # Returns
+    /// Score from the perspective of the side to move
+    fn alpha_beta(
+        &mut self,
+        board: &Board,
+        depth: u8,
+        ply: u8,
+        mut alpha: Score,
+        beta: Score,
+        pv: &mut Vec<Move>,
+    ) -> Score {
+        self.info.nodes += 1;
+
+        // Check if we should stop search (time limit exceeded)
+        if self.check_search_limits() {
+            return alpha;
+        }
+
+        // Update selective depth
+        if ply > self.info.selective_depth {
+            self.info.selective_depth = ply;
+        }
+
+        // Terminal node: evaluate position
+        if depth == 0 {
+            return self.quiescence(board, alpha, beta);
+        }
+
+        // Get zobrist hash for TT lookup
+        let hash = board.zobrist_hash().map(|h| h.get()).unwrap_or(0);
+        let original_alpha = alpha;
+
+        // Try transposition table cutoff
+        if let Some(score) = self.try_tt_cutoff(hash, depth, alpha, beta, pv) {
+            return score;
+        }
+
+        // Update alpha from TT if available (for better move ordering)
+        if let Some(tt_entry) = self.tt.probe(hash) {
+            if tt_entry.depth >= depth && tt_entry.entry_type == EntryType::LowerBound {
+                alpha = alpha.max(tt_entry.score);
+                if alpha >= beta {
+                    return alpha;
+                }
+            }
+        }
+
+        // Generate legal moves
+        let mut moves = Vec::new();
+        self.generator.legal(board, &mut moves);
+
+        // Check for checkmate or stalemate
+        if moves.is_empty() {
+            return self.detect_checkmate_or_stalemate(board, ply).unwrap_or(0);
+        }
+
+        // Order moves for better alpha-beta pruning
+        self.order_moves_for_search(&mut moves, hash, ply as usize);
+
+        // Search all moves at this node
+        let (best_score, best_move, local_pv) =
+            self.search_moves_at_node(board, moves, depth, ply, alpha, beta);
 
         // Determine entry type for TT
         let entry_type = if best_score <= original_alpha {
