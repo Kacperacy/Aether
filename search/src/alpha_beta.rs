@@ -8,6 +8,12 @@ use eval::{mated_in, Evaluator, Score, SimpleEvaluator, MATE_SCORE};
 use movegen::Generator;
 use std::time::Instant;
 
+/// How often to check if search should stop (every N nodes)
+const NODE_CHECK_INTERVAL: u64 = 4096;
+
+/// Safety margin for time management (stop searching after using this fraction of allocated time)
+const TIME_SAFETY_MARGIN: f32 = 0.5;
+
 /// Alpha-Beta search implementation
 ///
 /// This searcher uses the alpha-beta pruning algorithm to efficiently
@@ -132,13 +138,13 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                 break;
             }
 
-            // Don't start a new depth if we've used more than 50% of allocated time
+            // Don't start a new depth if we've used more than TIME_SAFETY_MARGIN of allocated time
             // (to prevent last iteration from roughly doubling total search time)
             if let Some(max_time) = limits.time {
                 if let Some(start) = self.start_time {
                     let elapsed = start.elapsed();
-                    let half_time = max_time / 2;
-                    if elapsed > half_time {
+                    let time_threshold = max_time.mul_f32(TIME_SAFETY_MARGIN);
+                    if elapsed > time_threshold {
                         break;
                     }
                 }
@@ -243,8 +249,8 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         self.info.nodes += 1;
 
         // Check if we should stop search (time limit exceeded)
-        // Check every 4096 nodes for performance
-        if self.info.nodes % 4096 == 0 {
+        // Check periodically for performance
+        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
             if let Some(max_time) = self.time_limit {
                 if let Some(start) = self.start_time {
                     if start.elapsed() >= max_time {
@@ -343,8 +349,8 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         let mut best_move = None;
         let mut local_pv = Vec::new();
 
-        // Check if in check (needed for LMR decisions)
-        let in_check = if let Some(king_sq) = board.get_king_square(board.side_to_move()) {
+        // TODO: Check if in check (needed for LMR decisions when re-enabled)
+        let _in_check = if let Some(king_sq) = board.get_king_square(board.side_to_move()) {
             board.is_square_attacked(king_sq, board.side_to_move().opponent())
         } else {
             false
@@ -355,7 +361,7 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         // that even giving opponent a free move doesn't help them
 
         // Search all moves
-        for (move_idx, mv) in moves.into_iter().enumerate() {
+        for (_move_idx, mv) in moves.into_iter().enumerate() {
             let mut board_copy = board.clone();
 
             // Make move

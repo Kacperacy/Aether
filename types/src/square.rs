@@ -70,28 +70,6 @@ impl Square {
         (self as u8) % 64
     }
 
-    pub fn from_algebraic(algebraic: &str) -> Result<Self, &'static str> {
-        if algebraic.len() != 2 {
-            return Err("Algebraic notation must be exactly 2 characters");
-        }
-
-        let file = match File::from_str(&algebraic[0..1]) {
-            Ok(file) => file,
-            Err(_) => return Err("Invalid file character (must be a-h)"),
-        };
-
-        let rank = match Rank::from_str(&algebraic[1..2]) {
-            Ok(rank) => rank,
-            Err(_) => return Err("Invalid rank character (must be 1-8)"),
-        };
-
-        Ok(Self::new(file, rank))
-    }
-
-    pub fn to_algebraic(self) -> String {
-        format!("{}{}", self.file().as_char(), self.rank() as i8)
-    }
-
     #[rustfmt::skip]
     pub const fn file(self) -> File {
         match self {

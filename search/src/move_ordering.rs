@@ -10,6 +10,24 @@
 
 use aether_types::{Move, Piece};
 
+/// Bonus for queen promotions (in addition to base promotion bonus)
+const QUEEN_PROMOTION_BONUS: i32 = 1000;
+
+/// Bonus for castling moves
+const CASTLE_BONUS: i32 = 50;
+
+/// Maximum search depth (ply) for killer move table
+const MAX_PLY: usize = 128;
+
+/// Number of killer moves to store per ply
+const KILLERS_PER_PLY: usize = 2;
+
+/// Bonus for killer moves (non-captures that caused beta cutoffs)
+const KILLER_MOVE_BONUS: i32 = 9000;
+
+/// Divisor for history heuristic scores (to scale them down)
+const HISTORY_SCORE_DIVISOR: i32 = 100;
+
 /// Trait for move ordering strategies
 ///
 /// Move ordering is critical for alpha-beta search efficiency.
@@ -100,7 +118,7 @@ impl MoveOrderer for SimpleMoveOrderer {
             score += self.promotion_bonus;
             // Queen promotions are best
             if promo_piece == Piece::Queen {
-                score += 1000;
+                score += QUEEN_PROMOTION_BONUS;
             }
         }
 
@@ -111,7 +129,7 @@ impl MoveOrderer for SimpleMoveOrderer {
 
         // Castling is generally good
         if mv.flags.is_castle {
-            score += 50;
+            score += CASTLE_BONUS;
         }
 
         score
@@ -139,9 +157,9 @@ impl AdvancedMoveOrderer {
     pub fn new() -> Self {
         Self {
             base_orderer: SimpleMoveOrderer::new(),
-            killer_moves: vec![vec![None; 2]; 128], // 2 killer moves per ply, up to depth 128
+            killer_moves: vec![vec![None; KILLERS_PER_PLY]; MAX_PLY],
             history_table: [[0; 64]; 6],
-            max_killers: 2,
+            max_killers: KILLERS_PER_PLY,
         }
     }
 
@@ -194,7 +212,7 @@ impl AdvancedMoveOrderer {
 
     /// Clear killer moves and history
     pub fn clear(&mut self) {
-        self.killer_moves = vec![vec![None; self.max_killers]; 128];
+        self.killer_moves = vec![vec![None; self.max_killers]; MAX_PLY];
         self.history_table = [[0; 64]; 6];
     }
 
@@ -232,11 +250,11 @@ impl MoveOrderer for AdvancedMoveOrderer {
         // Killer moves bonus (only for non-captures)
         if mv.capture.is_none() {
             if self.is_killer(mv, ply) {
-                score += 9000;
+                score += KILLER_MOVE_BONUS;
             }
 
             // Add history score
-            score += self.history_score(mv) / 100; // Scale down history scores
+            score += self.history_score(mv) / HISTORY_SCORE_DIVISOR;
         }
 
         score
