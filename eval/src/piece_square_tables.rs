@@ -1,6 +1,10 @@
-// Piece-Square Tables for positional evaluation
-// Values are in centipawns (100 = 1 pawn)
-// Tables are from White's perspective (rank 0 = 1st rank for White)
+//! Piece-square tables for positional evaluation.
+//!
+//! This module provides lookup tables that assign bonuses/penalties to pieces
+//! based on their position on the board. Values are in centipawns (100 = 1 pawn).
+//!
+//! All tables are from White's perspective (rank 0 = 1st rank for White) and
+//! are automatically flipped for Black pieces.
 
 use aether_types::{Color, Piece, Square};
 

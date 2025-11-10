@@ -1,3 +1,12 @@
+//! Alpha-beta search implementation with pruning and extensions.
+//!
+//! This module implements the core search algorithm using alpha-beta pruning with:
+//! - Iterative deepening for better move ordering
+//! - Transposition table for position caching
+//! - Move ordering (TT move, MVV-LVA, killer moves, history heuristic)
+//! - Quiescence search to avoid horizon effect
+//! - Principal variation tracking
+
 use crate::{
     transposition_table::{EntryType, TranspositionTable},
     AdvancedMoveOrderer, MoveOrderer, SearchInfo, SearchLimits, SearchResult, Searcher,

@@ -1,3 +1,14 @@
+//! Magic bitboard implementation for sliding piece attacks.
+//!
+//! This module implements the "magic bitboards" technique for efficiently
+//! computing rook, bishop, and queen attacks. Magic bitboards use:
+//! - Pre-computed attack tables
+//! - Multiplication-based hashing (magic numbers)
+//! - Perfect hashing with minimal memory usage
+//!
+//! The magic numbers and tables are generated offline and stored in
+//! `magic_constants.rs`.
+
 use crate::magic_constants::{BISHOP_MAGICS, BISHOP_MOVES, ROOK_MAGICS, ROOK_MOVES};
 use aether_types::{BitBoard, Square};
 

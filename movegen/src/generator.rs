@@ -1,3 +1,14 @@
+//! Move generation implementation.
+//!
+//! This module implements the `MoveGen` trait for generating pseudo-legal
+//! and legal moves. It handles all chess move types including:
+//! - Normal moves, captures, and promotions
+//! - Castling (kingside and queenside)
+//! - En passant captures
+//!
+//! The generator uses magic bitboards for sliding piece attacks and
+//! pre-computed tables for other pieces.
+
 use crate::attacks::attackers_to_square_with_occ;
 use crate::magic::{get_bishop_attacks, get_queen_attacks, get_rook_attacks};
 use crate::pieces::{get_king_moves, get_knight_moves, get_pawn_attacks, get_pawn_moves};

@@ -1,3 +1,12 @@
+//! Attack and defender computation.
+//!
+//! This module provides low-level attack computation functions used for:
+//! - Check detection (is the king attacked?)
+//! - Move legality (does this move leave the king in check?)
+//! - Static exchange evaluation (SEE)
+//!
+//! All functions use bitboard operations and magic bitboards for efficiency.
+
 use crate::magic::{get_bishop_attacks, get_rook_attacks};
 use crate::pieces::get_king_moves;
 use crate::pieces::knight::get_knight_attacks;
