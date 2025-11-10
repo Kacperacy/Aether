@@ -89,17 +89,17 @@ fn evaluate_pawn_shield<T: BoardQuery>(board: &T, king_square: Square, color: Co
             }
 
             // Also check one rank further (double pawn shield)
-            if let Some(fwd_rank) = forward_rank {
-                if let Some(double_fwd) = fwd_rank.offset(match color {
+            if let Some(fwd_rank) = forward_rank
+                && let Some(double_fwd) = fwd_rank.offset(match color {
                     Color::White => 1,
                     Color::Black => -1,
-                }) {
-                    let double_square = Square::new(check_file, double_fwd);
-                    if let Some((piece, piece_color)) = board.piece_at(double_square) {
-                        if piece == Piece::Pawn && piece_color == color {
-                            shield_score += PAWN_SHIELD_BONUS / 2; // Half bonus for further pawn
-                        }
-                    }
+                })
+            {
+                let double_square = Square::new(check_file, double_fwd);
+                if let Some((piece, piece_color)) = board.piece_at(double_square)
+                    && piece == Piece::Pawn && piece_color == color
+                {
+                    shield_score += PAWN_SHIELD_BONUS / 2; // Half bonus for further pawn
                 }
             }
         }
@@ -144,13 +144,13 @@ fn count_pawns_on_file<T: BoardQuery>(
         let rank = Rank::new(rank_idx);
         let square = Square::new(file, rank);
 
-        if let Some((piece, color)) = board.piece_at(square) {
-            if piece == Piece::Pawn {
-                if color == our_color {
-                    our_pawns += 1;
-                } else {
-                    enemy_pawns += 1;
-                }
+        if let Some((piece, color)) = board.piece_at(square)
+            && piece == Piece::Pawn
+        {
+            if color == our_color {
+                our_pawns += 1;
+            } else {
+                enemy_pawns += 1;
             }
         }
     }
@@ -169,24 +169,23 @@ fn evaluate_attackers<T: BoardQuery>(board: &T, king_square: Square, color: Colo
 
     for file_offset in -1..=1 {
         for rank_offset in -1..=1 {
-            if let Some(check_file) = offset_file(king_file, file_offset) {
-                if let Some(check_rank) = king_rank.offset(rank_offset) {
-                    let zone_square = Square::new(check_file, check_rank);
+            if let Some(check_file) = offset_file(king_file, file_offset)
+                && let Some(check_rank) = king_rank.offset(rank_offset)
+            {
+                let zone_square = Square::new(check_file, check_rank);
 
-                    // Check if this square is attacked by enemy
-                    if board.is_square_attacked(zone_square, enemy_color) {
-                        // Count major pieces (queen, rook) more heavily
-                        if let Some((piece, piece_color)) = board.piece_at(zone_square) {
-                            if piece_color == enemy_color {
-                                match piece {
-                                    Piece::Queen => attacker_count += 3,
-                                    Piece::Rook => attacker_count += 2,
-                                    Piece::Knight | Piece::Bishop => attacker_count += 1,
-                                    _ => {}
-                                }
+                // Check if this square is attacked by enemy
+                if board.is_square_attacked(zone_square, enemy_color) {
+                    // Count major pieces (queen, rook) more heavily
+                    if let Some((piece, piece_color)) = board.piece_at(zone_square)
+                        && piece_color == enemy_color {
+                            match piece {
+                                Piece::Queen => attacker_count += 3,
+                                Piece::Rook => attacker_count += 2,
+                                Piece::Knight | Piece::Bishop => attacker_count += 1,
+                                _ => {}
                             }
                         }
-                    }
                 }
             }
         }
@@ -234,7 +233,7 @@ fn offset_file(file: File, delta: i8) -> Option<File> {
     let file_idx = file as i8;
     let new_idx = file_idx + delta;
 
-    if new_idx >= 0 && new_idx < 8 {
+    if (0..8).contains(&new_idx) {
         Some(File::from_index(new_idx))
     } else {
         None

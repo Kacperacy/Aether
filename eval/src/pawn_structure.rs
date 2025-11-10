@@ -34,11 +34,10 @@ pub fn evaluate_pawn_structure<T: BoardQuery>(board: &T, color: Color) -> Score 
     let mut pawns = Vec::new();
     for square_idx in 0..64 {
         let square = Square::from_index(square_idx);
-        if let Some((piece, piece_color)) = board.piece_at(square) {
-            if piece == Piece::Pawn && piece_color == color {
+        if let Some((piece, piece_color)) = board.piece_at(square)
+            && piece == Piece::Pawn && piece_color == color {
                 pawns.push(square);
             }
-        }
     }
 
     // Evaluate each pawn
@@ -88,11 +87,10 @@ fn is_doubled_pawn<T: BoardQuery>(board: &T, pawn_square: Square, file: File, co
             continue;
         }
 
-        if let Some((piece, piece_color)) = board.piece_at(square) {
-            if piece == Piece::Pawn && piece_color == color {
+        if let Some((piece, piece_color)) = board.piece_at(square)
+            && piece == Piece::Pawn && piece_color == color {
                 return true; // Found another friendly pawn on same file
             }
-        }
     }
 
     false
@@ -104,18 +102,16 @@ fn is_isolated_pawn<T: BoardQuery>(board: &T, file: File, color: Color) -> bool 
     let right_file = offset_file(file, 1);
 
     // Check left file
-    if let Some(left) = left_file {
-        if has_pawn_on_file(board, left, color) {
+    if let Some(left) = left_file
+        && has_pawn_on_file(board, left, color) {
             return false;
         }
-    }
 
     // Check right file
-    if let Some(right) = right_file {
-        if has_pawn_on_file(board, right, color) {
+    if let Some(right) = right_file
+        && has_pawn_on_file(board, right, color) {
             return false;
         }
-    }
 
     true // No friendly pawns on adjacent files
 }
@@ -140,18 +136,17 @@ fn is_passed_pawn<T: BoardQuery>(
     for file_offset in -1..=1 {
         if let Some(check_file) = offset_file(file, file_offset) {
             for rank_idx in start_rank..end_rank {
-                if rank_idx < 0 || rank_idx >= 8 {
+                if !(0..8).contains(&rank_idx) {
                     continue;
                 }
 
                 let check_rank = Rank::new(rank_idx);
                 let check_square = Square::new(check_file, check_rank);
 
-                if let Some((piece, piece_color)) = board.piece_at(check_square) {
-                    if piece == Piece::Pawn && piece_color == opponent {
+                if let Some((piece, piece_color)) = board.piece_at(check_square)
+                    && piece == Piece::Pawn && piece_color == opponent {
                         return false; // Enemy pawn blocks or can capture
                     }
-                }
             }
         }
     }
@@ -174,21 +169,19 @@ fn is_protected_by_pawn<T: BoardQuery>(board: &T, pawn_square: Square, color: Co
         // Check left diagonal
         if let Some(left_file) = offset_file(file, -1) {
             let check_square = Square::new(left_file, back_rank);
-            if let Some((piece, piece_color)) = board.piece_at(check_square) {
-                if piece == Piece::Pawn && piece_color == color {
+            if let Some((piece, piece_color)) = board.piece_at(check_square)
+                && piece == Piece::Pawn && piece_color == color {
                     return true;
                 }
-            }
         }
 
         // Check right diagonal
         if let Some(right_file) = offset_file(file, 1) {
             let check_square = Square::new(right_file, back_rank);
-            if let Some((piece, piece_color)) = board.piece_at(check_square) {
-                if piece == Piece::Pawn && piece_color == color {
+            if let Some((piece, piece_color)) = board.piece_at(check_square)
+                && piece == Piece::Pawn && piece_color == color {
                     return true;
                 }
-            }
         }
     }
 
@@ -201,11 +194,10 @@ fn has_pawn_on_file<T: BoardQuery>(board: &T, file: File, color: Color) -> bool 
         let rank = Rank::new(rank_idx);
         let square = Square::new(file, rank);
 
-        if let Some((piece, piece_color)) = board.piece_at(square) {
-            if piece == Piece::Pawn && piece_color == color {
+        if let Some((piece, piece_color)) = board.piece_at(square)
+            && piece == Piece::Pawn && piece_color == color {
                 return true;
             }
-        }
     }
 
     false
@@ -216,7 +208,7 @@ fn offset_file(file: File, delta: i8) -> Option<File> {
     let file_idx = file as i8;
     let new_idx = file_idx + delta;
 
-    if new_idx >= 0 && new_idx < 8 {
+    if (0..8).contains(&new_idx) {
         Some(File::from_index(new_idx))
     } else {
         None

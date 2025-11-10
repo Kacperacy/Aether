@@ -140,15 +140,14 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
             // Don't start a new depth if we've used more than TIME_SAFETY_MARGIN of allocated time
             // (to prevent last iteration from roughly doubling total search time)
-            if let Some(max_time) = limits.time {
-                if let Some(start) = self.start_time {
+            if let Some(max_time) = limits.time
+                && let Some(start) = self.start_time {
                     let elapsed = start.elapsed();
                     let time_threshold = max_time.mul_f32(TIME_SAFETY_MARGIN);
                     if elapsed > time_threshold {
                         break;
                     }
                 }
-            }
 
             self.info.depth = depth;
             self.info.selective_depth = depth;
@@ -170,9 +169,9 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
 
                 // Try to get best move from Transposition Table (fast path)
                 let hash = board.zobrist_hash().map(|h| h.get()).unwrap_or(0);
-                if let Some(tt_entry) = self.tt.probe(hash) {
-                    if tt_entry.depth >= depth {
-                        if let Some(mv) = tt_entry.best_move {
+                if let Some(tt_entry) = self.tt.probe(hash)
+                    && tt_entry.depth >= depth
+                        && let Some(mv) = tt_entry.best_move {
                             // Verify move is legal before using it
                             let mut legal_moves = Vec::new();
                             self.generator.legal(board, &mut legal_moves);
@@ -181,8 +180,6 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
                                 best_pv = vec![mv];
                             }
                         }
-                    }
-                }
 
                 // Fallback: If TT didn't give us a move, search manually
                 // This shouldn't happen often since alpha_beta stores in TT
@@ -235,16 +232,13 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         }
 
         // Check time limit periodically for performance
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
-            if let Some(max_time) = self.time_limit {
-                if let Some(start) = self.start_time {
-                    if start.elapsed() >= max_time {
+        if self.info.nodes.is_multiple_of(NODE_CHECK_INTERVAL)
+            && let Some(max_time) = self.time_limit
+                && let Some(start) = self.start_time
+                    && start.elapsed() >= max_time {
                         self.should_stop = true;
                         return true;
                     }
-                }
-            }
-        }
 
         false
     }
@@ -311,16 +305,15 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
     }
 
     /// Orders moves for search, prioritizing TT move if available.
-    fn order_moves_for_search(&mut self, moves: &mut Vec<Move>, hash: u64, ply: usize) {
+    fn order_moves_for_search(&mut self, moves: &mut [Move], hash: u64, ply: usize) {
         // Try TT move first if available
-        if let Some(tt_entry) = self.tt.probe(hash) {
-            if let Some(tt_move) = tt_entry.best_move {
+        if let Some(tt_entry) = self.tt.probe(hash)
+            && let Some(tt_move) = tt_entry.best_move {
                 // Move TT move to front
                 if let Some(pos) = moves.iter().position(|&m| m == tt_move) {
                     moves.swap(0, pos);
                 }
             }
-        }
 
         self.move_orderer.order_moves_at_ply(moves, ply);
     }
@@ -440,14 +433,13 @@ impl<E: Evaluator, O: MoveOrderer> AlphaBetaSearcher<E, O> {
         }
 
         // Update alpha from TT if available (for better move ordering)
-        if let Some(tt_entry) = self.tt.probe(hash) {
-            if tt_entry.depth >= depth && tt_entry.entry_type == EntryType::LowerBound {
+        if let Some(tt_entry) = self.tt.probe(hash)
+            && tt_entry.depth >= depth && tt_entry.entry_type == EntryType::LowerBound {
                 alpha = alpha.max(tt_entry.score);
                 if alpha >= beta {
                     return alpha;
                 }
             }
-        }
 
         // Generate legal moves
         let mut moves = Vec::new();

@@ -59,11 +59,10 @@ fn count_piece_moves<T: BoardQuery>(board: &T, square: Square, piece: Piece, col
             ];
 
             for (df, dr) in offsets {
-                if let Some(target) = offset_square(square, df, dr) {
-                    if can_move_to(board, target, color) {
+                if let Some(target) = offset_square(square, df, dr)
+                    && can_move_to(board, target, color) {
                         count += 1;
                     }
-                }
             }
         }
         Piece::Bishop => {
@@ -100,22 +99,18 @@ fn count_sliding_moves<T: BoardQuery>(
         let mut current_square = square;
 
         // Slide in this direction until blocked
-        loop {
-            if let Some(next_square) = offset_square(current_square, df, dr) {
-                if can_move_to(board, next_square, color) {
-                    count += 1;
+        while let Some(next_square) = offset_square(current_square, df, dr) {
+            if can_move_to(board, next_square, color) {
+                count += 1;
 
-                    // If there's an enemy piece, we can capture but can't go further
-                    if board.piece_at(next_square).is_some() {
-                        break;
-                    }
-
-                    current_square = next_square;
-                } else {
-                    break; // Blocked by own piece
+                // If there's an enemy piece, we can capture but can't go further
+                if board.piece_at(next_square).is_some() {
+                    break;
                 }
+
+                current_square = next_square;
             } else {
-                break; // Off the board
+                break; // Blocked by own piece
             }
         }
     }
@@ -142,8 +137,8 @@ fn offset_square(square: Square, df: i8, dr: i8) -> Option<Square> {
     let new_file = file + df;
     let new_rank = rank + dr;
 
-    if new_file >= 0 && new_file < 8 && new_rank >= 0 && new_rank < 8 {
-        Some(Square::from_index((new_rank * 8 + new_file) as i8))
+    if (0..8).contains(&new_file) && (0..8).contains(&new_rank) {
+        Some(Square::from_index(new_rank * 8 + new_file))
     } else {
         None
     }
