@@ -9,7 +9,28 @@ use aether_types::Move;
 use eval::Score;
 use std::time::Duration;
 
-/// Search constraints and limits
+/// Search constraints and limits.
+///
+/// Allows configuration of search depth, time, or node limits.
+///
+/// # Examples
+///
+/// ```
+/// use search::SearchLimits;
+/// use std::time::Duration;
+///
+/// // Search to depth 6
+/// let limits = SearchLimits::depth(6);
+///
+/// // Search for 5 seconds
+/// let limits = SearchLimits::time(Duration::from_secs(5));
+///
+/// // Search 1 million nodes
+/// let limits = SearchLimits::nodes(1_000_000);
+///
+/// // Infinite search (until stopped)
+/// let limits = SearchLimits::infinite();
+/// ```
 #[derive(Debug, Clone)]
 pub struct SearchLimits {
     /// Maximum search depth in plies (half-moves)
@@ -37,7 +58,16 @@ impl Default for SearchLimits {
 }
 
 impl SearchLimits {
-    /// Create search limits with only depth constraint
+    /// Create search limits with only depth constraint.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use search::SearchLimits;
+    ///
+    /// let limits = SearchLimits::depth(8);
+    /// assert_eq!(limits.depth, Some(8));
+    /// ```
     pub fn depth(depth: u8) -> Self {
         Self {
             depth: Some(depth),
@@ -78,7 +108,9 @@ impl SearchLimits {
     }
 }
 
-/// Real-time search statistics
+/// Real-time search statistics.
+///
+/// Tracks information during search for progress updates and UCI output.
 #[derive(Debug, Clone, Default)]
 pub struct SearchInfo {
     /// Current search depth
@@ -120,7 +152,24 @@ impl SearchInfo {
     }
 }
 
-/// Result of a search
+/// Result of a search.
+///
+/// Contains the best move found and associated statistics.
+///
+/// # Example
+///
+/// ```ignore
+/// use search::{AlphaBetaSearcher, Searcher, SearchLimits};
+///
+/// let mut searcher = AlphaBetaSearcher::new();
+/// let result = searcher.search(&board, &SearchLimits::depth(6));
+///
+/// if let Some(best_move) = result.best_move {
+///     println!("Best move: {} with score {}", best_move, result.score);
+///     println!("Nodes searched: {}", result.info.nodes);
+///     println!("NPS: {}", result.info.nps);
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct SearchResult {
     /// Best move found

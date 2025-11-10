@@ -20,10 +20,25 @@ pub use transposition_table::{EntryType, TTEntry, TranspositionTable};
 use aether_types::{BoardQuery, Move};
 use eval::Evaluator;
 
-/// Trait for chess position search algorithms
+/// Trait for chess position search algorithms.
 ///
 /// This trait allows different search implementations (alpha-beta, MCTS, etc.)
 /// to be used interchangeably by the engine.
+///
+/// # Example
+///
+/// ```ignore
+/// use search::{AlphaBetaSearcher, Searcher, SearchLimits};
+/// use board::Board;
+///
+/// let mut searcher = AlphaBetaSearcher::new();
+/// let board = Board::starting_position().unwrap();
+/// let limits = SearchLimits::depth(6);
+///
+/// let result = searcher.search(&board, &limits);
+/// println!("Best move: {}", result.best_move.unwrap());
+/// println!("Score: {}", result.score);
+/// ```
 pub trait Searcher {
     /// Search for the best move in the current position
     ///
@@ -56,9 +71,18 @@ pub trait SearchableBoard: BoardQuery + Clone {
     fn unmake_move(&mut self, mv: Move) -> Result<(), String>;
 }
 
-/// Generic search function that works with any Searcher implementation
+/// Generic search function that works with any Searcher implementation.
 ///
 /// This allows the engine to be agnostic about the search algorithm used.
+///
+/// # Example
+///
+/// ```ignore
+/// let result = find_best_move(&board, &mut searcher, &evaluator, &limits);
+/// if let Some(mv) = result.best_move {
+///     println!("Playing: {}", mv);
+/// }
+/// ```
 pub fn find_best_move<T, S, E>(
     board: &T,
     searcher: &mut S,
