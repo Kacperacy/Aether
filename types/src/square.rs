@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, File, Rank};
+use crate::{BitBoard, Color, File, Rank, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -28,15 +28,15 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 ];
 
 impl FromStr for Square {
-    type Err = &'static str;
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 2 {
-            return Err("Invalid square length");
+            return Err(TypeError::InvalidSquare { input: s.to_string() });
         }
 
-        let file = File::from_str(&s[0..1]).map_err(|_| "Invalid file character (must be a-h)")?;
-        let rank = Rank::from_str(&s[1..2]).map_err(|_| "Invalid rank character (must be 1-8)")?;
+        let file = File::from_str(&s[0..1])?;
+        let rank = Rank::from_str(&s[1..2])?;
         Ok(Square::new(file, rank))
     }
 }

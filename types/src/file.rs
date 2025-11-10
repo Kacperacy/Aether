@@ -1,4 +1,4 @@
-use crate::BitBoard;
+use crate::{BitBoard, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -26,7 +26,7 @@ pub const ALL_FILES: [File; 8] = [
 ];
 
 impl FromStr for File {
-    type Err = &'static str;
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -38,7 +38,7 @@ impl FromStr for File {
             "f" => Ok(Self::F),
             "g" => Ok(Self::G),
             "h" => Ok(Self::H),
-            _ => Err("Invalid file"),
+            _ => Err(TypeError::InvalidFile { input: s.to_string() }),
         }
     }
 }

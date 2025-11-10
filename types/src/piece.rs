@@ -1,3 +1,4 @@
+use crate::TypeError;
 use std::str::FromStr;
 
 /// Represents a chess piece type.
@@ -21,17 +22,20 @@ pub enum Piece {
 }
 
 impl FromStr for Piece {
-    type Err = ();
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "p" => Ok(Self::Pawn),
-            "n" => Ok(Self::Knight),
-            "b" => Ok(Self::Bishop),
-            "r" => Ok(Self::Rook),
-            "q" => Ok(Self::Queen),
-            "k" => Ok(Self::King),
-            _ => Err(()),
+            "p" | "P" => Ok(Self::Pawn),
+            "n" | "N" => Ok(Self::Knight),
+            "b" | "B" => Ok(Self::Bishop),
+            "r" | "R" => Ok(Self::Rook),
+            "q" | "Q" => Ok(Self::Queen),
+            "k" | "K" => Ok(Self::King),
+            _ => {
+                let ch = s.chars().next().unwrap_or('\0');
+                Err(TypeError::InvalidPiece { input: ch })
+            }
         }
     }
 }
