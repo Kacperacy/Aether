@@ -1,6 +1,12 @@
+//! Error types for board operations.
+//!
+//! This module defines error types for board validation, move execution,
+//! and FEN parsing operations.
+
 use aether_types::{Color, Rank, Square};
 use thiserror::Error;
 
+/// Errors that can occur during board operations.
 #[derive(Debug, Error)]
 pub enum BoardError {
     #[error("Invalid piece placement: {piece:?} at {square:?}")]
@@ -28,6 +34,7 @@ pub enum BoardError {
     FenParsingError(#[from] FenError),
 }
 
+/// Errors that can occur during FEN string parsing.
 #[derive(Debug, Error)]
 pub enum FenError {
     #[error("Empty fen string")]
@@ -73,4 +80,5 @@ pub enum FenError {
     InvalidFullmoveNumber { number: String },
 }
 
+/// Result type alias for board operations.
 pub type Result<T> = std::result::Result<T, BoardError>;

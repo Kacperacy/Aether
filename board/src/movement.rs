@@ -1,8 +1,14 @@
+//! Move execution and board manipulation.
+//!
+//! This module implements the `BoardOps` trait for making and unmaking moves,
+//! along with low-level piece placement and removal operations.
+
 use crate::{Board, BoardOps, Result};
 use aether_types::{BitBoard, BoardQuery, Color, File, Move, MoveState, Piece, Rank, Square};
 
 impl Board {
     /// Places a piece on the board at the given square.
+    ///
     /// Does not update Zobrist hash - caller is responsible.
     pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = BitBoard::from_square(square);
@@ -14,6 +20,7 @@ impl Board {
     }
 
     /// Removes a piece from the board at the given square.
+    ///
     /// Returns the piece and color if one was present.
     /// Does not update Zobrist hash - caller is responsible.
     pub fn remove_piece(&mut self, square: Square) -> Option<(Piece, Color)> {
@@ -40,7 +47,8 @@ impl Board {
     }
 
     /// Simple move without state management (for backward compatibility).
-    /// Use BoardOps::make_move for full move execution with state tracking.
+    ///
+    /// Use `BoardOps::make_move` for full move execution with state tracking.
     pub fn make_simple_move(&mut self, from: Square, to: Square) -> Option<(Piece, Color)> {
         if let Some((piece, color)) = self.remove_piece(from) {
             // Capture if any piece on destination

@@ -1,9 +1,15 @@
+//! Zobrist hashing for position identification.
+//!
+//! This module implements Zobrist hashing, a technique for creating unique
+//! hash values for chess positions. Used for transposition table lookups
+//! and repetition detection.
+
 use crate::{Board, BoardQuery};
 use aether_types::zobrist_keys::zobrist_keys;
 use aether_types::{Color, Piece, Square};
 
 impl Board {
-    /// Calculate zobrist hash from scratch for current position
+    /// Calculate zobrist hash from scratch for current position.
     pub fn calculate_zobrist_hash(&self) -> u64 {
         let keys = zobrist_keys();
         let mut hash = 0u64;
@@ -39,7 +45,9 @@ impl Board {
         hash
     }
 
-    /// Update zobrist hash incrementally during move
+    /// Update zobrist hash incrementally during a move.
+    ///
+    /// More efficient than recalculating from scratch.
     pub fn update_zobrist_incremental(
         &mut self,
         piece: Piece,

@@ -1,12 +1,31 @@
+//! Board builder for constructing chess boards.
+//!
+//! This module provides a builder pattern for creating `Board` instances,
+//! allowing piece-by-piece construction with validation.
+
 use crate::{cache::BoardCache, error::*, game_state::GameState};
 use aether_types::{BitBoard, Color, File, Piece, Square};
 
+/// Builder for constructing a chess board.
+///
+/// Provides a fluent interface for setting up piece positions, game state,
+/// and validates the resulting board before construction.
+///
+/// # Example
+///
+/// ```ignore
+/// let board = BoardBuilder::new()
+///     .place_piece(Square::E1, Piece::King, Color::White)?
+///     .place_piece(Square::E8, Piece::King, Color::Black)?
+///     .build()?;
+/// ```
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
     game_state: GameState,
 }
 
 impl BoardBuilder {
+    /// Creates a new empty board builder.
     pub fn new() -> Self {
         Self {
             pieces: [[BitBoard::EMPTY; 6]; 2],
@@ -14,6 +33,7 @@ impl BoardBuilder {
         }
     }
 
+    /// Creates a builder pre-configured with the standard chess starting position.
     pub fn starting_position() -> Self {
         let mut builder = Self::new();
         builder.game_state = GameState::starting_position();
@@ -21,6 +41,9 @@ impl BoardBuilder {
         builder
     }
 
+    /// Places a piece on the board.
+    ///
+    /// Returns an error if the square is already occupied.
     pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) -> Result<&mut Self> {
         if self.is_square_occupied(square) {
             return Err(BoardError::OverlappingPieces { square });
@@ -30,11 +53,13 @@ impl BoardBuilder {
         Ok(self)
     }
 
+    /// Sets which side is to move.
     pub fn set_side_to_move(&mut self, color: Color) -> &mut Self {
         self.game_state.side_to_move = color;
         self
     }
 
+    /// Sets castling rights for a specific color.
     pub fn set_castling_rights(
         &mut self,
         color: Color,
@@ -44,6 +69,9 @@ impl BoardBuilder {
         self
     }
 
+    /// Sets the en passant target square.
+    ///
+    /// Validates that the square is on the correct rank for the side to move.
     pub fn set_en_passant(&mut self, square: Option<Square>) -> Result<&mut Self> {
         if let Some(sq) = square {
             // Validate en passant square
@@ -59,6 +87,9 @@ impl BoardBuilder {
         Ok(self)
     }
 
+    /// Builds and validates the board.
+    ///
+    /// Returns an error if validation fails (e.g., missing kings, invalid piece placement).
     pub fn build(self) -> Result<super::Board> {
         self.validate()?;
 
