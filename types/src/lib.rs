@@ -34,8 +34,7 @@ pub use square::*;
 
 /// OR-combines all piece bitboards for a color.
 ///
-/// Convenience helper shared across crates to avoid re-implementing the
-/// same micro-utility.
+/// Convenience helper shared across crates to avoid re-implementing the same micro-utility.
 #[inline]
 pub fn combine_piece_bitboards(piece_bbs: [BitBoard; 6]) -> BitBoard {
     let [p0, p1, p2, p3, p4, p5] = piece_bbs;

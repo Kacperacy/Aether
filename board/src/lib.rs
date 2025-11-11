@@ -118,6 +118,10 @@ impl BoardQuery for Board {
         !self.attackers_to_square(square, by_color).is_empty()
     }
 
+    fn piece_count(&self, piece: Piece, color: Color) -> u32 {
+        self.pieces[color as usize][piece as usize].len()
+    }
+
     fn get_king_square(&self, color: Color) -> Option<Square> {
         self.pieces[color as usize][Piece::King as usize].to_square()
     }

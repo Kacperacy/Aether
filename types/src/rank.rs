@@ -1,5 +1,5 @@
 use crate::TypeError::{InvalidRank, InvalidRankIndex};
-use crate::{BitBoard, Color, TypeError};
+use crate::{BitBoard, Color, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -30,7 +30,7 @@ pub const ALL_RANKS: [Rank; 8] = [
 impl FromStr for Rank {
     type Err = TypeError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "1" => Ok(Self::One),
             "2" => Ok(Self::Two),
@@ -56,7 +56,7 @@ impl Rank {
     pub const NUM: usize = 8;
 
     /// Safe conversion from index (0-7) to Rank
-    pub fn try_from_index(rank: u8) -> Result<Self, TypeError> {
+    pub fn try_from_index(rank: u8) -> Result<Self> {
         match rank {
             0 => Ok(Self::One),
             1 => Ok(Self::Two),

@@ -1,7 +1,9 @@
 use crate::attacks::attackers_to_square_with_occ;
 use crate::magic::{get_bishop_attacks, get_queen_attacks, get_rook_attacks};
 use crate::pieces::{get_king_moves, get_knight_moves, get_pawn_attacks, get_pawn_moves};
-use aether_types::{BitBoard, BoardQuery, Color, Move, MoveFlags, MoveGen, Piece, Square};
+use aether_types::{
+    ALL_SQUARES, BitBoard, BoardQuery, Color, Move, MoveFlags, MoveGen, Piece, Square,
+};
 
 /// Minimal move generator (incremental implementation).
 #[derive(Debug, Default, Clone, Copy)]
@@ -21,7 +23,7 @@ impl Generator {
         let mut occ = BitBoard::EMPTY;
         let mut own = BitBoard::EMPTY;
         let mut opp = BitBoard::EMPTY;
-        for &sq in Square::all().iter() {
+        for sq in ALL_SQUARES {
             if let Some((_, c)) = board.piece_at(sq) {
                 let bb = BitBoard::from_square(sq);
                 occ |= bb;
@@ -254,7 +256,7 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         let stm = board.side_to_move();
         let (occ, own, opp) = self.build_occupancies(board, stm);
 
-        for &sq in Square::all().iter() {
+        for sq in ALL_SQUARES {
             if let Some((piece, color)) = board.piece_at(sq) {
                 if color != stm {
                     continue;
@@ -300,7 +302,7 @@ struct PieceMap {
 impl PieceMap {
     fn from_board<T: BoardQuery>(board: &T) -> Self {
         let mut pieces = [[BitBoard::EMPTY; 6]; 2];
-        for &sq in Square::all().iter() {
+        for sq in ALL_SQUARES {
             if let Some((p, c)) = board.piece_at(sq) {
                 pieces[c as usize][p as usize] |= BitBoard::from_square(sq);
             }

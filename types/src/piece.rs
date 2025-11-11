@@ -1,5 +1,5 @@
-use crate::TypeError;
 use crate::TypeError::InvalidPiece;
+use crate::{Result, TypeError};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -26,7 +26,7 @@ pub const ALL_PIECES: [Piece; Piece::NUM] = [
 impl FromStr for Piece {
     type Err = TypeError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "p" => Ok(Self::Pawn),
             "n" => Ok(Self::Knight),

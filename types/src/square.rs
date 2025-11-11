@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, File, Rank};
+use crate::{BitBoard, Color, File, Rank, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -28,15 +28,23 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 ];
 
 impl FromStr for Square {
-    type Err = &'static str;
+    type Err = TypeError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         if s.len() != 2 {
-            return Err("Invalid square length");
+            return Err(TypeError::InvalidSquare(s.to_string()));
         }
 
-        let file = File::from_str(&s[0..1]).map_err(|_| "Invalid file character (must be a-h)")?;
-        let rank = Rank::from_str(&s[1..2]).map_err(|_| "Invalid rank character (must be 1-8)")?;
+        let file = match File::from_str(&s[0..1]) {
+            Ok(file) => file,
+            Err(_) => return Err(TypeError::InvalidSquare(s.to_string())),
+        };
+
+        let rank = match Rank::from_str(&s[1..2]) {
+            Ok(rank) => rank,
+            Err(_) => return Err(TypeError::InvalidSquare(s.to_string())),
+        };
+
         Ok(Square::new(file, rank))
     }
 }
@@ -48,50 +56,46 @@ impl Display for Square {
 }
 
 impl Square {
+    /// Number of squares on a chessboard
     pub const NUM: usize = 64;
 
-    pub const fn all() -> &'static [Square; Self::NUM] {
-        &ALL_SQUARES
-    }
-
+    /// Create a new Square from a File and Rank
     #[rustfmt::skip]
     pub const fn new(file: File, rank: Rank) -> Self {
         let index = rank as i8 * 8 + file as i8;
         ALL_SQUARES[index as usize]
     }
 
+    /// Create a Square from an index (0-63)
     pub const fn from_index(index: i8) -> Self {
         let file = File::from_index(index % 8);
         let rank = Rank::from_index(index / 8);
         Self::new(file, rank)
     }
 
+    /// Convert the Square to an index (0-63)
     pub const fn to_index(self) -> u8 {
         (self as u8) % 64
     }
 
-    pub fn from_algebraic(algebraic: &str) -> Result<Self, &'static str> {
+    /// Create a Square from algebraic notation (e.g., "e4")
+    pub fn from_algebraic(algebraic: &str) -> Result<Square> {
         if algebraic.len() != 2 {
-            return Err("Algebraic notation must be exactly 2 characters");
+            return Err(TypeError::InvalidSquare(algebraic.to_string()));
         }
 
-        let file = match File::from_str(&algebraic[0..1]) {
-            Ok(file) => file,
-            Err(_) => return Err("Invalid file character (must be a-h)"),
-        };
-
-        let rank = match Rank::from_str(&algebraic[1..2]) {
-            Ok(rank) => rank,
-            Err(_) => return Err("Invalid rank character (must be 1-8)"),
-        };
+        let file = File::from_str(&algebraic[0..1])?;
+        let rank = Rank::from_str(&algebraic[1..2])?;
 
         Ok(Self::new(file, rank))
     }
 
+    /// Convert the Square to algebraic notation (e.g., "e4")
     pub fn to_algebraic(self) -> String {
         format!("{}{}", self.file().as_char(), self.rank() as i8)
     }
 
+    /// Get the File of the Square
     #[rustfmt::skip]
     pub const fn file(self) -> File {
         match self {
@@ -106,6 +110,7 @@ impl Square {
         }
     }
 
+    /// Get the Rank of the Square
     #[rustfmt::skip]
     pub const fn rank(self) -> Rank {
         match self {
@@ -120,10 +125,12 @@ impl Square {
         }
     }
 
+    /// Get the BitBoard representation of the Square
     pub const fn bitboard(self) -> BitBoard {
         BitBoard(1 << self as u8)
     }
 
+    /// Offset the Square by the given file and rank deltas
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
         let file = self.file() as i8 + file;
         let rank = self.rank() as i8 + rank;
@@ -134,14 +141,17 @@ impl Square {
         }
     }
 
+    /// Flip the Square horizontally (mirror across vertical axis)
     pub const fn flip_file(self) -> Self {
         Self::new(self.file().flip(), self.rank())
     }
 
+    /// Flip the Square vertically (mirror across horizontal axis)
     pub const fn flip_rank(self) -> Self {
         Self::new(self.file(), self.rank().flip())
     }
 
+    /// Get the Square relative to the given color's perspective
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -149,6 +159,7 @@ impl Square {
         }
     }
 
+    /// Move the Square up by one rank relative to the given color
     pub const fn up(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(0, 1),
@@ -156,6 +167,7 @@ impl Square {
         }
     }
 
+    /// Move the Square down by one rank relative to the given color
     pub const fn down(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(0, -1),
@@ -163,6 +175,7 @@ impl Square {
         }
     }
 
+    /// Move the Square left by one file relative to the given color
     pub const fn left(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(-1, 0),
@@ -170,6 +183,7 @@ impl Square {
         }
     }
 
+    /// Move the Square right by one file relative to the given color
     pub const fn right(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(1, 0),

@@ -1,5 +1,5 @@
 use crate::{cache::BoardCache, error::*, game_state::GameState};
-use aether_types::{BitBoard, Color, File, Piece, Square};
+use aether_types::{ALL_COLORS, BitBoard, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
@@ -78,7 +78,7 @@ impl BoardBuilder {
 
     fn validate(&self) -> Result<()> {
         // Check for exactly one king per side
-        for color in [Color::White, Color::Black] {
+        for color in ALL_COLORS {
             let king_count = self.pieces[color as usize][Piece::King as usize].len();
             match king_count {
                 0 => return Err(BoardError::KingNotFound { color }),
@@ -94,7 +94,7 @@ impl BoardBuilder {
     }
 
     fn validate_castling_rights(&self) -> Result<()> {
-        for &color in &[Color::White, Color::Black] {
+        for color in ALL_COLORS {
             let rights = &self.game_state.castling_rights[color as usize];
             if rights.is_empty() {
                 continue;

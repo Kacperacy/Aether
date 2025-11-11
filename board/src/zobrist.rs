@@ -1,6 +1,6 @@
 use crate::{Board, BoardQuery};
 use aether_types::zobrist_keys::zobrist_keys;
-use aether_types::{Color, Piece, Square};
+use aether_types::{ALL_COLORS, Color, Piece, Square};
 
 impl Board {
     /// Calculate zobrist hash from scratch for current position
@@ -22,7 +22,7 @@ impl Board {
         }
 
         // Hash castling rights
-        for color in [Color::White, Color::Black] {
+        for color in ALL_COLORS {
             if self.can_castle_short(color) {
                 hash ^= keys.castling_key(color, true);
             }

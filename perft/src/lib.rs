@@ -8,7 +8,9 @@
 //! This crate should remain test-focused and avoid engine/search coupling beyond
 //! consuming the public APIs of `aether-types`, `board`, and `movegen`.
 
-use aether_types::{ALL_PIECES, BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square};
+use aether_types::{
+    ALL_COLORS, ALL_PIECES, ALL_SQUARES, BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square,
+};
 use movegen::{Generator, attacks::attackers_to_square_with_occ};
 
 #[derive(Clone, Debug)]
@@ -25,7 +27,7 @@ pub struct PerftState {
 impl PerftState {
     pub fn from_board<T: BoardQuery>(board: &T) -> Self {
         let mut pieces = [[BitBoard::EMPTY; 6]; 2];
-        for &sq in Square::all().iter() {
+        for sq in ALL_SQUARES {
             if let Some((p, c)) = board.piece_at(sq) {
                 pieces[c as usize][p as usize] |= BitBoard::from_square(sq);
             }
@@ -60,7 +62,7 @@ impl PerftState {
     #[allow(dead_code)]
     fn remove_piece_at(&mut self, sq: Square) -> Option<(Piece, Color)> {
         let bb = BitBoard::from_square(sq);
-        for color in [Color::White, Color::Black] {
+        for color in ALL_COLORS {
             for piece in ALL_PIECES {
                 let c = color as usize;
                 let p = piece as usize;
@@ -207,6 +209,10 @@ impl BoardQuery for PerftState {
         let occ = self.occ;
         let their = &self.pieces[by_color as usize];
         !attackers_to_square_with_occ(square, by_color, occ, their).is_empty()
+    }
+
+    fn piece_count(&self, piece: Piece, color: Color) -> u32 {
+        self.pieces[color as usize][piece as usize].len()
     }
 
     fn get_king_square(&self, color: Color) -> Option<Square> {
