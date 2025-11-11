@@ -1,4 +1,5 @@
-use crate::{BitBoard, Color};
+use crate::TypeError::{InvalidRank, InvalidRankIndex};
+use crate::{BitBoard, Color, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -14,6 +15,7 @@ pub enum Rank {
     Eight,
 }
 
+/// All ranks on a chessboard
 pub const ALL_RANKS: [Rank; 8] = [
     Rank::One,
     Rank::Two,
@@ -26,7 +28,7 @@ pub const ALL_RANKS: [Rank; 8] = [
 ];
 
 impl FromStr for Rank {
-    type Err = &'static str;
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -38,7 +40,7 @@ impl FromStr for Rank {
             "6" => Ok(Self::Six),
             "7" => Ok(Self::Seven),
             "8" => Ok(Self::Eight),
-            _ => Err("Invalid rank"),
+            _ => Err(InvalidRank(s.to_string())),
         }
     }
 }
@@ -50,8 +52,26 @@ impl Display for Rank {
 }
 
 impl Rank {
+    /// Number of ranks on a chessboard
     pub const NUM: usize = 8;
-    pub const fn new(rank: i8) -> Self {
+
+    /// Safe conversion from index (0-7) to Rank
+    pub fn try_from_index(rank: u8) -> Result<Self, TypeError> {
+        match rank {
+            0 => Ok(Self::One),
+            1 => Ok(Self::Two),
+            2 => Ok(Self::Three),
+            3 => Ok(Self::Four),
+            4 => Ok(Self::Five),
+            5 => Ok(Self::Six),
+            6 => Ok(Self::Seven),
+            7 => Ok(Self::Eight),
+            _ => Err(InvalidRankIndex(rank)),
+        }
+    }
+
+    /// Unsafe conversion from index (0-7) to Rank
+    pub const fn from_index(rank: i8) -> Self {
         match rank {
             0 => Self::One,
             1 => Self::Two,
@@ -65,6 +85,7 @@ impl Rank {
         }
     }
 
+    /// Returns the character representation of the Rank
     pub const fn as_char(self) -> char {
         match self {
             Self::One => '1',
@@ -78,15 +99,17 @@ impl Rank {
         }
     }
 
+    /// Returns a new Rank offset by the given amount, or None if out of bounds
     pub const fn offset(self, offset: i8) -> Option<Self> {
         let new_rank = self as i8 + offset;
         if new_rank < 0 || new_rank > 7 {
             None
         } else {
-            Some(Self::new(new_rank))
+            Some(Self::from_index(new_rank))
         }
     }
 
+    /// Flips the rank vertically (mirrors across the horizontal axisr)
     pub const fn flip(self) -> Self {
         match self {
             Self::One => Self::Eight,
@@ -100,6 +123,7 @@ impl Rank {
         }
     }
 
+    /// Returns the bitboard representing all squares on this rank
     pub const fn bitboard(self) -> BitBoard {
         match self {
             Self::One => BitBoard(0x00000000000000ff),
@@ -113,6 +137,7 @@ impl Rank {
         }
     }
 
+    /// Returns the rank relative to the given color (White's perspective)
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,

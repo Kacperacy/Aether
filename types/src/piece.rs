@@ -1,3 +1,5 @@
+use crate::TypeError;
+use crate::TypeError::InvalidPiece;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -11,8 +13,18 @@ pub enum Piece {
     King = 5,
 }
 
+/// All piece types in chess
+pub const ALL_PIECES: [Piece; Piece::NUM] = [
+    Piece::Pawn,
+    Piece::Knight,
+    Piece::Bishop,
+    Piece::Rook,
+    Piece::Queen,
+    Piece::King,
+];
+
 impl FromStr for Piece {
-    type Err = ();
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -22,14 +34,16 @@ impl FromStr for Piece {
             "r" => Ok(Self::Rook),
             "q" => Ok(Self::Queen),
             "k" => Ok(Self::King),
-            _ => Err(()),
+            _ => Err(InvalidPiece(s.to_string())),
         }
     }
 }
 
 impl Piece {
+    /// Number of piece types in chess
     pub const NUM: usize = 6;
 
+    /// Returns the character representation of the piece (lowercase)
     pub const fn as_char(self) -> char {
         match self {
             Self::Pawn => 'p',
@@ -41,6 +55,7 @@ impl Piece {
         }
     }
 
+    /// Creates a Piece from its character representation (lowercase)
     pub const fn from_char(c: char) -> Option<Self> {
         match c {
             'p' => Some(Self::Pawn),
@@ -53,17 +68,7 @@ impl Piece {
         }
     }
 
-    pub const fn all() -> [Self; 6] {
-        [
-            Self::Pawn,
-            Self::Knight,
-            Self::Bishop,
-            Self::Rook,
-            Self::Queen,
-            Self::King,
-        ]
-    }
-
+    /// Returns the standard material value of the piece in centipawns
     pub const fn value(self) -> u16 {
         match self {
             Self::Pawn => 100,
@@ -75,14 +80,17 @@ impl Piece {
         }
     }
 
+    /// Returns true if the piece is a sliding piece (Bishop, Rook, Queen)
     pub const fn is_sliding(self) -> bool {
         matches!(self, Self::Bishop | Self::Rook | Self::Queen)
     }
 
+    /// Returns true if the piece is a major piece (Rook, Queen)
     pub const fn is_major(self) -> bool {
         matches!(self, Self::Rook | Self::Queen)
     }
 
+    /// Returns true if the piece is a minor piece (Knight, Bishop)
     pub const fn is_minor(self) -> bool {
         matches!(self, Self::Knight | Self::Bishop)
     }

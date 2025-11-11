@@ -62,7 +62,7 @@ impl Square {
 
     pub const fn from_index(index: i8) -> Self {
         let file = File::from_index(index % 8);
-        let rank = Rank::new(index / 8);
+        let rank = Rank::from_index(index / 8);
         Self::new(file, rank)
     }
 
@@ -130,7 +130,7 @@ impl Square {
         if file < 0 || file >= 8 || rank < 0 || rank >= 8 {
             None
         } else {
-            Some(Square::new(File::from_index(file), Rank::new(rank)))
+            Some(Square::new(File::from_index(file), Rank::from_index(rank)))
         }
     }
 

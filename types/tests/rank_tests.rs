@@ -17,14 +17,14 @@ mod tests {
 
     #[test]
     fn test_rank_new() {
-        assert_eq!(Rank::new(0), Rank::One);
-        assert_eq!(Rank::new(1), Rank::Two);
-        assert_eq!(Rank::new(2), Rank::Three);
-        assert_eq!(Rank::new(3), Rank::Four);
-        assert_eq!(Rank::new(4), Rank::Five);
-        assert_eq!(Rank::new(5), Rank::Six);
-        assert_eq!(Rank::new(6), Rank::Seven);
-        assert_eq!(Rank::new(7), Rank::Eight);
+        assert_eq!(Rank::from_index(0), Rank::One);
+        assert_eq!(Rank::from_index(1), Rank::Two);
+        assert_eq!(Rank::from_index(2), Rank::Three);
+        assert_eq!(Rank::from_index(3), Rank::Four);
+        assert_eq!(Rank::from_index(4), Rank::Five);
+        assert_eq!(Rank::from_index(5), Rank::Six);
+        assert_eq!(Rank::from_index(6), Rank::Seven);
+        assert_eq!(Rank::from_index(7), Rank::Eight);
     }
 
     #[test]

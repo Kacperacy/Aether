@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_types::{BitBoard, Color, Piece, Square};
+use aether_types::{ALL_PIECES, BitBoard, Color, Piece, Square};
 
 impl Board {
     pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) {
@@ -28,7 +28,7 @@ impl Board {
                 self.pieces[color as usize][i] &= !bb;
                 self.cache.color_combined[color as usize] &= !bb;
                 self.cache.occupied &= !bb;
-                return Some((Piece::all()[i], color));
+                return Some((ALL_PIECES[i], color));
             }
         }
         None

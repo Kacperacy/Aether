@@ -8,7 +8,7 @@
 //! This crate should remain test-focused and avoid engine/search coupling beyond
 //! consuming the public APIs of `aether-types`, `board`, and `movegen`.
 
-use aether_types::{BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square};
+use aether_types::{ALL_PIECES, BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square};
 use movegen::{Generator, attacks::attackers_to_square_with_occ};
 
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ impl PerftState {
     fn remove_piece_at(&mut self, sq: Square) -> Option<(Piece, Color)> {
         let bb = BitBoard::from_square(sq);
         for color in [Color::White, Color::Black] {
-            for piece in Piece::all() {
+            for piece in ALL_PIECES {
                 let c = color as usize;
                 let p = piece as usize;
                 if !(self.pieces[c][p] & bb).is_empty() {
@@ -191,7 +191,7 @@ impl BoardQuery for PerftState {
         } else {
             Color::Black
         };
-        for piece in Piece::all() {
+        for piece in ALL_PIECES {
             if self.pieces[color as usize][piece as usize].has(sq) {
                 return Some((piece, color));
             }

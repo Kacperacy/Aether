@@ -1,4 +1,5 @@
-use crate::BitBoard;
+use crate::TypeError::{InvalidFile, InvalidFileIndex};
+use crate::{BitBoard, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -14,6 +15,7 @@ pub enum File {
     H,
 }
 
+/// All files on a chessboard
 pub const ALL_FILES: [File; 8] = [
     File::A,
     File::B,
@@ -26,7 +28,7 @@ pub const ALL_FILES: [File; 8] = [
 ];
 
 impl FromStr for File {
-    type Err = &'static str;
+    type Err = TypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -38,7 +40,7 @@ impl FromStr for File {
             "f" => Ok(Self::F),
             "g" => Ok(Self::G),
             "h" => Ok(Self::H),
-            _ => Err("Invalid file"),
+            _ => Err(InvalidFile(s.to_string())),
         }
     }
 }
@@ -50,7 +52,25 @@ impl Display for File {
 }
 
 impl File {
+    /// Number of files on a chessboard
     pub const NUM: usize = 8;
+
+    /// Safe conversion from index (0-7) to File
+    pub fn try_from_index(file: u8) -> Result<Self, TypeError> {
+        match file {
+            0 => Ok(Self::A),
+            1 => Ok(Self::B),
+            2 => Ok(Self::C),
+            3 => Ok(Self::D),
+            4 => Ok(Self::E),
+            5 => Ok(Self::F),
+            6 => Ok(Self::G),
+            7 => Ok(Self::H),
+            _ => Err(InvalidFileIndex(file)),
+        }
+    }
+
+    /// Unsafe conversion from index (0-7) to File
     pub const fn from_index(file: i8) -> Self {
         match file {
             0 => Self::A,
@@ -61,10 +81,11 @@ impl File {
             5 => Self::F,
             6 => Self::G,
             7 => Self::H,
-            _ => panic!("Invalid file"),
+            _ => panic!("Invalid file index"),
         }
     }
 
+    /// Returns the character representation of the File
     pub const fn as_char(self) -> char {
         match self {
             Self::A => 'a',
@@ -78,6 +99,7 @@ impl File {
         }
     }
 
+    /// Returns a new File offset by the given amount, or None if out of bounds
     pub const fn offset(self, offset: i8) -> Option<Self> {
         let new_file = self as i8 + offset;
         if new_file < 0 || new_file > 7 {
@@ -87,6 +109,7 @@ impl File {
         }
     }
 
+    /// Returns the File flipped horizontally (A<->H, B<->G, etc.)
     pub const fn flip(self) -> Self {
         match self {
             Self::A => Self::H,
@@ -100,6 +123,7 @@ impl File {
         }
     }
 
+    /// Returns the BitBoard representation of the File
     pub const fn bitboard(self) -> BitBoard {
         match self {
             Self::A => BitBoard(0x0101010101010101),
@@ -113,6 +137,7 @@ impl File {
         }
     }
 
+    /// Returns the BitBoard of squares adjacent to this File
     pub const fn adjacent(self) -> BitBoard {
         match self {
             Self::A => BitBoard(0x202020202020202),
@@ -126,6 +151,7 @@ impl File {
         }
     }
 
+    /// Converts the File to its corresponding index (0-7)
     pub const fn to_index(self) -> i8 {
         self as i8
     }

@@ -94,7 +94,7 @@ impl BitBoard {
         for rank in (0..8).rev() {
             print!("{} | ", rank + 1);
             for file in 0..8 {
-                let square = Square::new(File::from_index(file), Rank::new(rank));
+                let square = Square::new(File::from_index(file), Rank::from_index(rank));
                 if self.has(square) {
                     print!("X ");
                 } else {

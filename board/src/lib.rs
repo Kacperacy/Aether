@@ -20,7 +20,7 @@ mod zobrist;
 pub use builder::BoardBuilder;
 pub use fen::{FenOps, STARTING_POSITION_FEN};
 
-use aether_types::{BitBoard, BoardQuery, Color, File, MoveState, Piece, Rank, Square};
+use aether_types::{ALL_PIECES, BitBoard, BoardQuery, Color, File, MoveState, Piece, Rank, Square};
 use cache::BoardCache;
 use error::*;
 use game_state::GameState;
@@ -103,7 +103,7 @@ impl BoardQuery for Board {
 
         for (i, piece_bb) in self.pieces[color as usize].iter().enumerate() {
             if piece_bb.has(square) {
-                return Some((Piece::all()[i], color));
+                return Some((ALL_PIECES[i], color));
             }
         }
 
@@ -187,7 +187,7 @@ impl Board {
         for rank in (0..8).rev() {
             write!(out, "{}", rank + 1).unwrap();
             for file in 0..8 {
-                let sq = Square::new(File::from_index(file), Rank::new(rank));
+                let sq = Square::new(File::from_index(file), Rank::from_index(rank));
                 let ch = self.piece_at(sq).map_or('.', |(p, c)| {
                     let ch = p.as_char();
                     if c == Color::White {

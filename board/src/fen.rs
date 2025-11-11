@@ -119,13 +119,13 @@ impl<'a> FenParser<'a> {
         }
 
         for (rank_index, rank_str) in ranks.iter().enumerate() {
-            let rank = Rank::new(7 - rank_index as i8); // FEN starts from rank 8
+            let rank = Rank::from_index(7 - rank_index as i8); // FEN starts from rank 8
             let mut file_index = 0;
 
             for ch in rank_str.chars() {
                 if file_index >= 8 {
                     return Err(FenParsingError(TooManySquaresInRank {
-                        rank: Rank::new(rank_index as i8),
+                        rank: Rank::from_index(rank_index as i8),
                     }));
                 }
 
@@ -151,7 +151,7 @@ impl<'a> FenParser<'a> {
 
             if file_index != 8 {
                 return Err(FenParsingError(InvalidRankSquares {
-                    rank: Rank::new(rank_index as i8),
+                    rank: Rank::from_index(rank_index as i8),
                     amount: file_index as usize,
                 }));
             }
@@ -305,7 +305,7 @@ impl<'a> FenGenerator<'a> {
         let mut placement = String::new();
 
         for rank_index in 0..8 {
-            let rank = Rank::new(7 - rank_index); // Start from rank 8
+            let rank = Rank::from_index(7 - rank_index); // Start from rank 8
             let mut empty_count = 0;
 
             for file_index in 0..8 {
