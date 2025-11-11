@@ -8,29 +8,34 @@
 //! This crate should remain dependency-light and free of engine/search policy to avoid cycles.
 
 pub mod bitboard;
-mod board_query;
+mod board;
 pub mod castling;
 pub mod chess_move;
 pub mod color;
 pub mod error;
+mod evaluator;
 pub mod file;
 mod move_generator;
 pub mod piece;
 pub mod rank;
+mod searcher;
 pub mod square;
 pub mod zobrist_keys;
 
 pub use bitboard::*;
-pub use board_query::*;
+pub use board::*;
 pub use castling::*;
 pub use chess_move::*;
 pub use color::*;
 pub use error::*;
+pub use evaluator::*;
 pub use file::*;
 pub use move_generator::*;
 pub use piece::*;
 pub use rank::*;
+pub use searcher::*;
 pub use square::*;
+pub use zobrist_keys::*;
 
 /// OR-combines all piece bitboards for a color.
 ///

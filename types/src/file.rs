@@ -1,5 +1,5 @@
 use crate::TypeError::{InvalidFile, InvalidFileIndex};
-use crate::{BitBoard, Result, TypeError};
+use crate::{BitBoard, TypeError, TypeResult};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -30,7 +30,7 @@ pub const ALL_FILES: [File; 8] = [
 impl FromStr for File {
     type Err = TypeError;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> TypeResult<Self> {
         match s {
             "a" => Ok(Self::A),
             "b" => Ok(Self::B),
@@ -40,7 +40,9 @@ impl FromStr for File {
             "f" => Ok(Self::F),
             "g" => Ok(Self::G),
             "h" => Ok(Self::H),
-            _ => Err(InvalidFile(s.to_string())),
+            _ => Err(InvalidFile {
+                file: s.to_string(),
+            }),
         }
     }
 }
@@ -56,7 +58,7 @@ impl File {
     pub const NUM: usize = 8;
 
     /// Safe conversion from index (0-7) to File
-    pub fn try_from_index(file: u8) -> Result<Self> {
+    pub fn try_from_index(file: u8) -> TypeResult<Self> {
         match file {
             0 => Ok(Self::A),
             1 => Ok(Self::B),
@@ -66,7 +68,7 @@ impl File {
             5 => Ok(Self::F),
             6 => Ok(Self::G),
             7 => Ok(Self::H),
-            _ => Err(InvalidFileIndex(file)),
+            _ => Err(InvalidFileIndex { file_index: file }),
         }
     }
 

@@ -1,6 +1,6 @@
 //! Query trait describing the minimal, read-only board interface shared across crates.
 
-use crate::{Color, Piece, Square};
+use crate::{BoardResult, Color, Move, Piece, Square};
 
 /// Lightweight read-only view over a chess position used by lower-level crates.
 pub trait BoardQuery {
@@ -22,4 +22,17 @@ pub trait BoardQuery {
     fn en_passant_square(&self) -> Option<Square>;
     /// Side to move.
     fn side_to_move(&self) -> Color;
+}
+
+/// Trait for board operations
+pub trait BoardOps {
+    fn make_move(&mut self, mv: Move) -> BoardResult<()>;
+    fn unmake_move(&mut self, mv: Move) -> BoardResult<()>;
+}
+
+/// Trait for mutable board operations
+pub trait BoardMut {
+    fn set_piece(&mut self, square: Square, piece: Piece, color: Color);
+    fn remove_piece(&mut self, square: Square);
+    fn clear_board(&mut self);
 }

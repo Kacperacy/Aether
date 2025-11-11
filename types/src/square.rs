@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, File, Rank, Result, TypeError};
+use crate::{BitBoard, Color, File, Rank, TypeError, TypeResult};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -30,19 +30,29 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 impl FromStr for Square {
     type Err = TypeError;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> TypeResult<Self> {
         if s.len() != 2 {
-            return Err(TypeError::InvalidSquare(s.to_string()));
+            return Err(TypeError::InvalidSquare {
+                square: s.to_string(),
+            });
         }
 
         let file = match File::from_str(&s[0..1]) {
             Ok(file) => file,
-            Err(_) => return Err(TypeError::InvalidSquare(s.to_string())),
+            Err(_) => {
+                return Err(TypeError::InvalidSquare {
+                    square: s.to_string(),
+                });
+            }
         };
 
         let rank = match Rank::from_str(&s[1..2]) {
             Ok(rank) => rank,
-            Err(_) => return Err(TypeError::InvalidSquare(s.to_string())),
+            Err(_) => {
+                return Err(TypeError::InvalidSquare {
+                    square: s.to_string(),
+                });
+            }
         };
 
         Ok(Square::new(file, rank))
@@ -79,9 +89,11 @@ impl Square {
     }
 
     /// Create a Square from algebraic notation (e.g., "e4")
-    pub fn from_algebraic(algebraic: &str) -> Result<Square> {
+    pub fn from_algebraic(algebraic: &str) -> TypeResult<Square> {
         if algebraic.len() != 2 {
-            return Err(TypeError::InvalidSquare(algebraic.to_string()));
+            return Err(TypeError::InvalidSquare {
+                square: algebraic.to_string(),
+            });
         }
 
         let file = File::from_str(&algebraic[0..1])?;

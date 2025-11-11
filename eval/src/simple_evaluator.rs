@@ -1,5 +1,4 @@
-use crate::Evaluator;
-use aether_types::{ALL_COLORS, ALL_PIECES, BoardQuery, Color};
+use aether_types::{ALL_COLORS, ALL_PIECES, BoardQuery, Color, Evaluator};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SimpleEvaluator;

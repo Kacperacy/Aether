@@ -6,4 +6,3 @@ edition = "2024"
 [dependencies]
 aether-types = { workspace = true }
 movegen = { workspace = true }
-thiserror = "2.0.12"

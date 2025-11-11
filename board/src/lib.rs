@@ -11,7 +11,6 @@
 mod builder;
 mod cache;
 mod check;
-mod error;
 mod fen;
 mod game_state;
 mod movement;
@@ -20,9 +19,11 @@ mod zobrist;
 pub use builder::BoardBuilder;
 pub use fen::{FenOps, STARTING_POSITION_FEN};
 
-use aether_types::{ALL_PIECES, BitBoard, BoardQuery, Color, File, MoveState, Piece, Rank, Square};
+use aether_types::{
+    ALL_PIECES, BitBoard, BoardMut, BoardQuery, BoardResult, Color, File, MoveState, Piece, Rank,
+    Square,
+};
 use cache::BoardCache;
-use error::*;
 use game_state::GameState;
 use std::num::NonZeroU64;
 
@@ -37,25 +38,12 @@ pub struct Board {
     move_history: Vec<MoveState>,
 }
 
-// Trait for board operations
-pub trait BoardOps {
-    fn make_move(&mut self, mv: aether_types::Move) -> Result<()>;
-    fn unmake_move(&mut self, mv: aether_types::Move) -> Result<()>;
-}
-
-// Trait for mutable board operations
-pub trait BoardMut {
-    fn set_piece(&mut self, square: Square, piece: Piece, color: Color);
-    fn remove_piece(&mut self, square: Square);
-    fn clear_board(&mut self);
-}
-
 impl Board {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> BoardResult<Self> {
         BoardBuilder::new().build()
     }
 
-    pub fn starting_position() -> Result<Self> {
+    pub fn starting_position() -> BoardResult<Self> {
         BoardBuilder::starting_position().build()
     }
 
