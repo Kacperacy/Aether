@@ -1,5 +1,8 @@
-use crate::{cache::BoardCache, game_state::GameState};
-use aether_types::{ALL_COLORS, BitBoard, BoardError, BoardResult, Color, File, Piece, Square};
+use crate::error::BoardError::{
+    InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
+};
+use crate::{Result, cache::BoardCache, game_state::GameState};
+use aether_types::{ALL_COLORS, BitBoard, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
@@ -21,14 +24,9 @@ impl BoardBuilder {
         builder
     }
 
-    pub fn place_piece(
-        &mut self,
-        square: Square,
-        piece: Piece,
-        color: Color,
-    ) -> BoardResult<&mut Self> {
+    pub fn place_piece(&mut self, square: Square, piece: Piece, color: Color) -> Result<&mut Self> {
         if self.is_square_occupied(square) {
-            return Err(BoardError::OverlappingPieces { square });
+            return Err(OverlappingPieces { square });
         }
 
         self.pieces[color as usize][piece as usize] |= square.bitboard();
@@ -49,7 +47,7 @@ impl BoardBuilder {
         self
     }
 
-    pub fn set_en_passant(&mut self, square: Option<Square>) -> BoardResult<&mut Self> {
+    pub fn set_en_passant(&mut self, square: Option<Square>) -> Result<&mut Self> {
         if let Some(sq) = square {
             // Validate en passant square
             let expected_rank = match self.game_state.side_to_move {
@@ -57,14 +55,14 @@ impl BoardBuilder {
                 Color::Black => aether_types::Rank::Three,
             };
             if sq.rank() != expected_rank {
-                return Err(BoardError::InvalidEnPassantSquare { square: sq });
+                return Err(InvalidEnPassantSquare { square: sq });
             }
         }
         self.game_state.en_passant_square = square;
         Ok(self)
     }
 
-    pub fn build(self) -> BoardResult<super::Board> {
+    pub fn build(self) -> Result<super::Board> {
         self.validate()?;
 
         let mut cache = BoardCache::new();
@@ -81,14 +79,14 @@ impl BoardBuilder {
         })
     }
 
-    fn validate(&self) -> BoardResult<()> {
+    fn validate(&self) -> Result<()> {
         // Check for exactly one king per side
         for color in ALL_COLORS {
             let king_count = self.pieces[color as usize][Piece::King as usize].len();
             match king_count {
-                0 => return Err(BoardError::KingNotFound { color }),
+                0 => return Err(KingNotFound { color }),
                 1 => {}
-                _ => return Err(BoardError::MultipleKings { color }),
+                _ => return Err(MultipleKings { color }),
             }
         }
 
@@ -98,7 +96,7 @@ impl BoardBuilder {
         Ok(())
     }
 
-    fn validate_castling_rights(&self) -> BoardResult<()> {
+    fn validate_castling_rights(&self) -> Result<()> {
         for color in ALL_COLORS {
             let rights = &self.game_state.castling_rights[color as usize];
             if rights.is_empty() {
@@ -106,7 +104,7 @@ impl BoardBuilder {
             }
             let king_square = Square::new(File::E, color.back_rank());
             if !self.pieces[color as usize][Piece::King as usize].has(king_square) {
-                return Err(BoardError::InvalidCastlingRights {
+                return Err(InvalidCastlingRights {
                     reason: format!("{color} king not on starting square"),
                 });
             }

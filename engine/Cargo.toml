@@ -8,3 +8,4 @@ board = { workspace = true }
 aether-types = { workspace = true }
 search = { workspace = true }
 eval = { workspace = true }
+movegen = { workspace = true }

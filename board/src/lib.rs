@@ -11,21 +11,25 @@
 mod builder;
 mod cache;
 mod check;
+mod error;
 mod fen;
 mod game_state;
-mod movement;
+mod ops;
+mod query;
 mod zobrist;
 
 pub use builder::BoardBuilder;
 pub use fen::{FenOps, STARTING_POSITION_FEN};
+pub use ops::BoardOps;
+pub use query::BoardQuery;
 
-use aether_types::{
-    ALL_PIECES, BitBoard, BoardMut, BoardQuery, BoardResult, Color, File, MoveState, Piece, Rank,
-    Square,
-};
+use crate::error::BoardError;
+use aether_types::{BitBoard, Color, File, MoveState, Rank, Square};
 use cache::BoardCache;
 use game_state::GameState;
 use std::num::NonZeroU64;
+
+pub type Result<T> = std::result::Result<T, BoardError>;
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -39,139 +43,53 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new() -> BoardResult<Self> {
+    /// Creates a new, empty board
+    pub fn new() -> Result<Self> {
         BoardBuilder::new().build()
     }
 
-    pub fn starting_position() -> BoardResult<Self> {
+    /// Creates a board set up in the standard starting position
+    pub fn starting_position() -> Result<Self> {
         BoardBuilder::starting_position().build()
     }
 
+    /// Returns a builder for constructing a custom board position
     pub fn builder() -> BoardBuilder {
         BoardBuilder::new()
     }
 
+    /// Returns the piece bitboards for both colors and all piece types
     pub fn pieces(&self) -> &[[BitBoard; 6]; 2] {
         &self.pieces
     }
 
+    /// Returns the current game state
     pub fn game_state(&self) -> &GameState {
         &self.game_state
     }
 
+    /// Returns the Zobrist hash of the current position, if non-zero
     pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
         NonZeroU64::new(self.zobrist_hash)
     }
 
-    fn update_cache(&mut self) {
-        self.cache.refresh(&self.pieces);
-    }
-
+    /// Invalidates cached data (e.g., check status)
     pub fn invalidate_cache(&mut self) {
         self.cache.invalidate_check_cache();
     }
 
+    /// Changes the side to move and invalidates relevant caches
     pub fn change_side_to_move(&mut self) {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         self.invalidate_cache();
     }
-}
 
-impl BoardQuery for Board {
-    fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        if !self.cache.occupied.has(square) {
-            return None;
-        }
-
-        let color = if self.cache.color_combined[Color::White as usize].has(square) {
-            Color::White
-        } else {
-            Color::Black
-        };
-
-        for (i, piece_bb) in self.pieces[color as usize].iter().enumerate() {
-            if piece_bb.has(square) {
-                return Some((ALL_PIECES[i], color));
-            }
-        }
-
-        None
-    }
-
-    fn is_square_occupied(&self, square: Square) -> bool {
-        self.cache.occupied.has(square)
-    }
-
-    fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
-        !self.attackers_to_square(square, by_color).is_empty()
-    }
-
-    fn piece_count(&self, piece: Piece, color: Color) -> u32 {
-        self.pieces[color as usize][piece as usize].len()
-    }
-
-    fn get_king_square(&self, color: Color) -> Option<Square> {
-        self.pieces[color as usize][Piece::King as usize].to_square()
-    }
-
-    fn can_castle_short(&self, color: Color) -> bool {
-        self.game_state.castling_rights[color as usize]
-            .short
-            .is_some()
-    }
-
-    fn can_castle_long(&self, color: Color) -> bool {
-        self.game_state.castling_rights[color as usize]
-            .long
-            .is_some()
-    }
-
-    fn en_passant_square(&self) -> Option<Square> {
-        self.game_state.en_passant_square
-    }
-
-    fn side_to_move(&self) -> Color {
-        self.game_state.side_to_move
-    }
-}
-
-impl Default for Board {
-    fn default() -> Self {
-        Self::starting_position().expect("Failed to create starting position")
-    }
-}
-
-impl BoardMut for Board {
-    fn set_piece(&mut self, square: Square, piece: Piece, color: Color) {
-        self.pieces[color as usize][piece as usize] |= square.bitboard();
-        self.update_cache();
-        self.invalidate_cache();
-    }
-
-    fn remove_piece(&mut self, square: Square) {
-        for color in 0..2 {
-            for piece in 0..6 {
-                self.pieces[color][piece] &= !square.bitboard();
-            }
-        }
-        self.update_cache();
-        self.invalidate_cache();
-    }
-
-    fn clear_board(&mut self) {
-        self.pieces = [[BitBoard::EMPTY; 6]; 2];
-        self.update_cache();
-        self.invalidate_cache();
-    }
-}
-
-// Extension methods for board
-impl Board {
+    /// Prints an ASCII diagram of the current board to stdout.
     pub fn print(&self) {
         println!("{}", self.as_ascii());
     }
 
-    /// Returns an ASCII diagram of the current board.
+    /// Generates an ASCII diagram of the current board position.
     pub fn as_ascii(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
@@ -194,5 +112,12 @@ impl Board {
         }
         writeln!(out, "  A B C D E F G H").unwrap();
         out
+    }
+}
+
+impl Default for Board {
+    /// Creates a board in the standard starting position
+    fn default() -> Self {
+        Self::starting_position().expect("Failed to create starting position")
     }
 }

@@ -9,6 +9,7 @@ codegen = ["rand"]
 
 [dependencies]
 aether-types = { workspace = true }
+board = { workspace = true }
 rand = { workspace = true, optional = true }
 
 [[bin]]

@@ -7,3 +7,4 @@ edition = "2024"
 aether-types = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
+eval = { workspace = true }

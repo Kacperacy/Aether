@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, File, Rank, TypeError, TypeResult};
+use crate::{BitBoard, Color, File, Rank, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -30,7 +30,7 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 impl FromStr for Square {
     type Err = TypeError;
 
-    fn from_str(s: &str) -> TypeResult<Self> {
+    fn from_str(s: &str) -> Result<Self> {
         if s.len() != 2 {
             return Err(TypeError::InvalidSquare {
                 square: s.to_string(),
@@ -89,7 +89,7 @@ impl Square {
     }
 
     /// Create a Square from algebraic notation (e.g., "e4")
-    pub fn from_algebraic(algebraic: &str) -> TypeResult<Square> {
+    pub fn from_algebraic(algebraic: &str) -> Result<Square> {
         if algebraic.len() != 2 {
             return Err(TypeError::InvalidSquare {
                 square: algebraic.to_string(),

@@ -8,10 +8,9 @@
 //! This crate should remain test-focused and avoid engine/search coupling beyond
 //! consuming the public APIs of `aether-types`, `board`, and `movegen`.
 
-use aether_types::{
-    ALL_COLORS, ALL_PIECES, ALL_SQUARES, BitBoard, BoardQuery, Color, Move, MoveGen, Piece, Square,
-};
-use movegen::{Generator, attacks::attackers_to_square_with_occ};
+use aether_types::{ALL_COLORS, ALL_PIECES, ALL_SQUARES, BitBoard, Color, Move, Piece, Square};
+use board::BoardQuery;
+use movegen::{Generator, MoveGen, attacks::attackers_to_square_with_occ};
 
 #[derive(Clone, Debug)]
 pub struct PerftState {

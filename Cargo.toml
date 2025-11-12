@@ -22,14 +22,15 @@ members = [
     "eval",
     "engine",
     "uci",
-    "cli"
-, "perft"]
+    "cli",
+    "perft",
+    "opening"]
 
 [workspace.dependencies]
 # External dependencies
-rand = "0.9.1"
-thiserror = "2.0.12"
-criterion = "0.6.0"
+rand = "0.10.0-rc.5"
+thiserror = "2.0.17"
+criterion = "0.7.0"
 
 # Workspace members as dependencies
 aether-types = { path = "./types" }
@@ -42,15 +43,10 @@ uci = { path = "./uci" }
 cli = { path = "./cli" }
 
 [dev-dependencies]
-criterion = { workspace = true }
 
 [features]
 default = []
 bench = []
-
-#[[bench]]
-#name = "move_generation"
-#harness = false
 
 [workspace.lints.clippy]
 all = "warn"

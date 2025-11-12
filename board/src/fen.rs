@@ -9,21 +9,21 @@
 //! 5. Halfmove clock (moves since last pawn move or capture)
 //! 6. Fullmove number (increments after Black's move)
 
-use crate::{Board, BoardBuilder};
-use aether_types::BoardError::FenParsingError;
-use aether_types::FenError::{
+use crate::error::BoardError::FenParsingError;
+use crate::error::FenError;
+use crate::error::FenError::{
     InvalidEmptySquareCount, InvalidPieceCharacter, InvalidRankSquares, TooManySquaresInRank,
 };
-use aether_types::{
-    BoardQuery, BoardResult, CastlingRights, Color, FenError, File, Piece, Rank, Square,
-};
+use crate::query::BoardQuery;
+use crate::{Board, BoardBuilder, Result};
+use aether_types::{CastlingRights, Color, File, Piece, Rank, Square};
 use std::str::FromStr;
 
 /// Standard starting position FEN
 pub const STARTING_POSITION_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /// Parse a FEN string and create a Board
-pub fn parse_fen(fen: &str) -> BoardResult<Board> {
+pub fn parse_fen(fen: &str) -> Result<Board> {
     let fen_parser = FenParser::new(fen)?;
     fen_parser.build_board()
 }
@@ -40,7 +40,7 @@ struct FenParser<'a> {
 
 impl<'a> FenParser<'a> {
     /// Create a new FEN parser from a FEN string
-    pub fn new(fen: &'a str) -> BoardResult<Self> {
+    pub fn new(fen: &'a str) -> Result<Self> {
         let trimmed = fen.trim();
         if trimmed.is_empty() {
             return Err(FenParsingError(FenError::EmptyFen));
@@ -76,7 +76,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Build a board from the parsed FEN fields
-    pub fn build_board(self) -> BoardResult<Board> {
+    pub fn build_board(self) -> Result<Board> {
         let mut builder = BoardBuilder::new();
 
         // Parse piece placement (field 0)
@@ -109,7 +109,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse the piece placement field (rank 8 to rank 1)
-    fn parse_piece_placement(&self, builder: &mut BoardBuilder) -> BoardResult<()> {
+    fn parse_piece_placement(&self, builder: &mut BoardBuilder) -> Result<()> {
         let placement = self.fields[0];
         let ranks: Vec<&str> = placement.split('/').collect();
 
@@ -162,7 +162,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse a piece character into piece type and color
-    fn parse_piece_char(&self, ch: char) -> BoardResult<(Piece, Color)> {
+    fn parse_piece_char(&self, ch: char) -> Result<(Piece, Color)> {
         let (piece, color) = match ch {
             'P' => (Piece::Pawn, Color::White),
             'N' => (Piece::Knight, Color::White),
@@ -182,7 +182,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse side to move field
-    fn parse_side_to_move(&self) -> BoardResult<Color> {
+    fn parse_side_to_move(&self) -> Result<Color> {
         match self.fields[1] {
             "w" => Ok(Color::White),
             "b" => Ok(Color::Black),
@@ -193,7 +193,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse castling rights field
-    fn parse_castling_rights(&self) -> BoardResult<(CastlingRights, CastlingRights)> {
+    fn parse_castling_rights(&self) -> Result<(CastlingRights, CastlingRights)> {
         let castling_str = self.fields[2];
 
         if castling_str == "-" {
@@ -220,7 +220,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse en passant target square
-    fn parse_en_passant(&self, side_to_move: Color) -> BoardResult<Option<Square>> {
+    fn parse_en_passant(&self, side_to_move: Color) -> Result<Option<Square>> {
         let en_passant_str = self.fields[3];
 
         if en_passant_str == "-" {
@@ -257,7 +257,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse halfmove clock
-    fn parse_halfmove_clock(&self) -> BoardResult<u16> {
+    fn parse_halfmove_clock(&self) -> Result<u16> {
         self.fields[4].parse::<u16>().map_err(|_| {
             FenParsingError(FenError::InvalidHalfmoveClock {
                 clock: self.fields[4].to_string(),
@@ -266,7 +266,7 @@ impl<'a> FenParser<'a> {
     }
 
     /// Parse fullmove number
-    fn parse_fullmove_number(&self) -> BoardResult<u16> {
+    fn parse_fullmove_number(&self) -> Result<u16> {
         let fullmove = self.fields[5].parse::<u16>().map_err(|_| {
             FenParsingError(FenError::InvalidFullmoveNumber {
                 number: self.fields[5].to_string(),
@@ -416,14 +416,14 @@ impl<'a> FenGenerator<'a> {
 /// Extension trait for Board to add FEN functionality
 pub trait FenOps {
     /// Parse a FEN string and return a Board
-    fn from_fen(fen: &str) -> BoardResult<Board>;
+    fn from_fen(fen: &str) -> Result<Board>;
 
     /// Convert this board to a FEN string
     fn to_fen(&self) -> String;
 }
 
 impl FenOps for Board {
-    fn from_fen(fen: &str) -> BoardResult<Board> {
+    fn from_fen(fen: &str) -> Result<Board> {
         parse_fen(fen)
     }
 

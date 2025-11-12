@@ -1,4 +1,5 @@
-use crate::{Board, BoardQuery};
+use crate::Board;
+use crate::query::BoardQuery;
 use aether_types::zobrist_keys::zobrist_keys;
 use aether_types::{ALL_COLORS, Color, Piece, Square};
 

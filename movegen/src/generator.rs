@@ -1,9 +1,9 @@
+use crate::MoveGen;
 use crate::attacks::attackers_to_square_with_occ;
 use crate::magic::{get_bishop_attacks, get_queen_attacks, get_rook_attacks};
 use crate::pieces::{get_king_moves, get_knight_moves, get_pawn_attacks, get_pawn_moves};
-use aether_types::{
-    ALL_SQUARES, BitBoard, BoardQuery, Color, Move, MoveFlags, MoveGen, Piece, Square,
-};
+use aether_types::{ALL_SQUARES, BitBoard, Color, Move, MoveFlags, Piece, Square};
+use board::BoardQuery;
 
 /// Minimal move generator (incremental implementation).
 #[derive(Debug, Default, Clone, Copy)]
