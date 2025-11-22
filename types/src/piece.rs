@@ -23,6 +23,9 @@ pub const ALL_PIECES: [Piece; Piece::NUM] = [
     Piece::King,
 ];
 
+/// Pieces that a pawn can promote to
+pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen];
+
 impl FromStr for Piece {
     type Err = TypeError;
 

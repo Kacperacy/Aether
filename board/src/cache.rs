@@ -1,4 +1,4 @@
-use aether_types::{ALL_COLORS, BitBoard, Color};
+use aether_types::{ALL_COLORS, BitBoard, Color, combine_piece_bitboards};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoardCache {
@@ -20,8 +20,7 @@ impl BoardCache {
     /// Fully refreshes the cache based on the provided piece bitboards
     pub fn refresh(&mut self, pieces: &[[BitBoard; 6]; 2]) {
         for color in ALL_COLORS {
-            self.color_combined[color as usize] =
-                aether_types::combine_piece_bitboards(pieces[color as usize]);
+            self.color_combined[color as usize] = combine_piece_bitboards(pieces[color as usize]);
         }
         self.occupied = self.color_combined[0] | self.color_combined[1];
     }

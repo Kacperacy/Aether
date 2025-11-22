@@ -23,12 +23,12 @@ members = [
     "engine",
     "uci",
     "cli",
-    "perft",
     "opening"]
 
 [workspace.dependencies]
 # External dependencies
 rand = "0.10.0-rc.5"
+rand_chacha = "0.10.0-rc.1"
 thiserror = "2.0.17"
 criterion = "0.7.0"
 

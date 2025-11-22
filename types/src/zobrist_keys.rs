@@ -1,6 +1,7 @@
 use crate::{Color, File, Piece, Square};
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use rand_chacha::ChaCha8Rng;
+use rand_chacha::rand_core::SeedableRng;
 
 /// Zobrist keys for hashing chess positions
 /// Uses deterministic random generation with fixed seed for consistency
@@ -77,6 +78,7 @@ impl Default for ZobristKeys {
 
 /// Global zobrist keys instance - lazy static for thread safety
 use std::sync::OnceLock;
+
 static ZOBRIST_KEYS: OnceLock<ZobristKeys> = OnceLock::new();
 
 /// Get global zobrist keys instance

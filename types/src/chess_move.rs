@@ -10,7 +10,7 @@ pub struct Move {
     pub flags: MoveFlags,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct MoveFlags {
     pub is_castle: bool,
     pub is_en_passant: bool,
