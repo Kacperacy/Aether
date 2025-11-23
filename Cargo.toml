@@ -9,8 +9,6 @@ edition = "2024"
 aether-core = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
-search = { workspace = true }
-eval = { workspace = true }
 engine = { workspace = true }
 
 [workspace]
@@ -18,8 +16,6 @@ members = [
     "core",
     "board",
     "movegen",
-    "search",
-    "eval",
     "engine",
     "uci",
     "cli",
@@ -36,8 +32,6 @@ criterion = "0.7.0"
 aether-core = { path = "./core" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
-search = { path = "./search" }
-eval = { path = "./eval" }
 engine = { path = "./engine" }
 uci = { path = "./uci" }
 cli = { path = "./cli" }

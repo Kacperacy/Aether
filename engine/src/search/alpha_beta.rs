@@ -1,7 +1,7 @@
-use crate::{SearchInfo, SearchLimits, SearchResult};
+use crate::eval::Evaluator;
+use crate::search::{SearchInfo, SearchLimits, SearchResult};
 use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Score, mated_in};
 use board::BoardOps;
-use eval::Evaluator;
 use movegen::{Generator, MoveGen};
 use std::time::{Duration, Instant};
 

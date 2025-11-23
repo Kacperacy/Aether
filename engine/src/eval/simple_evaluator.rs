@@ -1,4 +1,4 @@
-use crate::Evaluator;
+use crate::eval::Evaluator;
 use aether_core::{ALL_COLORS, ALL_PIECES, Color};
 use board::BoardQuery;
 

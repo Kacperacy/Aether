@@ -11,8 +11,3 @@ codegen = ["rand"]
 aether-core = { workspace = true }
 board = { workspace = true }
 rand = { workspace = true, optional = true }
-
-[[bin]]
-name = "gen_magics"
-path = "src/bin/gen_magics.rs"
-required-features = ["codegen"]
