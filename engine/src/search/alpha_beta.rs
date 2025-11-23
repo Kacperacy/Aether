@@ -106,7 +106,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.generator.legal(board, &mut moves);
 
         if moves.is_empty() {
-            self.detect_checkmate_or_stalemate(board, ply);
+            return self.detect_checkmate_or_stalemate(board, ply);
         }
 
         let (best_score, best_move, local_pv) =
@@ -191,15 +191,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         false
     }
 
-    fn detect_checkmate_or_stalemate<T: BoardOps>(
-        &self,
-        board: &mut T,
-        ply: usize,
-    ) -> Option<Score> {
+    fn detect_checkmate_or_stalemate<T: BoardOps>(&self, board: &mut T, ply: usize) -> Score {
         if board.is_in_check(board.side_to_move()) {
-            Some(mated_in(ply as u32))
+            mated_in(ply as u32)
         } else {
-            Some(0) // Stalemate
+            0 // Stalemate
         }
     }
 }
