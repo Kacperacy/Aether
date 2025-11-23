@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_types::{ALL_PIECES, Color, Piece, Square};
+use aether_core::{ALL_PIECES, Color, Piece, Square};
 
 pub trait BoardQuery {
     /// Piece and color at square, if any.

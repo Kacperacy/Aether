@@ -1,5 +1,5 @@
 use crate::Evaluator;
-use aether_types::{ALL_COLORS, ALL_PIECES, Color};
+use aether_core::{ALL_COLORS, ALL_PIECES, Color};
 use board::BoardQuery;
 
 #[derive(Debug, Clone, Copy, Default)]

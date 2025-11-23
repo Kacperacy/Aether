@@ -1,4 +1,4 @@
-use aether_types::{ALL_COLORS, BitBoard, Color, combine_piece_bitboards};
+use aether_core::{ALL_COLORS, BitBoard, Color, combine_piece_bitboards};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoardCache {

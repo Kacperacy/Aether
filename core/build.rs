@@ -34,7 +34,7 @@ fn main() {
 
             println!("cargo:warning=To generate manually, run:");
             println!(
-                "cargo:warning=  cargo run -p aether-types --features codegen --bin gen_magics"
+                "cargo:warning=  cargo run -p aether-core --features codegen --bin gen_magics"
             );
         }
 
@@ -54,7 +54,7 @@ fn main() {
         if !constants_path.exists() {
             panic!(
                 "Magic constants file not found at: {}\n\
-                 Please run: cargo run -p types --features codegen --bin gen_magics",
+                 Please run: cargo run -p core --features codegen --bin gen_magics",
                 constants_path.display()
             );
         }

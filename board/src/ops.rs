@@ -4,7 +4,7 @@ use crate::error::MoveError::{
 };
 use crate::query::BoardQuery;
 use crate::{Board, Result};
-use aether_types::{ALL_PIECES, BitBoard, Color, File, Move, MoveState, Piece, Rank, Square};
+use aether_core::{ALL_PIECES, BitBoard, Color, File, Move, MoveState, Piece, Rank, Square};
 
 /// Trait for board operations
 pub trait BoardOps: BoardQuery + Clone {

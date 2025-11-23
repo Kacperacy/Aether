@@ -2,7 +2,7 @@
 
 mod alpha_beta;
 
-use aether_types::{Move, Score};
+use aether_core::{Move, Score};
 use board::BoardQuery;
 use std::time::Duration;
 

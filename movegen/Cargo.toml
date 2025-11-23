@@ -8,7 +8,7 @@ default = []
 codegen = ["rand"]
 
 [dependencies]
-aether-types = { workspace = true }
+aether-core = { workspace = true }
 board = { workspace = true }
 rand = { workspace = true, optional = true }
 

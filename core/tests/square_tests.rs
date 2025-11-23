@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use aether_types::{Color, File, Rank, Square};
+    use aether_core::{Color, File, Rank, Square};
     use std::str::FromStr;
     #[test]
     fn test_square_from_str() {

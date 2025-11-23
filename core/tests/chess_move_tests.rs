@@ -3,8 +3,8 @@
 // mod tests {
 //     #[test]
 //     fn test_chess_move_from_str() {
-//         use aether_types::chess_move::Move;
-//         use aether_types::{Piece, Square};
+//         use aether_core::chess_move::Move;
+//         use aether_core::{Piece, Square};
 //         use std::str::FromStr;
 //
 //         let m = Move::from_str("e2e4").unwrap();

@@ -1,10 +1,10 @@
 use crate::MoveGen;
-use aether_types::{
+use aether_core::{
     ALL_SQUARES, BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
     is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves,
     queen_attacks, rook_attacks,
 };
-use board::{Board, BoardQuery};
+use board::BoardQuery;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Generator;

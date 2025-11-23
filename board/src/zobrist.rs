@@ -1,7 +1,7 @@
 use crate::Board;
 use crate::query::BoardQuery;
-use aether_types::zobrist_keys::zobrist_keys;
-use aether_types::{ALL_COLORS, Color, Piece, Square};
+use aether_core::zobrist_keys::zobrist_keys;
+use aether_core::{ALL_COLORS, Color, Piece, Square};
 
 impl Board {
     /// Calculate zobrist hash from scratch for current position

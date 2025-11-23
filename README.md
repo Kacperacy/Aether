@@ -1,6 +1,6 @@
 # Aether
 
-A modular chess engine written in Rust. The repository is a Cargo workspace composed of multiple crates (types, board,
+A modular chess engine written in Rust. The repository is a Cargo workspace composed of multiple crates (core, board,
 movegen, eval, search, engine, uci, cli, perft).
 
 - Minimum supported Rust: latest stable with Edition 2024

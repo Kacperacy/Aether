@@ -35,7 +35,7 @@ fn main() -> std::io::Result<()> {
     }
 
     // Generate
-    use aether_types::attacks::codegen;
+    use aether_core::attacks::codegen;
 
     println!("Generating magic bitboards...");
     println!("This will take 10-30 seconds...\n");
@@ -52,6 +52,6 @@ fn main() -> std::io::Result<()> {
 #[cfg(not(feature = "codegen"))]
 fn main() {
     eprintln!("Error: This binary requires the 'codegen' feature");
-    eprintln!("Run with: cargo run -p aether-types --features codegen --bin gen_magics");
+    eprintln!("Run with: cargo run -p aether-core --features codegen --bin gen_magics");
     std::process::exit(1);
 }

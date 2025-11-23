@@ -1,9 +1,9 @@
-use aether_types::bitboard::BitBoard;
+use aether_core::bitboard::BitBoard;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aether_types::Square;
+    use aether_core::Square;
 
     #[test]
     fn test_bitboard_new() {

@@ -1,4 +1,4 @@
-use aether_types::{CastlingRights, Color, Square};
+use aether_core::{CastlingRights, Color, File, Square};
 
 /// Represents the state of a chess game
 #[derive(Debug, Clone, PartialEq)]
@@ -33,7 +33,6 @@ impl GameState {
 
     /// Creates a GameState representing the standard starting position
     pub fn starting_position() -> Self {
-        use aether_types::File;
         Self {
             side_to_move: Color::White,
             castling_rights: [

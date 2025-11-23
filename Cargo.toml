@@ -6,7 +6,7 @@ repository = "https://github.com/Kacperacy/Aether"
 edition = "2024"
 
 [dependencies]
-aether-types = { workspace = true }
+aether-core = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
 search = { workspace = true }
@@ -15,7 +15,7 @@ engine = { workspace = true }
 
 [workspace]
 members = [
-    "types",
+    "core",
     "board",
     "movegen",
     "search",
@@ -33,7 +33,7 @@ thiserror = "2.0.17"
 criterion = "0.7.0"
 
 # Workspace members as dependencies
-aether-types = { path = "./types" }
+aether-core = { path = "./core" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
 search = { path = "./search" }

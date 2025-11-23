@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use aether_types::File;
+    use aether_core::File;
     use std::str::FromStr;
 
     #[test]

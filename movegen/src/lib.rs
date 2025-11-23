@@ -1,5 +1,5 @@
 pub mod generator;
-use aether_types::Move;
+use aether_core::Move;
 use board::BoardQuery;
 pub use generator::Generator;
 

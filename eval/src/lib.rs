@@ -4,7 +4,7 @@
 
 mod simple_evaluator;
 
-use aether_types::Score;
+use aether_core::Score;
 use board::BoardQuery;
 
 /// Trait for evaluating chess positions.

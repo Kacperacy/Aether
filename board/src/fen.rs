@@ -16,7 +16,7 @@ use crate::error::FenError::{
 };
 use crate::query::BoardQuery;
 use crate::{Board, BoardBuilder, Result};
-use aether_types::{CastlingRights, Color, File, Piece, Rank, Square};
+use aether_core::{CastlingRights, Color, File, Piece, Rank, Square};
 use std::str::FromStr;
 
 /// Standard starting position FEN

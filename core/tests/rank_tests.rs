@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use aether_types::{Color, Rank};
+    use aether_core::{Color, Rank};
     use std::str::FromStr;
     #[test]
     fn test_rank_from_str() {

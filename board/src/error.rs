@@ -1,4 +1,4 @@
-use aether_types::{Color, Rank, Square};
+use aether_core::{Color, Rank, Square};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

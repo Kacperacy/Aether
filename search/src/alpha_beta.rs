@@ -1,5 +1,5 @@
 use crate::{SearchInfo, SearchLimits, SearchResult};
-use aether_types::{MATE_SCORE, Move, NEG_MATE_SCORE, Score, mated_in};
+use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Score, mated_in};
 use board::BoardOps;
 use eval::Evaluator;
 use movegen::{Generator, MoveGen};

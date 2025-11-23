@@ -2,7 +2,7 @@ use crate::error::BoardError::{
     InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
 };
 use crate::{Result, cache::BoardCache, game_state::GameState};
-use aether_types::{ALL_COLORS, BitBoard, Color, File, Piece, Square};
+use aether_core::{ALL_COLORS, BitBoard, CastlingRights, Color, File, Piece, Rank, Square};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
@@ -38,11 +38,7 @@ impl BoardBuilder {
         self
     }
 
-    pub fn set_castling_rights(
-        &mut self,
-        color: Color,
-        rights: aether_types::CastlingRights,
-    ) -> &mut Self {
+    pub fn set_castling_rights(&mut self, color: Color, rights: CastlingRights) -> &mut Self {
         self.game_state.castling_rights[color as usize] = rights;
         self
     }
@@ -51,8 +47,8 @@ impl BoardBuilder {
         if let Some(sq) = square {
             // Validate en passant square
             let expected_rank = match self.game_state.side_to_move {
-                Color::White => aether_types::Rank::Six,
-                Color::Black => aether_types::Rank::Three,
+                Color::White => Rank::Six,
+                Color::Black => Rank::Three,
             };
             if sq.rank() != expected_rank {
                 return Err(InvalidEnPassantSquare { square: sq });

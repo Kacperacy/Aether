@@ -1,4 +1,4 @@
-use aether_types::{BitBoard, Color, Square};
+use aether_core::{BitBoard, Color, Square};
 
 use crate::Board;
 use crate::query::BoardQuery;
