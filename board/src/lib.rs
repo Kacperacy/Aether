@@ -1,6 +1,5 @@
 mod builder;
 mod cache;
-mod check;
 mod error;
 mod fen;
 mod game_state;
@@ -14,7 +13,7 @@ pub use ops::BoardOps;
 pub use query::BoardQuery;
 
 use crate::error::BoardError;
-use aether_core::{BitBoard, Color, File, MoveState, Rank, Square};
+use aether_core::{BitBoard, Color, File, MoveState, Rank, Square, attackers_to_square};
 use cache::BoardCache;
 use game_state::GameState;
 use std::num::NonZeroU64;
@@ -72,6 +71,11 @@ impl Board {
     pub fn change_side_to_move(&mut self) {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         self.invalidate_cache();
+    }
+
+    /// Returns a BitBoard of all pieces of the given color attacking the specified square
+    pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
+        attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
     }
 
     /// Prints an ASCII diagram of the current board to stdout.

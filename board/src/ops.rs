@@ -21,7 +21,7 @@ pub trait BoardOps: BoardQuery + Clone {
     fn unmake_move(&mut self, mv: &Move) -> Result<()>;
 
     /// Is the position in check for the side to move?
-    fn is_in_check(&mut self) -> bool;
+    fn is_in_check(&mut self, color: Color) -> bool;
 }
 
 impl BoardOps for Board {
@@ -239,9 +239,7 @@ impl BoardOps for Board {
         Ok(())
     }
 
-    fn is_in_check(&mut self) -> bool {
-        let color = self.game_state.side_to_move;
-
+    fn is_in_check(&mut self, color: Color) -> bool {
         if let Some(is_check) = self.cache.cached_check_status[color as usize] {
             return is_check;
         }
@@ -275,5 +273,80 @@ impl Board {
                 self.game_state.castling_rights[self.game_state.side_to_move as usize].long = None;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{FenOps, STARTING_POSITION_FEN};
+    use aether_core::Square;
+
+    #[test]
+    fn test_is_in_check_starting_position() {
+        let mut board = Board::from_fen(STARTING_POSITION_FEN).unwrap();
+
+        assert!(!board.is_in_check(Color::White));
+        assert!(!board.is_in_check(Color::Black));
+    }
+
+    #[test]
+    fn test_is_in_check_white_checked_by_rook() {
+        let mut board = Board::from_fen("3kr3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+
+        assert!(board.is_in_check(Color::White));
+        assert!(!board.is_in_check(Color::Black));
+    }
+
+    #[test]
+    fn test_is_in_check_black_checked_by_queen() {
+        let mut board = Board::from_fen("4k3/8/8/8/8/8/8/4QK2 b - - 0 1").unwrap();
+
+        assert!(!board.is_in_check(Color::White));
+        assert!(board.is_in_check(Color::Black));
+    }
+
+    #[test]
+    fn test_is_in_check_blocked_attack() {
+        let mut board = Board::from_fen("3kr3/8/8/8/4P3/8/8/4K3 w - - 0 1").unwrap();
+
+        assert!(!board.is_in_check(Color::White));
+    }
+
+    #[test]
+    fn test_attackers_to_square_multiple() {
+        let mut board = Board::from_fen("7k/8/8/8/4p3/8/3N4/1B5K w - - 0 1").unwrap();
+
+        let attackers = board.attackers_to_square(Square::E4, Color::White);
+
+        assert_eq!(attackers.count(), 2);
+        assert!(attackers.has(Square::D2));
+        assert!(attackers.has(Square::B1));
+    }
+
+    #[test]
+    fn test_attackers_to_square_none() {
+        let mut board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+
+        let white_attackers = board.attackers_to_square(Square::E4, Color::White);
+        let black_attackers = board.attackers_to_square(Square::E4, Color::Black);
+
+        assert!(white_attackers.is_empty());
+        assert!(black_attackers.is_empty());
+    }
+
+    #[test]
+    fn test_is_in_check_knight_check() {
+        let mut board = Board::from_fen("4k3/8/3N4/8/8/8/8/4K3 b - - 0 1").unwrap();
+
+        assert!(board.is_in_check(Color::Black));
+        assert!(!board.is_in_check(Color::White));
+    }
+
+    #[test]
+    fn test_is_in_check_pawn_check() {
+        let mut board = Board::from_fen("8/8/8/4k3/3P1P2/8/8/4K3 b - - 0 1").unwrap();
+
+        assert!(board.is_in_check(Color::Black));
     }
 }
