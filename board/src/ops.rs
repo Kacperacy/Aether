@@ -128,7 +128,7 @@ impl BoardOps for Board {
         let mut final_move_state = move_state;
         final_move_state.captured_piece = captured_piece;
 
-        if mv.piece == Piece::Pawn || captured_piece.is_none() {
+        if mv.piece == Piece::Pawn || captured_piece.is_some() {
             self.game_state.halfmove_clock = 0;
         } else {
             self.game_state.halfmove_clock += 1;

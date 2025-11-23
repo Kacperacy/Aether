@@ -134,6 +134,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let mut child_pv = Vec::new();
             let score = -self.alpha_beta(board, depth - 1, ply + 1, -beta, -alpha, &mut child_pv);
 
+            board.unmake_move(&mv).unwrap();
+
             if score > best_score {
                 best_score = score;
                 best_move = Some(mv);
