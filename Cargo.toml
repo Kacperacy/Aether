@@ -17,9 +17,9 @@ members = [
     "board",
     "movegen",
     "engine",
-    "uci",
-    "cli",
-    "opening"]
+    "interface",
+    "opening",
+]
 
 [workspace.dependencies]
 # External dependencies
@@ -33,8 +33,6 @@ aether-core = { path = "./core" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
 engine = { path = "./engine" }
-uci = { path = "./uci" }
-cli = { path = "./cli" }
 
 [dev-dependencies]
 
