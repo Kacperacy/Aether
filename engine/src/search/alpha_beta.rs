@@ -197,7 +197,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         ply: usize,
     ) -> Option<Score> {
         if board.is_in_check(board.side_to_move()) {
-            Some(mated_in((ply / 2 + 1) as u32))
+            Some(mated_in(ply as u32))
         } else {
             Some(0) // Stalemate
         }
