@@ -96,7 +96,7 @@ fn test_make_unmake_en_passant() {
 
 #[test]
 fn test_make_unmake_promotion() {
-    let fen = "8/P7/8/8/8/8/7p/8 w - - 0 1";
+    let fen = "7k/P7/8/8/8/8/7p/K7 w - - 0 1";
     let mut board = Board::from_fen(fen).unwrap();
     let original_fen = board.to_fen();
 
