@@ -62,15 +62,9 @@ impl Board {
         NonZeroU64::new(self.zobrist_hash)
     }
 
-    /// Invalidates cached data (e.g., check status)
-    pub fn invalidate_cache(&mut self) {
-        self.cache.invalidate_check_cache();
-    }
-
     /// Changes the side to move and invalidates relevant caches
     pub fn change_side_to_move(&mut self) {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
-        self.invalidate_cache();
     }
 
     /// Returns a BitBoard of all pieces of the given color attacking the specified square
