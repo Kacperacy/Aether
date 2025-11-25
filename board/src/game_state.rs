@@ -55,7 +55,7 @@ impl GameState {
     pub fn switch_side(&mut self) {
         self.side_to_move = self.side_to_move.opponent();
         if self.side_to_move == Color::White {
-            self.fullmove_number += 1;
+            self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
     }
 

@@ -58,12 +58,6 @@ impl Board {
         &self.pieces
     }
 
-    /// Returns mutable reference to piece bitboards (for internal use)
-    #[inline]
-    pub(crate) fn pieces_mut(&mut self) -> &mut [[BitBoard; 6]; 2] {
-        &mut self.pieces
-    }
-
     /// Returns the current game state
     #[inline]
     pub fn game_state(&self) -> &GameState {
@@ -177,20 +171,17 @@ impl Board {
     pub fn is_fifty_move_draw(&self) -> bool {
         self.game_state.halfmove_clock >= 100
     }
+
+    /// Piece and color at square, if any. (Delegates to BoardQuery)
+    #[inline]
+    pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
+        <Self as BoardQuery>::piece_at(self, square)
+    }
 }
 
 impl Default for Board {
     /// Creates a board in the standard starting position
     fn default() -> Self {
         Self::starting_position().expect("Failed to create starting position")
-    }
-}
-
-// Re-export BoardQuery methods on Board for convenience
-impl Board {
-    /// Piece and color at square, if any. (Delegates to BoardQuery)
-    #[inline]
-    pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        <Self as BoardQuery>::piece_at(self, square)
     }
 }

@@ -1,6 +1,5 @@
 use crate::{ALL_SQUARES, BitBoard, File, Rank, Square};
 use std::io::Write;
-use std::mem::offset_of;
 use std::path::Path;
 use std::{fs, io};
 
@@ -149,6 +148,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let rank = sq.rank() as i8;
     let file = sq.file() as i8;
 
+    // Up-Right diagonal
     for i in 1..=7 {
         if rank + i <= 7 && file + i <= 7 {
             let target = Square::new(File::from_index(file + i), Rank::from_index(rank + i));
@@ -156,30 +156,47 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
             if blockers.has(target) {
                 break;
             }
+        } else {
+            break;
         }
+    }
 
+    // Up-Left diagonal
+    for i in 1..=7 {
         if rank + i <= 7 && file - i >= 0 {
             let target = Square::new(File::from_index(file - i), Rank::from_index(rank + i));
             attacks |= BitBoard::from_square(target);
             if blockers.has(target) {
                 break;
             }
+        } else {
+            break;
         }
+    }
 
+    // Down-Right diagonal
+    for i in 1..=7 {
         if rank - i >= 0 && file + i <= 7 {
             let target = Square::new(File::from_index(file + i), Rank::from_index(rank - i));
             attacks |= BitBoard::from_square(target);
             if blockers.has(target) {
                 break;
             }
+        } else {
+            break;
         }
+    }
 
+    // Down-Left diagonal
+    for i in 1..=7 {
         if rank - i >= 0 && file - i >= 0 {
             let target = Square::new(File::from_index(file - i), Rank::from_index(rank - i));
             attacks |= BitBoard::from_square(target);
             if blockers.has(target) {
                 break;
             }
+        } else {
+            break;
         }
     }
 

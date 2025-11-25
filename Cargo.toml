@@ -10,6 +10,7 @@ aether-core = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
 engine = { workspace = true }
+interface = { workspace = true }
 
 [workspace]
 members = [
@@ -33,6 +34,7 @@ aether-core = { path = "./core" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
 engine = { path = "./engine" }
+interface = { path = "./interface" }
 
 [dev-dependencies]
 

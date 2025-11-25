@@ -2,8 +2,7 @@ use crate::error::MoveError;
 use crate::query::BoardQuery;
 use crate::{Board, Result};
 use aether_core::{
-    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Rank,
-    Square,
+    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square,
 };
 
 /// Trait for board operations
