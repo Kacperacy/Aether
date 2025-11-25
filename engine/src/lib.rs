@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-const NODE_CHECK_INTERVAL: u64 = 2048;
+const NODE_CHECK_INTERVAL: u64 = 512;
 
 /// Main chess engine facade
 pub struct Engine {
@@ -74,6 +74,8 @@ impl Engine {
     }
 
     /// Search for the best move
+    /// soft_limit: target time, will finish current iteration then stop
+    /// hard_limit: absolute max, will abort search immediately
     pub fn search(
         &mut self,
         board: &mut Board,
@@ -87,6 +89,17 @@ impl Engine {
 
         let start_time = Instant::now();
         let max_depth = depth.unwrap_or(64);
+
+        // Calculate soft and hard limits
+        // Soft limit: when to stop starting new iterations
+        // Hard limit: absolute max time - should interrupt search if exceeded
+        let soft_limit = time_limit;
+        let hard_limit = time_limit.map(|t| {
+            // Hard limit = soft limit + 10%, capped at +100ms
+            let soft_ms = t.as_millis() as u64;
+            let extra = (soft_ms / 10).min(100);
+            Duration::from_millis(soft_ms + extra)
+        });
 
         let mut best_move: Option<Move> = None;
         let mut best_score = NEG_MATE_SCORE;
@@ -117,7 +130,14 @@ impl Engine {
 
         // Iterative deepening
         for d in 1..=max_depth {
-            if self.should_stop(start_time, time_limit) {
+            // Check soft limit before starting new iteration
+            if let Some(limit) = soft_limit {
+                if start_time.elapsed() >= limit {
+                    break;
+                }
+            }
+
+            if self.stop_flag.load(Ordering::SeqCst) {
                 break;
             }
 
@@ -132,10 +152,12 @@ impl Engine {
                 MATE_SCORE,
                 &mut current_pv,
                 start_time,
-                time_limit,
+                hard_limit,
             );
 
-            if self.should_stop(start_time, time_limit) {
+            // If we were stopped mid-search, don't update best move
+            // (the results might be incomplete)
+            if self.stop_flag.load(Ordering::SeqCst) {
                 break;
             }
 
@@ -190,13 +212,19 @@ impl Engine {
         // Periodic time check
         if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
             if self.should_stop(start_time, time_limit) {
+                self.stop_flag.store(true, Ordering::SeqCst);
                 return 0;
             }
         }
 
+        // Check if already stopped
+        if self.stop_flag.load(Ordering::Relaxed) {
+            return 0;
+        }
+
         // Leaf node - evaluate
         if depth == 0 {
-            return self.quiescence(board, alpha, beta);
+            return self.quiescence(board, alpha, beta, start_time, time_limit);
         }
 
         // Generate moves
@@ -250,8 +278,22 @@ impl Engine {
     }
 
     /// Quiescence search - search captures until position is quiet
-    fn quiescence(&mut self, board: &mut Board, mut alpha: Score, beta: Score) -> Score {
+    fn quiescence(
+        &mut self,
+        board: &mut Board,
+        mut alpha: Score,
+        beta: Score,
+        start_time: Instant,
+        time_limit: Option<Duration>,
+    ) -> Score {
         self.info.nodes += 1;
+
+        // Periodic time check in qsearch too
+        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
+            if self.should_stop(start_time, time_limit) {
+                return 0;
+            }
+        }
 
         let stand_pat = self.evaluator.evaluate(board);
 
@@ -271,8 +313,13 @@ impl Engine {
 
         for mv in moves {
             board.make_move(&mv).ok();
-            let score = -self.quiescence(board, -beta, -alpha);
+            let score = -self.quiescence(board, -beta, -alpha, start_time, time_limit);
             board.unmake_move(&mv).ok();
+
+            // Check if we were stopped
+            if self.stop_flag.load(Ordering::SeqCst) {
+                return 0;
+            }
 
             if score >= beta {
                 return beta;

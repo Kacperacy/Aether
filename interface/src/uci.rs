@@ -60,27 +60,60 @@ impl SearchParams {
         }
 
         if let Some(movetime) = self.movetime {
-            return Some(Duration::from_millis(movetime));
+            // Fixed time per move - use almost all of it (leave 50ms buffer)
+            return Some(Duration::from_millis(movetime.saturating_sub(50).max(10)));
         }
 
         let time = if is_white { self.wtime } else { self.btime };
         let inc = if is_white { self.winc } else { self.binc };
 
         if let Some(time_left) = time {
-            let moves_to_go = self.movestogo.unwrap_or(30) as u64;
             let increment = inc.unwrap_or(0);
 
-            // Simple time management: use time/moves_to_go + increment/2
-            // Leave some buffer (90% of calculated time)
-            let base_time = time_left / moves_to_go;
-            let total_time = base_time + increment / 2;
-            let safe_time = (total_time * 9) / 10;
+            // Estimate moves remaining
+            let moves_to_go = self.movestogo.unwrap_or(30) as u64;
 
-            // Don't use more than 1/3 of remaining time
-            let max_time = time_left / 3;
-            let final_time = safe_time.min(max_time).max(10); // At least 10ms
+            // Base time allocation
+            let base_time = time_left / moves_to_go.max(1);
+
+            // Add portion of increment
+            let inc_bonus = (increment * 7) / 10;
+
+            // Target time
+            let target_time = base_time + inc_bonus;
+
+            // Safety limits:
+            // 1. Never use more than 10% of remaining time (for bullet)
+            // 2. Leave at least 100ms on clock (or 50ms for very short times)
+            let max_fraction = time_left / 10;
+            let min_remaining = if time_left > 1000 { 100 } else { 50 };
+            let safety_buffer = time_left.saturating_sub(min_remaining);
+
+            let final_time = target_time.min(max_fraction).min(safety_buffer).max(5); // At least 5ms
 
             Some(Duration::from_millis(final_time))
+        } else {
+            None
+        }
+    }
+
+    /// Get hard time limit (absolute maximum, never exceed)
+    pub fn calculate_hard_limit(&self, is_white: bool) -> Option<Duration> {
+        if self.infinite {
+            return None;
+        }
+
+        if let Some(movetime) = self.movetime {
+            return Some(Duration::from_millis(movetime.saturating_sub(10).max(5)));
+        }
+
+        let time = if is_white { self.wtime } else { self.btime };
+
+        if let Some(time_left) = time {
+            // Hard limit: never use more than 25% of remaining time
+            // and always leave 30ms buffer
+            let hard_limit = (time_left / 4).saturating_sub(30).max(5);
+            Some(Duration::from_millis(hard_limit))
         } else {
             None
         }

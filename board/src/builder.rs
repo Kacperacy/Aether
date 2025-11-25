@@ -138,9 +138,54 @@ impl BoardBuilder {
     }
 
     fn compute_zobrist_hash(&self) -> u64 {
-        // Placeholder for zobrist hash computation
-        // In full implementation, this would use proper zobrist tables
-        0
+        use aether_core::{ALL_SQUARES, Piece, zobrist_keys};
+
+        let keys = zobrist_keys();
+        let mut hash = 0u64;
+
+        // Hash pieces
+        for &sq in &ALL_SQUARES {
+            for color in ALL_COLORS {
+                for piece_idx in 0..6 {
+                    let piece = match piece_idx {
+                        0 => Piece::Pawn,
+                        1 => Piece::Knight,
+                        2 => Piece::Bishop,
+                        3 => Piece::Rook,
+                        4 => Piece::Queen,
+                        5 => Piece::King,
+                        _ => continue,
+                    };
+
+                    if self.pieces[color as usize][piece_idx].has(sq) {
+                        hash ^= keys.piece_key(sq, piece, color);
+                    }
+                }
+            }
+        }
+
+        // Hash side to move
+        if self.game_state.side_to_move == Color::Black {
+            hash ^= keys.side_to_move;
+        }
+
+        // Hash castling rights
+        for color in ALL_COLORS {
+            let rights = &self.game_state.castling_rights[color as usize];
+            if rights.short.is_some() {
+                hash ^= keys.castling_key(color, true);
+            }
+            if rights.long.is_some() {
+                hash ^= keys.castling_key(color, false);
+            }
+        }
+
+        // Hash en passant
+        if let Some(ep_sq) = self.game_state.en_passant_square {
+            hash ^= keys.en_passant_key(ep_sq.file());
+        }
+
+        hash
     }
 }
 
