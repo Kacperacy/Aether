@@ -1,6 +1,9 @@
 //! Search crate
 
 mod alpha_beta;
+pub mod tt;
+
+pub use tt::{NodeType, TTEntry, TranspositionTable};
 
 use aether_core::{Move, Score};
 use board::BoardQuery;

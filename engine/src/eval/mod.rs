@@ -4,6 +4,8 @@
 
 mod simple_evaluator;
 
+pub use simple_evaluator::SimpleEvaluator;
+
 use aether_core::Score;
 use board::BoardQuery;
 

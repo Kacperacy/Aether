@@ -162,9 +162,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return true;
         }
 
-        if let Some(max_time) = limits.time
-            && let Some(start) = self.start_time
-        {
+        if let (Some(max_time), Some(start)) = (limits.time, self.start_time) {
             if start.elapsed() >= max_time {
                 return true;
             }
@@ -178,10 +176,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return true;
         }
 
-        if self.info.nodes.is_multiple_of(NODE_CHECK_INTERVAL) {
-            if let Some(max_time) = self.time_limit
-                && let Some(start) = self.start_time
-            {
+        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
+            if let (Some(max_time), Some(start)) = (self.time_limit, self.start_time) {
                 if start.elapsed() >= max_time {
                     return true;
                 }

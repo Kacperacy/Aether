@@ -4,6 +4,8 @@
 //! following the UCI protocol specification.
 
 use std::io::{self, BufRead, Write};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// UCI engine information
@@ -345,6 +347,11 @@ impl InfoResponse {
 
     pub fn with_nps(mut self, nps: u64) -> Self {
         self.nps = Some(nps);
+        self
+    }
+
+    pub fn with_hashfull(mut self, hashfull: u16) -> Self {
+        self.hashfull = Some(hashfull);
         self
     }
 
