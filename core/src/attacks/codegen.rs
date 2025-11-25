@@ -363,7 +363,7 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
         }
         code.push_str("],\n");
     }
-    code.push_str("];\n\n");
+    code.push_str("];\n");
 
     code
 }
