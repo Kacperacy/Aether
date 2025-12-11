@@ -22,6 +22,16 @@ pub trait BoardQuery {
     fn side_to_move(&self) -> Color;
     /// Returns the Zobrist hash of the current position
     fn zobrist_hash_raw(&self) -> u64;
+    /// Checks for insufficient material to continue the game.
+    fn is_insufficient_material(&self) -> bool;
+    /// Checks for threefold repetition.
+    fn is_threefold_repetition(&self) -> bool;
+    /// Checks for twofold repetition.
+    fn is_twofold_repetition(&self) -> bool;
+    /// Checks for fifty-move rule draw.
+    fn is_fifty_move_draw(&self) -> bool;
+    /// Checks for all draw conditions.
+    fn is_draw(&self) -> bool;
 }
 
 impl BoardQuery for Board {
@@ -83,5 +93,94 @@ impl BoardQuery for Board {
 
     fn zobrist_hash_raw(&self) -> u64 {
         self.zobrist_hash
+    }
+
+    fn is_insufficient_material(&self) -> bool {
+        if self.piece_count(Piece::Pawn, Color::White) > 0
+            || self.piece_count(Piece::Pawn, Color::Black) > 0
+        {
+            return false;
+        }
+
+        if self.piece_count(Piece::Rook, Color::White) > 0
+            || self.piece_count(Piece::Rook, Color::Black) > 0
+        {
+            return false;
+        }
+
+        if self.piece_count(Piece::Queen, Color::White) > 0
+            || self.piece_count(Piece::Queen, Color::Black) > 0
+        {
+            return false;
+        }
+
+        let white_knights = self.piece_count(Piece::Knight, Color::White);
+        let black_knights = self.piece_count(Piece::Knight, Color::Black);
+        let white_bishops = self.piece_count(Piece::Bishop, Color::White);
+        let black_bishops = self.piece_count(Piece::Bishop, Color::Black);
+
+        // Now we only have kings, bishops, and knights
+        let white_minors = white_bishops + white_knights;
+        let black_minors = black_bishops + black_knights;
+
+        // K vs K
+        if white_minors == 0 && black_minors == 0 {
+            return true;
+        }
+
+        // K+B vs K or K+N vs K
+        if white_minors == 1 && black_minors == 0 {
+            return true;
+        }
+        if white_minors == 0 && black_minors == 1 {
+            return true;
+        }
+
+        // K+B vs K+B on same color squares
+        if white_bishops == 1 && black_bishops == 1 && white_knights == 0 && black_knights == 0 {
+            // Get bishop squares
+            let white_bishop_bb = &self.pieces[Color::White as usize][Piece::Bishop as usize];
+            let black_bishop_bb = &self.pieces[Color::Black as usize][Piece::Bishop as usize];
+
+            if let Some(white_sq) = white_bishop_bb.to_square() {
+                if let Some(black_sq) = black_bishop_bb.to_square() {
+                    // Check if both bishops are on same color squares
+                    // A square is light if (file + rank) is even
+                    let white_is_light =
+                        (white_sq.file() as usize + white_sq.rank() as usize) % 2 == 0;
+                    let black_is_light =
+                        (black_sq.file() as usize + black_sq.rank() as usize) % 2 == 0;
+
+                    if white_is_light == black_is_light {
+                        return true; // Same color bishops = draw
+                    }
+                }
+            }
+        }
+
+        // All other cases have sufficient material
+        false
+    }
+
+    #[inline]
+    fn is_threefold_repetition(&self) -> bool {
+        self.repetition_count() >= 2
+    }
+
+    #[inline]
+    fn is_twofold_repetition(&self) -> bool {
+        self.repetition_count() >= 1
+    }
+
+    #[inline]
+    fn is_fifty_move_draw(&self) -> bool {
+        self.game_state.halfmove_clock >= 100
+    }
+
+    #[inline]
+    fn is_draw(&self) -> bool {
+        self.is_fifty_move_draw()
+            || self.is_threefold_repetition()
+            || self.is_insufficient_material()
     }
 }

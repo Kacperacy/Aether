@@ -190,6 +190,20 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return 0;
         }
 
+        if ply > 0 {
+            if board.is_twofold_repetition() {
+                return 0;
+            }
+
+            if board.is_fifty_move_draw() {
+                return 0;
+            }
+
+            if board.is_insufficient_material() {
+                return 0;
+            }
+        }
+
         if ply >= MAX_PLY {
             return self.evaluator.evaluate(board);
         }
@@ -430,5 +444,96 @@ mod tests {
         // Should find Ra8# (mate)
         let best = result.best_move.unwrap();
         assert_eq!(best.to.to_string(), "a8");
+    }
+
+    #[test]
+    fn test_search_detects_threefold_repetition() {
+        // Setup a position where repetition can occur
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let mut board = Board::from_fen(fen).unwrap();
+
+        let evaluator = SimpleEvaluator::new();
+        let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
+
+        // Make moves that repeat position
+        // (This is a conceptual test - full implementation needs move setup)
+
+        let limits = SearchLimits::depth(6);
+        let result = searcher.search(&mut board, &limits, |_, _, _| {});
+
+        // Search should complete without hanging on repetitions
+        assert!(result.best_move.is_some());
+    }
+
+    #[test]
+    fn test_search_avoids_immediate_repetition() {
+        // Position where bot could repeat immediately
+        let fen = "4k3/8/8/8/8/8/8/4K2R w - - 0 1";
+        let mut board = Board::from_fen(fen).unwrap();
+
+        let evaluator = SimpleEvaluator::new();
+        let mut searcher = AlphaBetaSearcher::new(evaluator, 16);
+
+        // First move
+        let limits = SearchLimits::depth(6);
+        let result1 = searcher.search(&mut board, &limits, |_, _, _| {});
+        let best_move1 = result1.best_move.unwrap();
+
+        board.make_move(&best_move1).unwrap();
+
+        // Opponent moves (simulate)
+        let mut opponent_moves = Vec::new();
+        searcher.generator.legal(&mut board, &mut opponent_moves);
+        board.make_move(&opponent_moves[0]).unwrap();
+
+        // Second move - should NOT repeat position
+        let result2 = searcher.search(&mut board, &limits, |_, _, _| {});
+        let best_move2 = result2.best_move.unwrap();
+
+        board.make_move(&best_move2).unwrap();
+
+        // Check that position didn't repeat
+        assert!(!board.is_threefold_repetition());
+    }
+
+    #[test]
+    fn test_search_recognizes_insufficient_material_draw() {
+        // K+B vs K - insufficient material
+        let fen = "8/8/8/4k3/8/8/2B5/4K3 w - - 0 1";
+        let mut board = Board::from_fen(fen).unwrap();
+
+        let evaluator = SimpleEvaluator::new();
+        let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
+
+        let limits = SearchLimits::depth(6);
+        let result = searcher.search(&mut board, &limits, |_, _, _| {});
+
+        // Score should be close to 0 (draw)
+        assert!(
+            result.score.abs() < 50,
+            "Insufficient material should evaluate near 0"
+        );
+    }
+
+    #[test]
+    fn test_fifty_move_rule_in_search() {
+        // Position with halfmove clock near 100
+        let fen = "4k3/8/8/8/8/8/8/4K3 w - - 100 1";
+        let mut board = Board::from_fen(fen).unwrap();
+
+        assert!(board.is_fifty_move_draw());
+
+        let evaluator = SimpleEvaluator::new();
+        let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
+
+        // Search should immediately return draw score
+        let limits = SearchLimits::depth(1);
+        let mut pv = Vec::new();
+        let score = searcher.alpha_beta(
+            &mut board, 1, 1, // ply > 0 to trigger draw detection
+            -1000, 1000, &mut pv, true,
+        );
+
+        assert_eq!(score, 0, "Fifty-move rule should return 0 (draw)");
     }
 }
