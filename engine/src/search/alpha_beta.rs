@@ -3,7 +3,7 @@ use crate::search::move_ordering::MoveOrderer;
 use crate::search::{
     NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry, TranspositionTable,
 };
-use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, PAWN_VALUE, QUEEN_VALUE, Score, mated_in};
+use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, QUEEN_VALUE, Score, mated_in};
 use board::{BoardOps, BoardQuery};
 use movegen::{Generator, MoveGen};
 use std::sync::Arc;
@@ -347,14 +347,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.move_orderer.order_moves(&mut moves);
 
         for mv in moves {
-            // SSE pruning: skip captures that are unlikely to be good
-            // (Simple version: skip if captured piece is significantly less valuable)
-            if let Some(captured) = mv.capture {
-                if mv.piece.value() > captured.value() + PAWN_VALUE {
-                    continue;
-                }
-            }
-
             board.make_move(&mv).ok();
             let score = -self.quiescence(board, ply + 1, -beta, -alpha);
             board.unmake_move(&mv).ok();
