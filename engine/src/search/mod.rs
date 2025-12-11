@@ -73,33 +73,44 @@ impl SearchLimits {
     /// Creates search limits with a specified number of nodes.
     pub fn nodes(nodes: u64) -> Self {
         Self {
+            depth: None, // No depth limit - iterate until node count reached
             nodes: Some(nodes),
-            ..Self::default()
+            time: None,
+            hard_time: None,
+            infinite: false,
         }
     }
 
     /// Creates search limits with a specified time duration.
     pub fn time(time: Duration) -> Self {
         Self {
+            depth: None, // No depth limit - iterate until time runs out
+            nodes: None,
             time: Some(time),
-            ..Self::default()
+            hard_time: None,
+            infinite: false,
         }
     }
 
     /// Creates search limits with specified time and hard time limits.
     pub fn time_with_hard_limit(time: Duration, hard_time: Duration) -> Self {
         Self {
+            depth: None, // No depth limit - iterate until time runs out
+            nodes: None,
             time: Some(time),
             hard_time: Some(hard_time),
-            ..Self::default()
+            infinite: false,
         }
     }
 
     /// Creates search limits for an infinite search.
     pub fn infinite() -> Self {
         Self {
+            depth: Some(128), // Large depth limit for infinite search
+            nodes: None,
+            time: None,
+            hard_time: None,
             infinite: true,
-            ..Self::default()
         }
     }
 }
