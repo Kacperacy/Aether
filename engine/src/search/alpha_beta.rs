@@ -190,6 +190,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return 0;
         }
 
+        if ply >= MAX_PLY {
+            return self.evaluator.evaluate(board);
+        }
+
         if ply > 0 {
             if board.is_twofold_repetition() {
                 return 0;
@@ -202,10 +206,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             if board.is_insufficient_material() {
                 return 0;
             }
-        }
-
-        if ply >= MAX_PLY {
-            return self.evaluator.evaluate(board);
         }
 
         let zobrist_key = board.zobrist_hash_raw();
@@ -339,24 +339,40 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return 0;
         }
 
-        let stand_pat = self.evaluator.evaluate(board);
-
-        if stand_pat >= beta {
-            return beta;
+        if ply >= MAX_PLY {
+            return self.evaluator.evaluate(board);
         }
 
-        if stand_pat > alpha {
-            alpha = stand_pat;
-        }
+        let in_check = board.is_in_check(board.side_to_move());
 
-        // Delta pruning: if even the best possible capture (queen)
-        // can't improve alpha, skip search
-        if stand_pat + QUEEN_VALUE + 200 < alpha {
-            return alpha;
+        if !in_check {
+            let stand_pat = self.evaluator.evaluate(board);
+
+            if stand_pat >= beta {
+                return beta;
+            }
+
+            if stand_pat > alpha {
+                alpha = stand_pat;
+            }
+
+            // Delta pruning: if even the best possible capture (queen)
+            // can't improve alpha, skip search
+            if stand_pat + QUEEN_VALUE + 200 < alpha {
+                return alpha;
+            }
         }
 
         let mut moves = Vec::new();
-        self.generator.captures(board, &mut moves);
+        if in_check {
+            self.generator.legal(board, &mut moves);
+
+            if moves.is_empty() {
+                return mated_in(ply as u32);
+            }
+        } else {
+            self.generator.captures(board, &mut moves);
+        }
 
         self.move_orderer.order_moves(&mut moves);
 
