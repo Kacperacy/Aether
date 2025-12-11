@@ -4,8 +4,6 @@
 //! following the UCI protocol specification.
 
 use std::io::{self, BufRead, Write};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// UCI engine information

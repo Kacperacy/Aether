@@ -1,6 +1,7 @@
 //! Search crate
 
-mod alpha_beta;
+pub mod alpha_beta;
+mod move_ordering;
 pub mod tt;
 
 pub use tt::{NodeType, TTEntry, TranspositionTable};
@@ -33,8 +34,11 @@ pub struct SearchLimits {
     /// Maximum number of nodes to search.
     pub nodes: Option<u64>,
 
-    /// Maximum time to search.
+    /// Maximum time to search. (soft limit - finish current iteration)
     pub time: Option<Duration>,
+
+    /// Hard time limit for the search. (terminate immediately when reached)
+    pub hard_time: Option<Duration>,
 
     /// Whether to search indefinitely until stopped.
     pub infinite: bool,
@@ -46,6 +50,7 @@ impl Default for SearchLimits {
             depth: Some(3), // Default depth of 3
             nodes: None,
             time: None,
+            hard_time: None,
             infinite: false,
         }
     }
@@ -77,6 +82,15 @@ impl SearchLimits {
     pub fn time(time: Duration) -> Self {
         Self {
             time: Some(time),
+            ..Self::default()
+        }
+    }
+
+    /// Creates search limits with specified time and hard time limits.
+    pub fn time_with_hard_limit(time: Duration, hard_time: Duration) -> Self {
+        Self {
+            time: Some(time),
+            hard_time: Some(hard_time),
             ..Self::default()
         }
     }
@@ -125,9 +139,8 @@ impl SearchInfo {
 
     /// Calculates nodes per second based on time elapsed.
     pub fn calculate_nps(&mut self) {
-        let seconds = self.time_elapsed.as_secs_f64();
-        if seconds > 0.0 {
-            self.nps = (self.nps as f64 / seconds) as u64;
+        if self.time_elapsed.as_millis() > 0 {
+            self.nps = (self.nodes as u128 * 1000 / self.time_elapsed.as_millis()) as u64;
         }
     }
 }

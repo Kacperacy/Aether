@@ -20,6 +20,8 @@ pub trait BoardQuery {
     fn en_passant_square(&self) -> Option<Square>;
     /// Side to move.
     fn side_to_move(&self) -> Color;
+    /// Returns the Zobrist hash of the current position
+    fn zobrist_hash_raw(&self) -> u64;
 }
 
 impl BoardQuery for Board {
@@ -77,5 +79,9 @@ impl BoardQuery for Board {
 
     fn side_to_move(&self) -> Color {
         self.game_state.side_to_move
+    }
+
+    fn zobrist_hash_raw(&self) -> u64 {
+        self.zobrist_hash
     }
 }

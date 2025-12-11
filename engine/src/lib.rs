@@ -1,69 +1,58 @@
 mod eval;
 pub mod search;
 
-pub use eval::{Evaluator, SimpleEvaluator};
-pub use search::{
-    NodeType, SearchInfo, SearchLimits, SearchResult, Searcher, TTEntry, TranspositionTable,
-};
-
-use aether_core::{Color, MATE_SCORE, Move, NEG_MATE_SCORE, Score};
-use board::{Board, BoardOps, BoardQuery};
+use crate::eval::SimpleEvaluator;
+use crate::search::alpha_beta::AlphaBetaSearcher;
+use crate::search::{SearchInfo, SearchLimits, SearchResult};
+use aether_core::{Move, Score};
+use board::{Board, BoardOps};
 use movegen::{Generator, MoveGen};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
-const NODE_CHECK_INTERVAL: u64 = 512;
-
-/// Main chess engine facade
 pub struct Engine {
     /// Move generator
     generator: Generator,
-    /// Position evaluator
-    evaluator: SimpleEvaluator,
-    /// Transposition table
-    tt: TranspositionTable,
-    /// Stop flag for interrupting search
-    stop_flag: Arc<AtomicBool>,
-    /// Search statistics
-    info: SearchInfo,
+    /// Alpha-beta searcher (handles all search logic)
+    searcher: AlphaBetaSearcher<SimpleEvaluator>,
 }
 
 impl Engine {
     /// Create a new engine with specified hash size in MB
     pub fn new(hash_size_mb: usize) -> Self {
+        let evaluator = SimpleEvaluator::new();
+        let searcher = AlphaBetaSearcher::new(evaluator, hash_size_mb);
+
         Self {
             generator: Generator::new(),
-            evaluator: SimpleEvaluator::new(),
-            tt: TranspositionTable::new(hash_size_mb),
-            stop_flag: Arc::new(AtomicBool::new(false)),
-            info: SearchInfo::new(),
+            searcher,
         }
     }
 
     /// Get a clone of the stop flag for external control
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
-        Arc::clone(&self.stop_flag)
+        self.searcher.stop_flag()
     }
 
     /// Stop the current search
-    pub fn stop(&self) {
-        self.stop_flag.store(true, Ordering::SeqCst);
+    pub fn stop(&mut self) {
+        self.searcher.stop();
     }
 
     /// Clear transposition table (call on ucinewgame)
     pub fn new_game(&mut self) {
-        self.tt.clear();
+        self.searcher.clear_tt();
     }
 
     /// Resize transposition table
     pub fn resize_tt(&mut self, size_mb: usize) {
-        self.tt.resize(size_mb);
+        self.searcher.resize_tt(size_mb);
     }
 
     /// Get hash table usage in permille
     pub fn hashfull(&self) -> u16 {
-        self.tt.hashfull()
+        self.searcher.hashfull()
     }
 
     /// Generate all legal moves for a position
@@ -74,25 +63,35 @@ impl Engine {
     }
 
     /// Search for the best move
-    /// soft_limit: target time, will finish current iteration then stop
-    /// hard_limit: absolute max, will abort search immediately
+    ///
+    /// # Arguments
+    /// * `board` - The position to search
+    /// * `depth` - Optional depth limit
+    /// * `time_limit` - Optional soft time limit (will finish current iteration)
+    /// * `on_info` - Callback for search info updates
+    ///
+    /// # Returns
+    /// SearchResult containing best move, score, and search statistics
     pub fn search(
         &mut self,
         board: &mut Board,
         depth: Option<u8>,
         time_limit: Option<Duration>,
-        mut on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
+        on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
-        self.stop_flag.store(false, Ordering::SeqCst);
-        self.info = SearchInfo::new();
-        self.tt.new_search();
+        // Convert parameters to SearchLimits
+        let limits = self.create_search_limits(depth, time_limit);
 
-        let start_time = Instant::now();
-        let max_depth = depth.unwrap_or(64);
+        // Delegate to AlphaBetaSearcher
+        self.searcher.search(board, &limits, on_info)
+    }
 
-        // Calculate soft and hard limits
-        // Soft limit: when to stop starting new iterations
-        // Hard limit: absolute max time - should interrupt search if exceeded
+    /// Create SearchLimits from legacy parameters
+    fn create_search_limits(
+        &self,
+        depth: Option<u8>,
+        time_limit: Option<Duration>,
+    ) -> SearchLimits {
         let soft_limit = time_limit;
         let hard_limit = time_limit.map(|t| {
             // Hard limit = soft limit + 10%, capped at +100ms
@@ -101,280 +100,19 @@ impl Engine {
             Duration::from_millis(soft_ms + extra)
         });
 
-        let mut best_move: Option<Move> = None;
-        let mut best_score = NEG_MATE_SCORE;
-        let mut pv = Vec::new();
-
-        // Generate legal moves
-        let mut legal_moves = Vec::new();
-        self.generator.legal(board, &mut legal_moves);
-
-        if legal_moves.is_empty() {
-            return SearchResult {
-                best_move: None,
-                score: 0,
-                pv: Vec::new(),
-                info: self.info.clone(),
-            };
+        if let (Some(soft), Some(hard)) = (soft_limit, hard_limit) {
+            SearchLimits::time_with_hard_limit(soft, hard)
+        } else if let Some(d) = depth {
+            SearchLimits::depth(d)
+        } else {
+            SearchLimits::default()
         }
-
-        // Single move - return immediately
-        if legal_moves.len() == 1 {
-            return SearchResult {
-                best_move: Some(legal_moves[0]),
-                score: 0,
-                pv: vec![legal_moves[0]],
-                info: self.info.clone(),
-            };
-        }
-
-        // Iterative deepening
-        for d in 1..=max_depth {
-            // Check soft limit before starting new iteration
-            if let Some(limit) = soft_limit {
-                if start_time.elapsed() >= limit {
-                    break;
-                }
-            }
-
-            if self.stop_flag.load(Ordering::SeqCst) {
-                break;
-            }
-
-            self.info.depth = d;
-            let mut current_pv = Vec::new();
-
-            let score = self.alpha_beta(
-                board,
-                d,
-                0,
-                NEG_MATE_SCORE,
-                MATE_SCORE,
-                &mut current_pv,
-                start_time,
-                hard_limit,
-            );
-
-            // If we were stopped mid-search, don't update best move
-            // (the results might be incomplete)
-            if self.stop_flag.load(Ordering::SeqCst) {
-                break;
-            }
-
-            best_score = score;
-            if !current_pv.is_empty() {
-                best_move = Some(current_pv[0]);
-                pv = current_pv;
-            }
-
-            // Update info
-            self.info.score = score;
-            self.info.time_elapsed = start_time.elapsed();
-            self.info.pv = pv.clone();
-            self.info.hash_full = self.tt.hashfull();
-
-            if self.info.time_elapsed.as_millis() > 0 {
-                self.info.nps =
-                    (self.info.nodes as u128 * 1000 / self.info.time_elapsed.as_millis()) as u64;
-            }
-
-            // Callback with current search info
-            on_info(&self.info, best_move, score);
-
-            // Stop if we found a mate
-            if score.abs() > 90000 {
-                break;
-            }
-        }
-
-        SearchResult {
-            best_move,
-            score: best_score,
-            pv,
-            info: self.info.clone(),
-        }
-    }
-
-    /// Alpha-beta search with negamax
-    fn alpha_beta(
-        &mut self,
-        board: &mut Board,
-        depth: u8,
-        ply: usize,
-        mut alpha: Score,
-        beta: Score,
-        pv: &mut Vec<Move>,
-        start_time: Instant,
-        time_limit: Option<Duration>,
-    ) -> Score {
-        self.info.nodes += 1;
-
-        // Periodic time check
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
-            if self.should_stop(start_time, time_limit) {
-                self.stop_flag.store(true, Ordering::SeqCst);
-                return 0;
-            }
-        }
-
-        // Check if already stopped
-        if self.stop_flag.load(Ordering::Relaxed) {
-            return 0;
-        }
-
-        // Leaf node - evaluate
-        if depth == 0 {
-            return self.quiescence(board, alpha, beta, start_time, time_limit);
-        }
-
-        // Generate moves
-        let mut moves = Vec::new();
-        self.generator.legal(board, &mut moves);
-
-        // No moves - checkmate or stalemate
-        if moves.is_empty() {
-            if board.is_in_check(board.side_to_move()) {
-                return -MATE_SCORE + ply as Score;
-            }
-            return 0; // Stalemate
-        }
-
-        // Order moves (captures first - simple MVV-LVA)
-        self.order_moves(&mut moves);
-
-        let mut local_pv = Vec::new();
-
-        for mv in moves {
-            board.make_move(&mv).ok();
-
-            let mut child_pv = Vec::new();
-            let score = -self.alpha_beta(
-                board,
-                depth - 1,
-                ply + 1,
-                -beta,
-                -alpha,
-                &mut child_pv,
-                start_time,
-                time_limit,
-            );
-
-            board.unmake_move(&mv).ok();
-
-            if score >= beta {
-                return beta; // Beta cutoff
-            }
-
-            if score > alpha {
-                alpha = score;
-                local_pv.clear();
-                local_pv.push(mv);
-                local_pv.extend_from_slice(&child_pv);
-            }
-        }
-
-        *pv = local_pv;
-        alpha
-    }
-
-    /// Quiescence search - search captures until position is quiet
-    fn quiescence(
-        &mut self,
-        board: &mut Board,
-        mut alpha: Score,
-        beta: Score,
-        start_time: Instant,
-        time_limit: Option<Duration>,
-    ) -> Score {
-        self.info.nodes += 1;
-
-        // Periodic time check in qsearch too
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
-            if self.should_stop(start_time, time_limit) {
-                return 0;
-            }
-        }
-
-        let stand_pat = self.evaluator.evaluate(board);
-
-        if stand_pat >= beta {
-            return beta;
-        }
-
-        if stand_pat > alpha {
-            alpha = stand_pat;
-        }
-
-        // Generate captures only
-        let mut moves = Vec::new();
-        self.generator.captures(board, &mut moves);
-
-        self.order_moves(&mut moves);
-
-        for mv in moves {
-            board.make_move(&mv).ok();
-            let score = -self.quiescence(board, -beta, -alpha, start_time, time_limit);
-            board.unmake_move(&mv).ok();
-
-            // Check if we were stopped
-            if self.stop_flag.load(Ordering::SeqCst) {
-                return 0;
-            }
-
-            if score >= beta {
-                return beta;
-            }
-
-            if score > alpha {
-                alpha = score;
-            }
-        }
-
-        alpha
-    }
-
-    /// Simple move ordering: captures first, ordered by MVV-LVA
-    fn order_moves(&self, moves: &mut [Move]) {
-        moves.sort_by(|a, b| {
-            let a_score = self.move_score(a);
-            let b_score = self.move_score(b);
-            b_score.cmp(&a_score)
-        });
-    }
-
-    /// Score a move for ordering (higher = search first)
-    fn move_score(&self, mv: &Move) -> i32 {
-        let mut score = 0;
-
-        // Captures: MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
-        if let Some(captured) = mv.capture {
-            score += 10 * captured.value() as i32 - mv.piece.value() as i32;
-        }
-
-        // Promotions
-        if let Some(promo) = mv.promotion {
-            score += promo.value() as i32;
-        }
-
-        score
-    }
-
-    /// Check if search should stop
-    fn should_stop(&self, start_time: Instant, time_limit: Option<Duration>) -> bool {
-        if self.stop_flag.load(Ordering::SeqCst) {
-            return true;
-        }
-
-        if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
-                return true;
-            }
-        }
-
-        false
     }
 
     /// Perft - count nodes at given depth
+    ///
+    /// This is a debugging/testing function that counts all leaf nodes
+    /// at a given depth. Useful for validating move generation.
     pub fn perft(&self, board: &mut Board, depth: u8) -> u64 {
         if depth == 0 {
             return 1;
@@ -398,6 +136,9 @@ impl Engine {
     }
 
     /// Perft divide - count nodes per move at given depth
+    ///
+    /// Like perft, but returns the node count for each move separately.
+    /// Useful for debugging specific moves.
     pub fn perft_divide(&self, board: &mut Board, depth: u8) -> Vec<(Move, u64)> {
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);
@@ -418,5 +159,74 @@ impl Engine {
 impl Default for Engine {
     fn default() -> Self {
         Self::new(16)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use board::Board;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_engine_creation() {
+        let engine = Engine::new(16);
+        assert_eq!(engine.hashfull(), 0);
+    }
+
+    #[test]
+    fn test_legal_moves() {
+        let engine = Engine::new(16);
+        let board = Board::starting_position().unwrap();
+        let moves = engine.legal_moves(&board);
+        assert_eq!(moves.len(), 20); // 20 legal moves from starting position
+    }
+
+    #[test]
+    fn test_search_starting_position() {
+        let mut engine = Engine::new(16);
+        let mut board = Board::starting_position().unwrap();
+
+        let result = engine.search(&mut board, Some(3), None, |_, _, _| {});
+
+        assert!(result.best_move.is_some());
+        assert!(!result.pv.is_empty());
+        assert!(result.info.nodes > 0);
+    }
+
+    #[test]
+    fn test_perft_starting_position() {
+        let engine = Engine::new(16);
+        let mut board = Board::starting_position().unwrap();
+
+        // Known perft values for starting position
+        assert_eq!(engine.perft(&mut board, 1), 20);
+        assert_eq!(engine.perft(&mut board, 2), 400);
+        assert_eq!(engine.perft(&mut board, 3), 8902);
+    }
+
+    #[test]
+    fn test_stop_search() {
+        let mut engine = Engine::new(16);
+        let stop_flag = engine.stop_flag();
+
+        // Start search in background would go here
+        // For now, just test that stop works
+        engine.stop();
+        assert!(stop_flag.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_new_game_clears_tt() {
+        let mut engine = Engine::new(16);
+        let mut board = Board::starting_position().unwrap();
+
+        // Do a search to populate TT (deeper search to ensure TT gets populated)
+        engine.search(&mut board, Some(6), None, |_, _, _| {});
+        assert!(engine.hashfull() > 0);
+
+        // New game should clear TT
+        engine.new_game();
+        assert_eq!(engine.hashfull(), 0);
     }
 }

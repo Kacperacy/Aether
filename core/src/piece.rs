@@ -1,5 +1,5 @@
 use crate::TypeError::InvalidPiece;
-use crate::{Result, TypeError};
+use crate::{Result, Score, TypeError};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -25,6 +25,12 @@ pub const ALL_PIECES: [Piece; Piece::NUM] = [
 
 /// Pieces that a pawn can promote to
 pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen];
+pub const PAWN_VALUE: Score = 100;
+pub const KNIGHT_VALUE: Score = 320;
+pub const BISHOP_VALUE: Score = 330;
+pub const ROOK_VALUE: Score = 500;
+pub const QUEEN_VALUE: Score = 900;
+pub const KING_VALUE: Score = 20000;
 
 impl FromStr for Piece {
     type Err = TypeError;
@@ -74,14 +80,14 @@ impl Piece {
     }
 
     /// Returns the standard material value of the piece in centipawns
-    pub const fn value(self) -> u16 {
+    pub const fn value(self) -> Score {
         match self {
-            Self::Pawn => 100,
-            Self::Knight => 320,
-            Self::Bishop => 330,
-            Self::Rook => 500,
-            Self::Queen => 900,
-            Self::King => 20000,
+            Self::Pawn => PAWN_VALUE,
+            Self::Knight => KNIGHT_VALUE,
+            Self::Bishop => BISHOP_VALUE,
+            Self::Rook => ROOK_VALUE,
+            Self::Queen => QUEEN_VALUE,
+            Self::King => KING_VALUE,
         }
     }
 
