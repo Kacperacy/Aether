@@ -18,7 +18,6 @@ members = [
     "movegen",
     "engine",
     "interface",
-    "opening",
 ]
 
 [workspace.dependencies]
@@ -33,7 +32,6 @@ board = { path = "./board" }
 movegen = { path = "./movegen" }
 engine = { path = "./engine" }
 interface = { path = "./interface" }
-opening = { path = "./opening" }
 
 [dev-dependencies]
 

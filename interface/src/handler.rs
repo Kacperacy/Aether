@@ -5,9 +5,8 @@ use crate::uci::{
     UciResponse, send_response, send_responses,
 };
 use aether_core::{Color, Move, Piece, Square};
-use board::{Board, BoardOps, BoardQuery, FenOps, polyglot_hash};
+use board::{Board, BoardOps, BoardQuery, FenOps};
 use engine::Engine;
-use opening::{OpeningBook, convert_polyglot_castling};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -21,12 +20,6 @@ pub struct EngineOptions {
     pub threads: usize,
     /// Whether to show debug output
     pub debug: bool,
-    /// Whether to use an own book
-    pub own_book: bool,
-    /// Path to the opening book file
-    pub book_path: Option<String>,
-    /// If true, always play the best book move, otherwise play a random book move
-    pub book_best_move: bool,
 }
 
 impl Default for EngineOptions {
@@ -35,9 +28,6 @@ impl Default for EngineOptions {
             hash_size: 16,
             threads: 1,
             debug: false,
-            own_book: false,
-            book_path: None,
-            book_best_move: true,
         }
     }
 }
@@ -54,8 +44,6 @@ pub struct UciHandler {
     options: EngineOptions,
     /// Stop flag for search
     stop_flag: Arc<AtomicBool>,
-    /// Opening book
-    book: Option<OpeningBook>,
 }
 
 impl UciHandler {
@@ -64,16 +52,12 @@ impl UciHandler {
         let engine = Engine::new(16);
         let stop_flag = engine.stop_flag();
 
-        // Load the embedded default opening book
-        let book = OpeningBook::default_book().ok();
-
         Self {
             info: EngineInfo::default(),
             board: Board::starting_position().expect("Failed to create starting position"),
             engine,
             options: EngineOptions::default(),
             stop_flag,
-            book,
         }
     }
 
@@ -194,47 +178,6 @@ impl UciHandler {
                     }
                 }
             }
-            "ownbook" => {
-                self.options.own_book =
-                    value.as_ref().map_or(false, |v| v.to_lowercase() == "true");
-            }
-            "bookfile" => {
-                if let Some(path) = value {
-                    if path.is_empty() {
-                        self.options.book_path = None;
-                        self.book = None;
-                    } else {
-                        self.options.book_path = Some(path.clone());
-                        match OpeningBook::open(&path) {
-                            Ok(book) => {
-                                if self.options.debug {
-                                    send_response(&UciResponse::Info(
-                                        InfoResponse::new().with_string(format!(
-                                            "Loaded opening book: {} ({} entries)",
-                                            path,
-                                            book.len()
-                                        )),
-                                    ));
-                                }
-                                self.book = Some(book);
-                            }
-                            Err(e) => {
-                                if self.options.debug {
-                                    send_response(&UciResponse::Info(
-                                        InfoResponse::new()
-                                            .with_string(format!("Failed to load book: {}", e)),
-                                    ));
-                                }
-                                self.book = None;
-                            }
-                        }
-                    }
-                }
-            }
-            "bookbestmove" => {
-                self.options.book_best_move =
-                    value.as_ref().map_or(true, |v| v.to_lowercase() == "true");
-            }
             _ => {}
         }
     }
@@ -320,16 +263,6 @@ impl UciHandler {
 
     /// Handle "go" command
     fn cmd_go(&mut self, params: SearchParams) {
-        // 1. Try opening book first (if enabled)
-        if let Some(book_move) = self.probe_book() {
-            send_response(&UciResponse::BestMove {
-                best: book_move,
-                ponder: None,
-            });
-            return;
-        }
-
-        // 2. Standard search (existing code below)
         let is_white = self.board.side_to_move() == Color::White;
         let time_limit = params.calculate_move_time(is_white);
         let depth_limit = params.depth;
@@ -426,50 +359,6 @@ impl UciHandler {
         println!("Nodes: {}", total);
         println!("Time: {:?}", elapsed);
         println!("NPS: {}", nps);
-    }
-
-    /// Probe the opening book for a move in the current position
-    /// Returns UCI move string if found and legal, None otherwise
-    fn probe_book(&mut self) -> Option<String> {
-        // Check if book is enabled and loaded
-        if !self.options.own_book {
-            return None;
-        }
-
-        let book = self.book.as_mut()?;
-
-        // Use Polyglot-compatible hash (NOT the engine's internal Zobrist hash)
-        let key = polyglot_hash(&self.board);
-
-        // Select move based on configuration
-        let poly_move = if self.options.book_best_move {
-            book.select_move(key).ok()?
-        } else {
-            // Weighted random selection
-            let random: f64 = rand::random();
-            book.select_move_weighted(key, random).ok()?
-        }?;
-
-        // Convert Polyglot castling notation (e1h1 -> e1g1) to standard UCI
-        let uci_str = convert_polyglot_castling(&poly_move.to_uci());
-
-        // Validate the move is legal in the current position
-        // This handles edge cases where book hash collides or book is outdated
-        if self.parse_uci_move(&uci_str).is_some() {
-            if self.options.debug {
-                send_response(&UciResponse::Info(
-                    InfoResponse::new().with_string(format!("Book move: {}", uci_str)),
-                ));
-            }
-            Some(uci_str)
-        } else {
-            if self.options.debug {
-                send_response(&UciResponse::Info(InfoResponse::new().with_string(
-                    format!("Book move {} is illegal, searching...", uci_str),
-                )));
-            }
-            None
-        }
     }
 }
 
