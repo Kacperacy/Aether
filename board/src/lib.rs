@@ -4,6 +4,7 @@ mod error;
 mod fen;
 mod game_state;
 mod ops;
+mod polyglot;
 mod query;
 mod zobrist;
 
@@ -11,6 +12,7 @@ pub use builder::BoardBuilder;
 pub use error::{BoardError, FenError, MoveError};
 pub use fen::{FenOps, STARTING_POSITION_FEN};
 pub use ops::BoardOps;
+pub use polyglot::polyglot_hash;
 pub use query::BoardQuery;
 
 use aether_core::{BitBoard, Color, File, MoveState, Piece, Rank, Square, attackers_to_square};

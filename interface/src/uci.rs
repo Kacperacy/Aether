@@ -3,6 +3,8 @@
 //! This module handles communication between the chess engine and GUI applications
 //! following the UCI protocol specification.
 
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Write};
 use std::time::Duration;
 
@@ -399,17 +401,53 @@ pub struct OptionInfo {
     pub option_type: OptionType,
 }
 
-#[derive(Debug, Clone)]
-pub enum OptionType {
-    Check { default: bool },
-    Spin { default: i64, min: i64, max: i64 },
-    Combo { default: String, vars: Vec<String> },
-    Button,
-    String { default: String },
+impl Display for OptionInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "option name {} type ", self.name)?;
+        match &self.option_type {
+            OptionType::Check { default } => {
+                write!(f, "check default {}", default)
+            }
+            OptionType::Spin { default, min, max } => {
+                write!(f, "spin default {} min {} max {}", default, min, max)
+            }
+            OptionType::Combo { default, options } => {
+                write!(f, "combo default {}", default)?;
+                for opt in options {
+                    write!(f, " var {}", opt)?;
+                }
+                Ok(())
+            }
+            OptionType::Button => write!(f, "button"),
+            OptionType::String { default } => {
+                write!(f, "string default {}", default)
+            }
+        }
+    }
 }
 
-impl std::fmt::Display for UciResponse {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#[derive(Debug, Clone)]
+pub enum OptionType {
+    Check {
+        default: bool,
+    },
+    Spin {
+        default: i64,
+        min: i64,
+        max: i64,
+    },
+    Combo {
+        default: String,
+        options: Vec<String>,
+    },
+    Button,
+    String {
+        default: String,
+    },
+}
+
+impl Display for UciResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             UciResponse::IdName(name) => write!(f, "id name {}", name),
             UciResponse::IdAuthor(author) => write!(f, "id author {}", author),
@@ -468,26 +506,7 @@ impl std::fmt::Display for UciResponse {
                 Ok(())
             }
             UciResponse::Option(opt) => {
-                write!(f, "option name {} type ", opt.name)?;
-                match &opt.option_type {
-                    OptionType::Check { default } => {
-                        write!(f, "check default {}", default)
-                    }
-                    OptionType::Spin { default, min, max } => {
-                        write!(f, "spin default {} min {} max {}", default, min, max)
-                    }
-                    OptionType::Combo { default, vars } => {
-                        write!(f, "combo default {}", default)?;
-                        for v in vars {
-                            write!(f, " var {}", v)?;
-                        }
-                        Ok(())
-                    }
-                    OptionType::Button => write!(f, "button"),
-                    OptionType::String { default } => {
-                        write!(f, "string default {}", default)
-                    }
-                }
+                write!(f, "{}", opt)
             }
         }
     }

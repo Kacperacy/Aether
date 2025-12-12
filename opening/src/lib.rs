@@ -1,6 +1,28 @@
 use std::io;
-use std::io::{ErrorKind, Read, Seek};
+use std::io::{Cursor, ErrorKind, Read, Seek};
 use std::path::Path;
+
+const DEFAULT_BOOK: &[u8] = include_bytes!("books/Human.bin");
+
+trait ReadSeek: Read + Seek + Send {}
+impl<T: Read + Seek + Send> ReadSeek for T {}
+
+/// Convert Polyglot castling notation to standard UCI notation.
+///
+/// Polyglot encodes castling as king-to-rook moves:
+/// - e1h1 -> e1g1 (white kingside)
+/// - e1a1 -> e1c1 (white queenside)
+/// - e8h8 -> e8g8 (black kingside)
+/// - e8a8 -> e8c8 (black queenside)
+pub fn convert_polyglot_castling(uci: &str) -> String {
+    match uci {
+        "e1h1" => "e1g1".to_string(),
+        "e1a1" => "e1c1".to_string(),
+        "e8h8" => "e8g8".to_string(),
+        "e8a8" => "e8c8".to_string(),
+        _ => uci.to_string(),
+    }
+}
 
 /// A move in Polyglot format
 #[derive(Debug, Clone, Copy)]
@@ -59,23 +81,6 @@ pub struct PolyglotEntry {
 }
 
 impl PolyglotEntry {
-    /// Get the move from this entry
-    pub fn get_move(&self) -> PolyglotMove {
-        PolyglotMove::from_u16(self.mv)
-    }
-
-    /// Get the weight (probability) of this move
-    pub fn weight(&self) -> u16 {
-        self.weight
-    }
-}
-
-pub struct OpeningBook {
-    file: std::fs::File,
-    entry_count: usize,
-}
-
-impl PolyglotEntry {
     const SIZE: usize = 16;
 
     fn from_bytes(bytes: &[u8]) -> Self {
@@ -88,6 +93,21 @@ impl PolyglotEntry {
             learn: u32::from_be_bytes(bytes[12..16].try_into().unwrap()),
         }
     }
+
+    /// Get the move from this entry
+    pub fn get_move(&self) -> PolyglotMove {
+        PolyglotMove::from_u16(self.mv)
+    }
+
+    /// Get the weight (probability) of this move
+    pub fn weight(&self) -> u16 {
+        self.weight
+    }
+}
+
+pub struct OpeningBook {
+    reader: Box<dyn ReadSeek>,
+    entry_count: usize,
 }
 
 impl OpeningBook {
@@ -105,7 +125,27 @@ impl OpeningBook {
 
         let entry_count = file_size / PolyglotEntry::SIZE;
 
-        Ok(Self { file, entry_count })
+        Ok(Self {
+            reader: Box::new(file),
+            entry_count,
+        })
+    }
+
+    /// Creates an opening book from the embedded default book (Human.bin)
+    pub fn default_book() -> io::Result<Self> {
+        if DEFAULT_BOOK.len() % PolyglotEntry::SIZE != 0 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid embedded book size",
+            ));
+        }
+
+        let entry_count = DEFAULT_BOOK.len() / PolyglotEntry::SIZE;
+
+        Ok(Self {
+            reader: Box::new(Cursor::new(DEFAULT_BOOK)),
+            entry_count,
+        })
     }
 
     /// Returns the number of entries in the book
@@ -121,10 +161,10 @@ impl OpeningBook {
     /// Reads a polyglot entry at the specified index
     fn read_entry(&mut self, index: usize) -> io::Result<PolyglotEntry> {
         let offset = (index * PolyglotEntry::SIZE) as u64;
-        self.file.seek(io::SeekFrom::Start(offset))?;
+        self.reader.seek(io::SeekFrom::Start(offset))?;
 
         let mut buffer = [0u8; PolyglotEntry::SIZE];
-        self.file.read_exact(&mut buffer)?;
+        self.reader.read_exact(&mut buffer)?;
 
         Ok(PolyglotEntry::from_bytes(&buffer))
     }
@@ -258,5 +298,14 @@ mod tests {
         let mv_raw = 4 | (7 << 3) | (4 << 6) | (6 << 9) | (4 << 12);
         let mv = PolyglotMove::from_u16(mv_raw);
         assert_eq!(mv.to_uci(), "e7e8q");
+    }
+
+    #[test]
+    fn test_polyglot_castling_conversion() {
+        assert_eq!(convert_polyglot_castling("e1h1"), "e1g1");
+        assert_eq!(convert_polyglot_castling("e1a1"), "e1c1");
+        assert_eq!(convert_polyglot_castling("e8h8"), "e8g8");
+        assert_eq!(convert_polyglot_castling("e8a8"), "e8c8");
+        assert_eq!(convert_polyglot_castling("e2e4"), "e2e4"); // unchanged
     }
 }

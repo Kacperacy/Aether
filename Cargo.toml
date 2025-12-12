@@ -9,7 +9,6 @@ edition = "2024"
 aether-core = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
-engine = { workspace = true }
 interface = { workspace = true }
 
 [workspace]
@@ -27,7 +26,6 @@ members = [
 rand = "0.10.0-rc.5"
 rand_chacha = "0.10.0-rc.1"
 thiserror = "2.0.17"
-criterion = "0.7.0"
 
 # Workspace members as dependencies
 aether-core = { path = "./core" }
@@ -35,6 +33,7 @@ board = { path = "./board" }
 movegen = { path = "./movegen" }
 engine = { path = "./engine" }
 interface = { path = "./interface" }
+opening = { path = "./opening" }
 
 [dev-dependencies]
 
