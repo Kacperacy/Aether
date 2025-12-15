@@ -64,12 +64,6 @@ impl Board {
         &self.game_state
     }
 
-    /// Returns mutable reference to game state (for internal use)
-    #[inline]
-    pub(crate) fn game_state_mut(&mut self) -> &mut GameState {
-        &mut self.game_state
-    }
-
     /// Returns the Zobrist hash of the current position, if non-zero
     #[inline]
     pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
@@ -82,22 +76,10 @@ impl Board {
         self.zobrist_hash
     }
 
-    /// Sets the zobrist hash (for internal use)
-    #[inline]
-    pub(crate) fn set_zobrist_hash(&mut self, hash: u64) {
-        self.zobrist_hash = hash;
-    }
-
     /// Returns reference to move history
     #[inline]
     pub fn move_history(&self) -> &[MoveState] {
         &self.move_history
-    }
-
-    /// Returns mutable reference to move history (for internal use)
-    #[inline]
-    pub(crate) fn move_history_mut(&mut self) -> &mut Vec<MoveState> {
-        &mut self.move_history
     }
 
     /// Returns reference to the cache

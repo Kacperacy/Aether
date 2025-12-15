@@ -10,6 +10,8 @@ use aether_core::{Move, Score};
 use board::BoardQuery;
 use std::time::Duration;
 
+const MAX_PLY: usize = 128;
+
 /// Searcher for the best move in a given position.
 pub trait Searcher {
     /// Performs a search on the given board with the specified limits.

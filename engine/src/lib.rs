@@ -43,6 +43,7 @@ impl Engine {
     /// Clear transposition table (call on ucinewgame)
     pub fn new_game(&mut self) {
         self.searcher.clear_tt();
+        self.searcher.clear_move_ordering();
     }
 
     /// Resize transposition table

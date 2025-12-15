@@ -94,20 +94,6 @@ impl Board {
             }
         }
     }
-
-    /// Update zobrist hash for en passant change
-    pub(crate) fn zobrist_update_en_passant(
-        &mut self,
-        old_ep: Option<Square>,
-        new_ep: Option<Square>,
-    ) {
-        if let Some(old_sq) = old_ep {
-            self.zobrist_toggle_en_passant(old_sq.file());
-        }
-        if let Some(new_sq) = new_ep {
-            self.zobrist_toggle_en_passant(new_sq.file());
-        }
-    }
 }
 
 #[cfg(test)]
@@ -157,7 +143,6 @@ mod tests {
     fn test_zobrist_toggle_piece() {
         let mut board = Board::from_fen("k7/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
         let initial_hash = board.calculate_zobrist_hash();
-        board.set_zobrist_hash(initial_hash);
 
         // Toggle piece twice should return to original hash
         board.zobrist_toggle_piece(Square::E1, Piece::King, Color::White);

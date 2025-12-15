@@ -1,5 +1,5 @@
 use crate::eval::Evaluator;
-use aether_core::{ALL_COLORS, ALL_PIECES, ALL_SQUARES, Color, Piece, Square};
+use aether_core::{ALL_SQUARES, Color, Piece, Square};
 use board::BoardQuery;
 
 /// Piece-square tables for positional evaluation

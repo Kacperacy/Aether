@@ -12,6 +12,10 @@ pub trait BoardOps: BoardQuery + Clone {
 
     /// Unmake a move on the board, restoring the previous position.
     fn unmake_move(&mut self, mv: &Move) -> Result<()>;
+    ///  Make a null move (pass the turn without moving any piece).
+    fn make_null_move(&mut self);
+    /// Unmake a null move.
+    fn unmake_null_move(&mut self);
 
     /// Is the position in check for the given color?
     fn is_in_check(&self, color: Color) -> bool;
@@ -145,6 +149,36 @@ impl BoardOps for Board {
         self.cache.refresh(&self.pieces);
 
         Ok(())
+    }
+
+    fn make_null_move(&mut self) {
+        let state = MoveState {
+            captured_piece: None,
+            mv_from: Square::A1, // Dummy values
+            mv_to: Square::A1,   // Dummy values
+            promotion: None,
+            old_zobrist_hash: self.zobrist_hash,
+            old_en_passant: self.game_state.en_passant_square,
+            old_castling_rights: self.game_state.castling_rights,
+            old_halfmove_clock: self.game_state.halfmove_clock,
+        };
+        self.move_history.push(state);
+
+        if let Some(ep_sq) = self.game_state.en_passant_square {
+            self.zobrist_toggle_en_passant(ep_sq.file());
+            self.game_state.en_passant_square = None;
+        }
+
+        self.game_state.switch_side();
+        self.zobrist_toggle_side();
+    }
+
+    fn unmake_null_move(&mut self) {
+        if let Some(state) = self.move_history.pop() {
+            self.game_state.side_to_move = self.game_state.side_to_move.opponent();
+            self.game_state.en_passant_square = state.old_en_passant;
+            self.zobrist_hash = state.old_zobrist_hash;
+        }
     }
 
     fn is_in_check(&self, color: Color) -> bool {

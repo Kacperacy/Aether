@@ -1,10 +1,72 @@
-use aether_core::Move;
+use crate::search::MAX_PLY;
+use aether_core::{Move, Piece, Square};
 
-pub struct MoveOrderer;
+pub struct MoveOrderer {
+    killers: [[Option<Move>; 2]; MAX_PLY],
+    history: [[i32; 64]; 6],
+}
 
 impl MoveOrderer {
     pub fn new() -> Self {
-        Self
+        Self {
+            killers: [[None; 2]; MAX_PLY],
+            history: [[0; 64]; 6],
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.killers = [[None; 2]; MAX_PLY];
+        self.history = [[0; 64]; 6];
+    }
+
+    pub fn update_history(&mut self, mv: Move, depth: usize) {
+        if mv.capture.is_some() {
+            return;
+        }
+
+        let bonus = depth as i32 * depth as i32;
+        let idx = mv.to.to_index() as usize;
+        self.history[mv.piece as usize][idx] += bonus;
+
+        if self.history[mv.piece as usize][idx] > 8_000 {
+            self.age_history();
+        }
+    }
+
+    fn age_history(&mut self) {
+        for piece in 0..Piece::NUM {
+            for sq in 0..Square::NUM {
+                self.history[piece][sq] /= 2;
+            }
+        }
+    }
+
+    fn history_score(&self, mv: &Move) -> i32 {
+        if mv.capture.is_some() {
+            return 0;
+        }
+
+        let idx = mv.to.to_index() as usize;
+        self.history[mv.piece as usize][idx]
+    }
+
+    pub fn store_killer(&mut self, mv: Move, ply: usize) {
+        if ply >= MAX_PLY || mv.capture.is_some() {
+            return;
+        }
+
+        if self.killers[ply][0] != Some(mv) {
+            self.killers[ply][1] = self.killers[ply][0];
+            self.killers[ply][0] = Some(mv);
+        }
+    }
+
+    pub fn is_killer(&self, mv: &Move, ply: usize) -> bool {
+        if ply >= MAX_PLY {
+            return false;
+        }
+
+        self.killers[ply][0] == Some(*mv) || self.killers[ply][1] == Some(*mv)
     }
 
     pub fn order_moves(&self, moves: &mut [Move]) {
@@ -15,13 +77,20 @@ impl MoveOrderer {
         });
     }
 
+    pub fn order_moves_full(&self, moves: &mut [Move], tt_move: Option<Move>, ply: usize) {
+        moves.sort_by(|a, b| {
+            let a_score = self.move_score_full(a, tt_move, ply);
+            let b_score = self.move_score_full(b, tt_move, ply);
+            b_score.cmp(&a_score)
+        });
+    }
+
     fn move_score(&self, mv: &Move) -> i32 {
         let mut score = 0;
 
         // Captures: MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
         if let Some(captured) = mv.capture {
-            score += 10 * captured.value() as i32;
-            score -= mv.piece.value() as i32;
+            score += 10 * captured.value() as i32 - mv.piece.value() as i32;
         }
 
         // Promotions
@@ -36,6 +105,29 @@ impl MoveOrderer {
         // - PV moves
 
         score
+    }
+
+    fn move_score_full(&self, mv: &Move, tt_move: Option<Move>, ply: usize) -> i32 {
+        // Highest priority for TT move
+        if Some(*mv) == tt_move {
+            return 20_000;
+        }
+
+        // Captures: MVV-LVA
+        if let Some(captured) = mv.capture {
+            return 10_000 + 10 * captured.value() as i32 - mv.piece.value() as i32;
+        }
+
+        // Promotions
+        if let Some(promo) = mv.promotion {
+            return 9_000 + promo.value() as i32;
+        }
+
+        if self.is_killer(mv, ply) {
+            return 8_000;
+        }
+
+        self.history_score(mv)
     }
 
     pub fn order_moves_with_tt(&self, moves: &mut [Move], tt_move: Option<Move>) {

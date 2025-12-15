@@ -14,7 +14,6 @@ use crate::error::FenError;
 use crate::error::FenError::{
     InvalidEmptySquareCount, InvalidPieceCharacter, InvalidRankSquares, TooManySquaresInRank,
 };
-use crate::query::BoardQuery;
 use crate::{Board, BoardBuilder, Result};
 use aether_core::{CastlingRights, Color, File, Piece, Rank, Square};
 use std::str::FromStr;
@@ -435,6 +434,7 @@ impl FenOps for Board {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BoardQuery;
 
     #[test]
     fn test_parse_starting_position() {

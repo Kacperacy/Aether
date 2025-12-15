@@ -130,23 +130,6 @@ impl UciHandler {
             },
         }));
 
-        send_response(&UciResponse::Option(OptionInfo {
-            name: "OwnBook".to_string(),
-            option_type: OptionType::Check { default: false },
-        }));
-
-        send_response(&UciResponse::Option(OptionInfo {
-            name: "BookFile".to_string(),
-            option_type: OptionType::String {
-                default: String::new(),
-            },
-        }));
-
-        send_response(&UciResponse::Option(OptionInfo {
-            name: "BookBestMove".to_string(),
-            option_type: OptionType::Check { default: true },
-        }));
-
         send_response(&UciResponse::UciOk);
     }
 

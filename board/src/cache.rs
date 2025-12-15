@@ -1,4 +1,4 @@
-use aether_core::{ALL_COLORS, BitBoard, Color, Piece, Square};
+use aether_core::{ALL_COLORS, BitBoard, Color, Square};
 
 /// Cached aggregate bitboards for fast access during move generation and evaluation
 #[derive(Debug, Clone, PartialEq)]
@@ -93,7 +93,6 @@ impl Default for BoardCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aether_core::{File, Rank};
 
     #[test]
     fn test_cache_new() {

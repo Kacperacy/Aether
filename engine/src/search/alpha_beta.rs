@@ -1,9 +1,9 @@
 use crate::eval::Evaluator;
 use crate::search::move_ordering::MoveOrderer;
 use crate::search::{
-    NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry, TranspositionTable,
+    MAX_PLY, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry, TranspositionTable,
 };
-use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, QUEEN_VALUE, Score, mated_in};
+use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, QUEEN_VALUE, Score, mated_in};
 use board::{BoardOps, BoardQuery};
 use movegen::{Generator, MoveGen};
 use std::mem;
@@ -11,9 +11,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-const MAX_PLY: usize = 128;
 const NODE_CHECK_INTERVAL: u64 = 4096;
 const DELTA_PRUNING_MARGIN: Score = 200;
+const NULL_MOVE_REDUCTION: u8 = 3;
+const NULL_MOVE_MIN_DEPTH: u8 = 3;
+const LMR_FULL_DEPTH_MOVES: usize = 4;
+const LMR_MIN_DEPTH: u8 = 3;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -57,6 +60,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
     pub fn clear_tt(&mut self) {
         self.tt.clear();
+    }
+
+    pub fn clear_move_ordering(&mut self) {
+        self.move_orderer.clear();
     }
 
     pub fn resize_tt(&mut self, size_mb: usize) {
@@ -238,23 +245,51 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return self.quiescence(board, ply, alpha, beta);
         }
 
+        let in_check = board.is_in_check(board.side_to_move());
+
+        // Null move pruning
+        if !is_pv_node
+            && !in_check
+            && depth >= NULL_MOVE_MIN_DEPTH
+            && self.has_non_pawn_material(board)
+        {
+            board.make_null_move();
+
+            let null_score = -self.alpha_beta(
+                board,
+                depth.saturating_sub(NULL_MOVE_REDUCTION + 1),
+                ply + 1,
+                -beta,
+                -beta + 1,
+                &mut Vec::new(),
+                false,
+            );
+
+            board.unmake_null_move();
+
+            if null_score >= beta {
+                return beta;
+            }
+        }
+
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);
 
         if moves.is_empty() {
             return if board.is_in_check(board.side_to_move()) {
-                return mated_in(ply as u32);
+                mated_in(ply as u32)
             } else {
                 0 // Stalemate
             };
         }
 
-        self.move_orderer.order_moves_with_tt(&mut moves, tt_move);
+        self.move_orderer.order_moves_full(&mut moves, tt_move, ply);
 
         let mut best_score = NEG_MATE_SCORE;
         let mut best_move: Option<Move> = None;
         let mut local_pv: Vec<Move> = Vec::new();
         let mut node_type = NodeType::UpperBound;
+        let mut moves_searched = 0;
 
         for mv in moves {
             board
@@ -262,19 +297,56 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 .expect("make_move failed in alpha_beta");
 
             let mut child_pv: Vec<Move> = Vec::new();
-            let score = -self.alpha_beta(
-                board,
-                depth - 1,
-                ply + 1,
-                -beta,
-                -alpha,
-                &mut child_pv,
-                is_pv_node,
-            );
+            let mut score;
+
+            let gives_check = board.is_in_check(board.side_to_move());
+
+            let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
+                && depth >= LMR_MIN_DEPTH
+                && mv.capture.is_none()
+                && mv.promotion.is_none()
+                && !in_check
+                && !gives_check;
+
+            if can_reduce {
+                let reduction = 1 + (moves_searched as u8 / 6);
+                score = -self.alpha_beta(
+                    board,
+                    depth.saturating_sub(reduction + 1),
+                    ply + 1,
+                    -alpha - 1,
+                    -alpha,
+                    &mut Vec::new(),
+                    false,
+                );
+
+                if score > alpha {
+                    score = -self.alpha_beta(
+                        board,
+                        depth - 1,
+                        ply + 1,
+                        -beta,
+                        -alpha,
+                        &mut child_pv,
+                        is_pv_node,
+                    )
+                }
+            } else {
+                score = -self.alpha_beta(
+                    board,
+                    depth - 1,
+                    ply + 1,
+                    -beta,
+                    -alpha,
+                    &mut child_pv,
+                    is_pv_node,
+                );
+            }
 
             board
                 .unmake_move(&mv)
                 .expect("unmake_move failed in alpha_beta");
+            moves_searched += 1;
 
             if score > best_score {
                 best_score = score;
@@ -286,6 +358,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
 
             if score >= beta {
+                if mv.capture.is_none() && mv.promotion.is_none() {
+                    self.move_orderer.store_killer(mv, ply);
+                    self.move_orderer.update_history(mv, depth as usize);
+                }
+
                 node_type = NodeType::LowerBound;
 
                 let tt_score = TTEntry::score_to_tt(beta, ply);
@@ -420,6 +497,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
 
         false
+    }
+
+    fn has_non_pawn_material<T: BoardQuery>(&self, board: &T) -> bool {
+        let side = board.side_to_move();
+        board.piece_count(Piece::Knight, side) > 0
+            || board.piece_count(Piece::Bishop, side) > 0
+            || board.piece_count(Piece::Rook, side) > 0
+            || board.piece_count(Piece::Queen, side) > 0
     }
 }
 
