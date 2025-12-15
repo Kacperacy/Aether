@@ -26,6 +26,9 @@ pub enum BoardError {
 
     #[error("FEN parsing error: {0}")]
     FenParsingError(#[from] FenError),
+
+    #[error("Invalid castling destination square {square:?} for {color:?}")]
+    InvalidCastlingDestination { square: Square, color: Color },
 }
 
 #[derive(Debug, Error)]

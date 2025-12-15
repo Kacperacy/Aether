@@ -2,6 +2,8 @@
 
 use aether_core::{Move, Score};
 
+const MATE_THRESHOLD: Score = 90000;
+
 /// Type of node stored in the transposition table
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
@@ -52,9 +54,9 @@ impl TTEntry {
 
     /// Adjust mate scores based on ply (for correct mate distance)
     pub fn score_to_tt(score: Score, ply: usize) -> Score {
-        if score > 90000 {
+        if score > MATE_THRESHOLD {
             score + ply as Score
-        } else if score < -90000 {
+        } else if score < -MATE_THRESHOLD {
             score - ply as Score
         } else {
             score
@@ -63,9 +65,9 @@ impl TTEntry {
 
     /// Adjust mate scores when retrieving from TT
     pub fn score_from_tt(score: Score, ply: usize) -> Score {
-        if score > 90000 {
+        if score > MATE_THRESHOLD {
             score - ply as Score
-        } else if score < -90000 {
+        } else if score < -MATE_THRESHOLD {
             score + ply as Score
         } else {
             score

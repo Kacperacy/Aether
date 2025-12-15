@@ -1,6 +1,6 @@
 use crate::error::MoveError;
 use crate::query::BoardQuery;
-use crate::{Board, Result};
+use crate::{Board, BoardError, Result};
 use aether_core::{
     ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square,
 };
@@ -63,7 +63,7 @@ impl BoardOps for Board {
 
         // 6. Handle castling rook movement
         if mv.flags.is_castle {
-            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side);
+            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
             self.remove_piece_internal(rook_from);
             self.place_piece_internal(rook_to, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_from, Piece::Rook, side);
@@ -113,7 +113,6 @@ impl BoardOps for Board {
         let side = self.game_state.side_to_move;
 
         // Remove piece from destination
-        let final_piece = mv.promotion.unwrap_or(mv.piece);
         self.remove_piece_internal(mv.to);
 
         // Place original piece at source
@@ -131,7 +130,7 @@ impl BoardOps for Board {
 
         // Unmake castling rook movement
         if mv.flags.is_castle {
-            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side);
+            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
             self.remove_piece_internal(rook_to);
             self.place_piece_internal(rook_from, Piece::Rook, side);
         }
@@ -185,13 +184,16 @@ impl Board {
 
     /// Get the source and destination squares for the castling rook.
     #[inline]
-    fn get_castling_rook_squares(king_to: Square, side: Color) -> (Square, Square) {
+    fn get_castling_rook_squares(king_to: Square, side: Color) -> Result<(Square, Square)> {
         match (side, king_to) {
-            (Color::White, Square::G1) => (Square::H1, Square::F1),
-            (Color::White, Square::C1) => (Square::A1, Square::D1),
-            (Color::Black, Square::G8) => (Square::H8, Square::F8),
-            (Color::Black, Square::C8) => (Square::A8, Square::D8),
-            _ => panic!("Invalid castling destination: {:?} for {:?}", king_to, side),
+            (Color::White, Square::G1) => Ok((Square::H1, Square::F1)),
+            (Color::White, Square::C1) => Ok((Square::A1, Square::D1)),
+            (Color::Black, Square::G8) => Ok((Square::H8, Square::F8)),
+            (Color::Black, Square::C8) => Ok((Square::A8, Square::D8)),
+            _ => Err(BoardError::InvalidCastlingDestination {
+                square: king_to,
+                color: side,
+            }),
         }
     }
 
@@ -305,9 +307,8 @@ mod tests {
         let mut board = Board::from_fen(STARTING_POSITION_FEN).unwrap();
         let original_fen = board.to_fen();
 
-        let mv = Move::new(Square::E2, Square::E4)
-            .with_piece(Piece::Pawn)
-            .with_flags(aether_core::MoveFlags {
+        let mv =
+            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
                 is_double_pawn_push: true,
                 ..Default::default()
             });
@@ -332,9 +333,7 @@ mod tests {
                 .unwrap();
         let original_fen = board.to_fen();
 
-        let mv = Move::new(Square::E4, Square::D5)
-            .with_piece(Piece::Pawn)
-            .with_capture(Piece::Pawn);
+        let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
 
         board.make_move(&mv).unwrap();
         board.unmake_move(&mv).unwrap();
@@ -348,9 +347,8 @@ mod tests {
             Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
         let original_fen = board.to_fen();
 
-        let mv = Move::new(Square::E1, Square::G1)
-            .with_piece(Piece::King)
-            .with_flags(aether_core::MoveFlags {
+        let mv =
+            Move::new(Square::E1, Square::G1, Piece::King).with_flags(aether_core::MoveFlags {
                 is_castle: true,
                 ..Default::default()
             });
@@ -375,8 +373,7 @@ mod tests {
                 .unwrap();
         let original_fen = board.to_fen();
 
-        let mv = Move::new(Square::D5, Square::E6)
-            .with_piece(Piece::Pawn)
+        let mv = Move::new(Square::D5, Square::E6, Piece::Pawn)
             .with_capture(Piece::Pawn)
             .with_flags(aether_core::MoveFlags {
                 is_en_passant: true,
@@ -400,9 +397,7 @@ mod tests {
         let mut board = Board::from_fen("8/P7/8/8/8/8/8/4K2k w - - 0 1").unwrap();
         let original_fen = board.to_fen();
 
-        let mv = Move::new(Square::A7, Square::A8)
-            .with_piece(Piece::Pawn)
-            .with_promotion(Piece::Queen);
+        let mv = Move::new(Square::A7, Square::A8, Piece::Pawn).with_promotion(Piece::Queen);
 
         board.make_move(&mv).unwrap();
 
@@ -420,9 +415,8 @@ mod tests {
         let mut board =
             Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 3").unwrap();
 
-        let mv = Move::new(Square::E2, Square::E4)
-            .with_piece(Piece::Pawn)
-            .with_flags(aether_core::MoveFlags {
+        let mv =
+            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
                 is_double_pawn_push: true,
                 ..Default::default()
             });
@@ -438,9 +432,7 @@ mod tests {
             Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 5 2")
                 .unwrap();
 
-        let mv = Move::new(Square::E4, Square::D5)
-            .with_piece(Piece::Pawn)
-            .with_capture(Piece::Pawn);
+        let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
 
         board.make_move(&mv).unwrap();
 
@@ -452,7 +444,7 @@ mod tests {
         let mut board =
             Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
 
-        let mv = Move::new(Square::G1, Square::F3).with_piece(Piece::Knight);
+        let mv = Move::new(Square::G1, Square::F3, Piece::Knight);
 
         board.make_move(&mv).unwrap();
 
@@ -464,7 +456,7 @@ mod tests {
         let mut board =
             Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
 
-        let mv = Move::new(Square::E1, Square::F1).with_piece(Piece::King);
+        let mv = Move::new(Square::E1, Square::F1, Piece::King);
 
         board.make_move(&mv).unwrap();
 
@@ -480,7 +472,7 @@ mod tests {
         let mut board =
             Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
 
-        let mv = Move::new(Square::H1, Square::G1).with_piece(Piece::Rook);
+        let mv = Move::new(Square::H1, Square::G1, Piece::Rook);
 
         board.make_move(&mv).unwrap();
 
@@ -493,9 +485,7 @@ mod tests {
         let mut board =
             Board::from_fen("r3k2r/pppppppp/8/8/8/7B/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
 
-        let mv = Move::new(Square::H3, Square::H8)
-            .with_piece(Piece::Bishop)
-            .with_capture(Piece::Rook);
+        let mv = Move::new(Square::H3, Square::H8, Piece::Bishop).with_capture(Piece::Rook);
 
         board.make_move(&mv).unwrap();
 

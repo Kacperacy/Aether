@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_core::{ALL_PIECES, Color, Piece, Square};
+use aether_core::{ALL_PIECES, BitBoard, Color, Piece, Square};
 
 pub trait BoardQuery {
     /// Piece and color at square, if any.
@@ -12,6 +12,8 @@ pub trait BoardQuery {
     fn piece_count(&self, piece: Piece, color: Color) -> u32;
     /// King square for `color`, if present.
     fn get_king_square(&self, color: Color) -> Option<Square>;
+    /// BitBoard of all squares occupied by `color`.
+    fn occupied_by(&self, color: Color) -> BitBoard;
     /// Whether side can castle short (right exists); path safety is validated by consumers.
     fn can_castle_short(&self, color: Color) -> bool;
     /// Whether side can castle long (right exists); path safety is validated by consumers.
@@ -69,6 +71,10 @@ impl BoardQuery for Board {
 
     fn get_king_square(&self, color: Color) -> Option<Square> {
         self.pieces[color as usize][Piece::King as usize].to_square()
+    }
+
+    fn occupied_by(&self, color: Color) -> BitBoard {
+        self.cache.color_combined[color as usize]
     }
 
     fn can_castle_short(&self, color: Color) -> bool {
@@ -138,24 +144,7 @@ impl BoardQuery for Board {
 
         // K+B vs K+B on same color squares
         if white_bishops == 1 && black_bishops == 1 && white_knights == 0 && black_knights == 0 {
-            // Get bishop squares
-            let white_bishop_bb = &self.pieces[Color::White as usize][Piece::Bishop as usize];
-            let black_bishop_bb = &self.pieces[Color::Black as usize][Piece::Bishop as usize];
-
-            if let Some(white_sq) = white_bishop_bb.to_square() {
-                if let Some(black_sq) = black_bishop_bb.to_square() {
-                    // Check if both bishops are on same color squares
-                    // A square is light if (file + rank) is even
-                    let white_is_light =
-                        (white_sq.file() as usize + white_sq.rank() as usize) % 2 == 0;
-                    let black_is_light =
-                        (black_sq.file() as usize + black_sq.rank() as usize) % 2 == 0;
-
-                    if white_is_light == black_is_light {
-                        return true; // Same color bishops = draw
-                    }
-                }
-            }
+            return self.are_bishops_on_same_color();
         }
 
         // All other cases have sufficient material
@@ -182,5 +171,26 @@ impl BoardQuery for Board {
         self.is_fifty_move_draw()
             || self.is_threefold_repetition()
             || self.is_insufficient_material()
+    }
+}
+
+impl Board {
+    fn are_bishops_on_same_color(&self) -> bool {
+        // Get bishop squares
+        let white_bishop_bb = &self.pieces[Color::White as usize][Piece::Bishop as usize];
+        let black_bishop_bb = &self.pieces[Color::Black as usize][Piece::Bishop as usize];
+
+        let Some(white_sq) = white_bishop_bb.to_square() else {
+            return false; // Should not happen
+        };
+
+        let Some(black_sq) = black_bishop_bb.to_square() else {
+            return false; // Should not happen
+        };
+
+        let white_is_light = (white_sq.file() as usize + white_sq.rank() as usize) % 2 == 0;
+        let black_is_light = (black_sq.file() as usize + black_sq.rank() as usize) % 2 == 0;
+
+        white_is_light == black_is_light
     }
 }

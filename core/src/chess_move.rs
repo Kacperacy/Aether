@@ -55,11 +55,11 @@ impl Display for Move {
 
 impl Move {
     /// Creates a new Move from the given origin and destination squares.
-    pub fn new(from: Square, to: Square) -> Self {
+    pub fn new(from: Square, to: Square, piece: Piece) -> Self {
         Move {
             from,
             to,
-            piece: Piece::Pawn, // This should be properly determined
+            piece,
             capture: None,
             promotion: None,
             flags: MoveFlags {
@@ -71,31 +71,32 @@ impl Move {
     }
 
     /// Sets the promotion piece for the move.
-    pub fn with_promotion(mut self, piece: Piece) -> Self {
+    pub const fn with_promotion(mut self, piece: Piece) -> Self {
         self.promotion = Some(piece);
         self
     }
 
     /// Sets the moving piece for the move.
-    pub fn with_piece(mut self, piece: Piece) -> Self {
+    pub const fn with_piece(mut self, piece: Piece) -> Self {
         self.piece = piece;
         self
     }
 
     /// Sets the captured piece for the move.
-    pub fn with_capture(mut self, piece: Piece) -> Self {
+    pub const fn with_capture(mut self, piece: Piece) -> Self {
         self.capture = Some(piece);
         self
     }
 
     /// Sets the move flags for the move.
-    pub fn with_flags(mut self, flags: MoveFlags) -> Self {
+    pub const fn with_flags(mut self, flags: MoveFlags) -> Self {
         self.flags = flags;
         self
     }
 
     /// Returns true if the move is a capture.
-    pub fn is_capture(&self) -> bool {
+    #[inline]
+    pub const fn is_capture(&self) -> bool {
         self.capture.is_some()
     }
 }

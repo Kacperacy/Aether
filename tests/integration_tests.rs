@@ -122,12 +122,10 @@ fn test_halfmove_clock() {
     // e2e4 (pawn move - reset clock)
     let e2 = Square::new(File::E, Rank::Two);
     let e4 = Square::new(File::E, Rank::Four);
-    let mv = Move::new(e2, e4)
-        .with_piece(aether_core::Piece::Pawn)
-        .with_flags(aether_core::MoveFlags {
-            is_double_pawn_push: true,
-            ..Default::default()
-        });
+    let mv = Move::new(e2, e4, aether_core::Piece::Pawn).with_flags(aether_core::MoveFlags {
+        is_double_pawn_push: true,
+        ..Default::default()
+    });
 
     board.make_move(&mv).unwrap();
     assert_eq!(

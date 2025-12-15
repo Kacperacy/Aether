@@ -20,11 +20,9 @@ impl Display for Color {
 impl Not for Color {
     type Output = Self;
 
-    fn not(self) -> Self {
-        match self {
-            Self::White => Self::Black,
-            Self::Black => Self::White,
-        }
+    #[inline]
+    fn not(self) -> Self::Output {
+        self.opponent()
     }
 }
 
@@ -50,6 +48,7 @@ impl Color {
     }
 
     /// Returns the opponent color
+    #[inline]
     pub const fn opponent(self) -> Self {
         match self {
             Self::White => Self::Black,

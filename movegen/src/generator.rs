@@ -1,6 +1,6 @@
 use crate::MoveGen;
 use aether_core::{
-    ALL_SQUARES, BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
+    BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
     is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves,
     queen_attacks, rook_attacks,
 };
@@ -18,21 +18,9 @@ impl Generator {
     /// Build occupancy bitboards for move generation
     #[inline]
     fn occupancies<T: BoardQuery>(&self, board: &T, side: Color) -> (BitBoard, BitBoard, BitBoard) {
-        let mut all = BitBoard::EMPTY;
-        let mut own = BitBoard::EMPTY;
-        let mut opp = BitBoard::EMPTY;
-
-        for sq in ALL_SQUARES {
-            if let Some((_, color)) = board.piece_at(sq) {
-                let bb = BitBoard::from_square(sq);
-                all |= bb;
-                if color == side {
-                    own |= bb;
-                } else {
-                    opp |= bb;
-                }
-            }
-        }
+        let own = board.occupied_by(side);
+        let opp = board.occupied_by(side.opponent());
+        let all = own | opp;
 
         (all, own, opp)
     }
@@ -48,7 +36,7 @@ impl Generator {
         flags: MoveFlags,
         promotion: Option<Piece>,
     ) {
-        let mut mv = Move::new(from, to).with_piece(piece).with_flags(flags);
+        let mut mv = Move::new(from, to, piece).with_flags(flags);
 
         if let Some(cap) = capture {
             mv = mv.with_capture(cap);
@@ -276,15 +264,13 @@ impl Generator {
 impl<T: BoardQuery> MoveGen<T> for Generator {
     fn pseudo_legal(&self, board: &T, moves: &mut Vec<Move>) {
         moves.clear();
+        moves.reserve(256);
+
         let side = board.side_to_move();
         let (occupied, own, opponent) = self.occupancies(board, side);
 
-        for sq in ALL_SQUARES {
-            if let Some((piece, color)) = board.piece_at(sq) {
-                if color != side {
-                    continue;
-                }
-
+        for sq in own {
+            if let Some((piece, _)) = board.piece_at(sq) {
                 match piece {
                     Piece::Pawn => self.gen_pawn_moves(board, sq, side, occupied, opponent, moves),
                     Piece::Knight => self.gen_knight_moves(board, sq, occupied, own, moves),
@@ -328,18 +314,22 @@ impl PieceMap {
     fn from_board<T: BoardQuery>(board: &T) -> Self {
         let mut pieces = [[BitBoard::EMPTY; 6]; 2];
 
-        for sq in ALL_SQUARES {
-            if let Some((piece, color)) = board.piece_at(sq) {
-                pieces[color as usize][piece as usize] |= BitBoard::from_square(sq);
+        // Get occupancy BitBoards directly from board - avoids fold() computation
+        let white_occ = board.occupied_by(Color::White);
+        let black_occ = board.occupied_by(Color::Black);
+
+        // Iterate only over occupied squares (~32) instead of all 64
+        for sq in white_occ {
+            if let Some((piece, _)) = board.piece_at(sq) {
+                pieces[Color::White as usize][piece as usize] |= BitBoard::from_square(sq);
             }
         }
 
-        let white_occ = pieces[Color::White as usize]
-            .iter()
-            .fold(BitBoard::EMPTY, |a, b| a | *b);
-        let black_occ = pieces[Color::Black as usize]
-            .iter()
-            .fold(BitBoard::EMPTY, |a, b| a | *b);
+        for sq in black_occ {
+            if let Some((piece, _)) = board.piece_at(sq) {
+                pieces[Color::Black as usize][piece as usize] |= BitBoard::from_square(sq);
+            }
+        }
 
         Self {
             pieces,
@@ -420,6 +410,7 @@ fn is_move_legal(map: &PieceMap, side: Color, mv: &Move) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use board::Board;
 
     // Note: Proper tests would require a BoardQuery implementation
     // These are structural tests only
@@ -427,13 +418,42 @@ mod tests {
     #[test]
     fn test_generator_creation() {
         let gen1 = Generator::new();
-        let _gen2 = Generator::default();
-        assert!(true); // Just verify it compiles
+        let gen2 = Generator::default();
+
+        // Verify both generators are functional
+        let board = Board::starting_position().unwrap();
+        let mut moves1 = Vec::new();
+        let mut moves2 = Vec::new();
+
+        gen1.legal(&board, &mut moves1);
+        gen2.legal(&board, &mut moves2);
+
+        assert_eq!(
+            moves1.len(),
+            20,
+            "Starting position should have 20 legal moves"
+        );
+        assert_eq!(
+            moves2.len(),
+            20,
+            "Default generator should also produce 20 moves"
+        );
+        assert_eq!(
+            moves1, moves2,
+            "Both generators should produce identical moves"
+        );
     }
 
     #[test]
     fn test_piece_map_occupancy() {
-        // Would need a mock board to properly test
-        assert!(true);
+        let board = Board::starting_position().unwrap();
+        let map = PieceMap::from_board(&board);
+
+        // White should have 16 pieces
+        assert_eq!(map.color_occ[Color::White as usize].len(), 16);
+        // Black should have 16 pieces
+        assert_eq!(map.color_occ[Color::Black as usize].len(), 16);
+        // Total 32 pieces
+        assert_eq!(map.all_occ.len(), 32);
     }
 }

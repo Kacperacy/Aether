@@ -78,33 +78,23 @@ impl Square {
 
     /// Create a Square from an index (0-63)
     pub const fn from_index(index: i8) -> Self {
+        debug_assert!(index >= 0 && index < 64, "Square index out of range");
         let file = File::from_index(index % 8);
         let rank = Rank::from_index(index / 8);
         Self::new(file, rank)
     }
 
+    pub const fn try_from_index(index: i8) -> Option<Self> {
+        if index < 0 || index >= 64 {
+            None
+        } else {
+            Some(Self::from_index(index))
+        }
+    }
+
     /// Convert the Square to an index (0-63)
     pub const fn to_index(self) -> u8 {
         (self as u8) % 64
-    }
-
-    /// Create a Square from algebraic notation (e.g., "e4")
-    pub fn from_algebraic(algebraic: &str) -> Result<Square> {
-        if algebraic.len() != 2 {
-            return Err(TypeError::InvalidSquare {
-                square: algebraic.to_string(),
-            });
-        }
-
-        let file = File::from_str(&algebraic[0..1])?;
-        let rank = Rank::from_str(&algebraic[1..2])?;
-
-        Ok(Self::new(file, rank))
-    }
-
-    /// Convert the Square to algebraic notation (e.g., "e4")
-    pub fn to_algebraic(self) -> String {
-        format!("{}{}", self.file().as_char(), self.rank() as i8)
     }
 
     /// Get the File of the Square

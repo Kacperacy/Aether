@@ -1,4 +1,4 @@
-use crate::{File, Rank, Square};
+use crate::Square;
 use std::fmt;
 use std::fmt::Display;
 use std::ops::*;
@@ -89,23 +89,6 @@ impl SubAssign for BitBoard {
 }
 
 impl BitBoard {
-    pub fn print(&self) {
-        println!("  +-----------------+");
-        for rank in (0..8).rev() {
-            print!("{} | ", rank + 1);
-            for file in 0..8 {
-                let square = Square::new(File::from_index(file), Rank::from_index(rank));
-                if self.has(square) {
-                    print!("X ");
-                } else {
-                    print!(". ");
-                }
-            }
-            println!("|");
-        }
-        println!("  +-----------------+");
-        println!("    a b c d e f g h");
-    }
     pub const EMPTY: Self = Self(0);
 
     pub const FULL: Self = Self(!0);

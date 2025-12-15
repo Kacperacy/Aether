@@ -6,12 +6,14 @@ use crate::search::{
 use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, QUEEN_VALUE, Score, mated_in};
 use board::{BoardOps, BoardQuery};
 use movegen::{Generator, MoveGen};
+use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 const MAX_PLY: usize = 128;
 const NODE_CHECK_INTERVAL: u64 = 4096;
+const DELTA_PRUNING_MARGIN: Score = 200;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -19,7 +21,6 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     tt: TranspositionTable,
     move_orderer: MoveOrderer,
     info: SearchInfo,
-    // pv_table: Vec<Vec<Move>>,
     stop_flag: Arc<AtomicBool>,
     start_time: Option<Instant>,
     soft_limit: Option<Duration>,
@@ -47,7 +48,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     }
 
     pub fn stop(&mut self) {
-        self.stop_flag.store(true, Ordering::SeqCst);
+        self.stop_flag.store(true, Ordering::Release);
     }
 
     pub fn get_info(&self) -> &SearchInfo {
@@ -72,7 +73,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         limits: &SearchLimits,
         mut on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
-        self.stop_flag.store(false, Ordering::SeqCst);
+        self.stop_flag.store(false, Ordering::Release);
         self.info = SearchInfo::new();
         self.start_time = Some(Instant::now());
         self.soft_limit = limits.time;
@@ -118,7 +119,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 }
             }
 
-            if self.stop_flag.load(Ordering::SeqCst) {
+            if self.stop_flag.load(Ordering::Acquire) {
                 break;
             }
 
@@ -135,7 +136,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 true,
             );
 
-            if self.stop_flag.load(Ordering::SeqCst) {
+            if self.stop_flag.load(Ordering::Acquire) {
                 break;
             }
 
@@ -147,7 +148,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             self.info.score = score;
             self.info.time_elapsed = start_time.elapsed();
-            self.info.pv = pv.clone();
+            mem::swap(&mut self.info.pv, &mut pv);
             self.info.hash_full = self.tt.hashfull();
             self.info.calculate_nps();
 
@@ -181,12 +182,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
             if self.should_stop() {
-                self.stop_flag.store(true, Ordering::SeqCst);
+                self.stop_flag.store(true, Ordering::Release);
                 return 0;
             }
         }
 
-        if self.stop_flag.load(Ordering::SeqCst) {
+        if self.stop_flag.load(Ordering::Acquire) {
             return 0;
         }
 
@@ -256,7 +257,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut node_type = NodeType::UpperBound;
 
         for mv in moves {
-            board.make_move(&mv).ok();
+            board
+                .make_move(&mv)
+                .expect("make_move failed in alpha_beta");
 
             let mut child_pv: Vec<Move> = Vec::new();
             let score = -self.alpha_beta(
@@ -269,7 +272,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 is_pv_node,
             );
 
-            board.unmake_move(&mv).ok();
+            board
+                .unmake_move(&mv)
+                .expect("unmake_move failed in alpha_beta");
 
             if score > best_score {
                 best_score = score;
@@ -330,12 +335,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
             if self.should_stop() {
-                self.stop_flag.store(true, Ordering::SeqCst);
+                self.stop_flag.store(true, Ordering::Release);
                 return 0;
             }
         }
 
-        if self.stop_flag.load(Ordering::Relaxed) {
+        if self.stop_flag.load(Ordering::Acquire) {
             return 0;
         }
 
@@ -358,7 +363,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             // Delta pruning: if even the best possible capture (queen)
             // can't improve alpha, skip search
-            if stand_pat + QUEEN_VALUE + 200 < alpha {
+            if stand_pat + QUEEN_VALUE + DELTA_PRUNING_MARGIN < alpha {
                 return alpha;
             }
         }
@@ -377,11 +382,15 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.move_orderer.order_moves(&mut moves);
 
         for mv in moves {
-            board.make_move(&mv).ok();
+            board
+                .make_move(&mv)
+                .expect("make_move failed in quiescence");
             let score = -self.quiescence(board, ply + 1, -beta, -alpha);
-            board.unmake_move(&mv).ok();
+            board
+                .unmake_move(&mv)
+                .expect("unmake_move failed in quiescence");
 
-            if self.stop_flag.load(Ordering::SeqCst) {
+            if self.stop_flag.load(Ordering::Acquire) {
                 return 0;
             }
 
@@ -398,7 +407,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     }
 
     fn should_stop(&self) -> bool {
-        if self.stop_flag.load(Ordering::SeqCst) {
+        if self.stop_flag.load(Ordering::Acquire) {
             return true;
         }
 
