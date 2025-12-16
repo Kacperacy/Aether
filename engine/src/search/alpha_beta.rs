@@ -17,6 +17,9 @@ const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
 const LMR_FULL_DEPTH_MOVES: usize = 4;
 const LMR_MIN_DEPTH: u8 = 3;
+const ASPIRATION_DEPTH: u8 = 5;
+const ASPIRATION_WINDOW: Score = 50;
+const ASPIRATION_MAX_DELTA: Score = 400;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -118,6 +121,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             };
         }
 
+        let mut prev_score: Score = 0;
+
         // Iterative deepening
         for depth in 1..=max_depth {
             if let Some(limit) = self.soft_limit {
@@ -133,20 +138,70 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             self.info.depth = depth;
             let mut current_pv = Vec::new();
 
-            let score = self.alpha_beta(
-                board,
-                depth,
-                0,
-                NEG_MATE_SCORE,
-                MATE_SCORE,
-                &mut current_pv,
-                true,
-            );
+            let score;
+
+            if depth >= ASPIRATION_DEPTH {
+                let mut delta = ASPIRATION_WINDOW;
+                let mut alpha = (prev_score - delta).max(NEG_MATE_SCORE);
+                let mut beta = (prev_score + delta).min(MATE_SCORE);
+                let mut best_pv = Vec::new();
+
+                loop {
+                    current_pv.clear();
+                    let result =
+                        self.alpha_beta(board, depth, 0, alpha, beta, &mut current_pv, true);
+
+                    if self.stop_flag.load(Ordering::Acquire) {
+                        score = prev_score;
+                        current_pv = best_pv;
+                        break;
+                    }
+
+                    if result <= alpha {
+                        // Failed low, widen window downwards
+                        beta = (alpha + beta) / 2; // Shrink beta towards alpha
+                        alpha = (alpha - delta).max(NEG_MATE_SCORE);
+                        delta *= 2;
+
+                        if delta > ASPIRATION_MAX_DELTA {
+                            alpha = NEG_MATE_SCORE;
+                            beta = MATE_SCORE;
+                        }
+                    } else if result >= beta {
+                        // Failed high - save PV as it might be good
+                        if !current_pv.is_empty() {
+                            best_pv = current_pv.clone();
+                        }
+                        beta = (beta + delta).min(MATE_SCORE);
+                        delta *= 2;
+
+                        if delta > ASPIRATION_MAX_DELTA {
+                            alpha = NEG_MATE_SCORE;
+                            beta = MATE_SCORE;
+                        }
+                    } else {
+                        // Successful search
+                        score = result;
+                        break;
+                    }
+                }
+            } else {
+                score = self.alpha_beta(
+                    board,
+                    depth,
+                    0,
+                    NEG_MATE_SCORE,
+                    MATE_SCORE,
+                    &mut current_pv,
+                    true,
+                );
+            }
 
             if self.stop_flag.load(Ordering::Acquire) {
                 break;
             }
 
+            prev_score = score;
             best_score = score;
             if !current_pv.is_empty() {
                 best_move = Some(current_pv[0]);
@@ -301,46 +356,64 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             let gives_check = board.is_in_check(board.side_to_move());
 
-            let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
-                && depth >= LMR_MIN_DEPTH
-                && mv.capture.is_none()
-                && mv.promotion.is_none()
-                && !in_check
-                && !gives_check;
+            let extended_depth = if gives_check { 1 } else { 0 };
 
-            if can_reduce {
-                let reduction = 1 + (moves_searched as u8 / 6);
+            if moves_searched == 0 {
                 score = -self.alpha_beta(
                     board,
-                    depth.saturating_sub(reduction + 1),
-                    ply + 1,
-                    -alpha - 1,
-                    -alpha,
-                    &mut Vec::new(),
-                    false,
-                );
-
-                if score > alpha {
-                    score = -self.alpha_beta(
-                        board,
-                        depth - 1,
-                        ply + 1,
-                        -beta,
-                        -alpha,
-                        &mut child_pv,
-                        is_pv_node,
-                    )
-                }
-            } else {
-                score = -self.alpha_beta(
-                    board,
-                    depth - 1,
+                    depth - 1 + extended_depth,
                     ply + 1,
                     -beta,
                     -alpha,
                     &mut child_pv,
                     is_pv_node,
                 );
+            } else {
+                // Late Move Reductions (LMR)
+                let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
+                    && depth >= LMR_MIN_DEPTH
+                    && mv.capture.is_none()
+                    && mv.promotion.is_none()
+                    && !in_check
+                    && !gives_check;
+
+                if can_reduce {
+                    // LMR + null window
+                    let reduction = 1 + (moves_searched as u8 / 6);
+                    score = -self.alpha_beta(
+                        board,
+                        depth.saturating_sub(reduction + 1),
+                        ply + 1,
+                        -alpha - 1,
+                        -alpha,
+                        &mut Vec::new(),
+                        false,
+                    );
+                } else {
+                    // Normal search with null window (PVS)
+                    score = -self.alpha_beta(
+                        board,
+                        depth - 1 + extended_depth,
+                        ply + 1,
+                        -alpha - 1,
+                        -alpha,
+                        &mut Vec::new(),
+                        false,
+                    );
+                }
+
+                if score > alpha && score < beta {
+                    // Re-search
+                    score = -self.alpha_beta(
+                        board,
+                        depth - 1 + extended_depth,
+                        ply + 1,
+                        -beta,
+                        -alpha,
+                        &mut child_pv,
+                        true,
+                    );
+                }
             }
 
             board
