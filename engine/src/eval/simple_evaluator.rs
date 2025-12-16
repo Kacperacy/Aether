@@ -2,10 +2,8 @@ use crate::eval::Evaluator;
 use aether_core::{ALL_SQUARES, Color, Piece, Square};
 use board::BoardQuery;
 
-/// Piece-square tables for positional evaluation
-/// Values are from White's perspective, mirrored for Black
 #[rustfmt::skip]
-const PAWN_PST: [i32; 64] = [
+const PAWN_PST_MG: [i32; 64] = [
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
     10, 10, 20, 30, 30, 20, 10, 10,
@@ -17,7 +15,7 @@ const PAWN_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const KNIGHT_PST: [i32; 64] = [
+const KNIGHT_PST_MG: [i32; 64] = [
     -50,-40,-30,-30,-30,-30,-40,-50,
     -40,-20,  0,  0,  0,  0,-20,-40,
     -30,  0, 10, 15, 15, 10,  0,-30,
@@ -29,7 +27,7 @@ const KNIGHT_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const BISHOP_PST: [i32; 64] = [
+const BISHOP_PST_MG: [i32; 64] = [
     -20,-10,-10,-10,-10,-10,-10,-20,
     -10,  0,  0,  0,  0,  0,  0,-10,
     -10,  0,  5, 10, 10,  5,  0,-10,
@@ -41,7 +39,7 @@ const BISHOP_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const ROOK_PST: [i32; 64] = [
+const ROOK_PST_MG: [i32; 64] = [
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 10, 10, 10, 10, 10,  5,
     -5,  0,  0,  0,  0,  0,  0, -5,
@@ -53,7 +51,7 @@ const ROOK_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const QUEEN_PST: [i32; 64] = [
+const QUEEN_PST_MG: [i32; 64] = [
     -20,-10,-10, -5, -5,-10,-10,-20,
     -10,  0,  0,  0,  0,  0,  0,-10,
     -10,  0,  5,  5,  5,  5,  0,-10,
@@ -65,7 +63,7 @@ const QUEEN_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const KING_MIDDLEGAME_PST: [i32; 64] = [
+const KING_PST_MG: [i32; 64] = [
     -30,-40,-40,-50,-50,-40,-40,-30,
     -30,-40,-40,-50,-50,-40,-40,-30,
     -30,-40,-40,-50,-50,-40,-40,-30,
@@ -77,7 +75,67 @@ const KING_MIDDLEGAME_PST: [i32; 64] = [
 ];
 
 #[rustfmt::skip]
-const KING_ENDGAME_PST: [i32; 64] = [
+const PAWN_PST_EG: [i32; 64] = [
+     0,  0,  0,  0,  0,  0,  0,  0,
+    80, 80, 80, 80, 80, 80, 80, 80,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    30, 30, 30, 30, 30, 30, 30, 30,
+    20, 20, 20, 20, 20, 20, 20, 20,
+    10, 10, 10, 10, 10, 10, 10, 10,
+    10, 10, 10, 10, 10, 10, 10, 10,
+     0,  0,  0,  0,  0,  0,  0,  0,
+];
+
+#[rustfmt::skip]
+const KNIGHT_PST_EG: [i32; 64] = [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50,
+];
+
+#[rustfmt::skip]
+const BISHOP_PST_EG: [i32; 64] = [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20,
+];
+
+#[rustfmt::skip]
+const ROOK_PST_EG: [i32; 64] = [
+     0,  0,  0,  0,  0,  0,  0,  0,
+     5, 10, 10, 10, 10, 10, 10,  5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+     0,  0,  0,  5,  5,  0,  0,  0,
+];
+
+#[rustfmt::skip]
+const QUEEN_PST_EG: [i32; 64] = [
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20,
+];
+
+#[rustfmt::skip]
+const KING_PST_EG: [i32; 64] = [
     -50,-40,-30,-20,-20,-30,-40,-50,
     -30,-20,-10,  0,  0,-10,-20,-30,
     -30,-10, 20, 30, 30, 20,-10,-30,
@@ -88,11 +146,18 @@ const KING_ENDGAME_PST: [i32; 64] = [
     -50,-30,-30,-30,-30,-30,-30,-50,
 ];
 
+const KNIGHT_PHASE: i32 = 1;
+const BISHOP_PHASE: i32 = 1;
+const ROOK_PHASE: i32 = 2;
+const QUEEN_PHASE: i32 = 4;
+
+// Total phase at game start (4 knights + 4 bishops + 4 rooks + 2 queens)
+const TOTAL_PHASE: i32 = KNIGHT_PHASE * 4 + BISHOP_PHASE * 4 + ROOK_PHASE * 4 + QUEEN_PHASE * 2;
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SimpleEvaluator;
 
 impl SimpleEvaluator {
-    /// Creates a new SimpleEvaluator
     pub fn new() -> Self {
         Self
     }
@@ -101,93 +166,79 @@ impl SimpleEvaluator {
     #[inline]
     fn pst_index(square: Square, color: Color) -> usize {
         let idx = square.to_index() as usize;
-        if color == Color::White {
-            // Mirror vertically for white (rank 0 -> rank 7)
-            idx ^ 56
-        } else {
-            idx
-        }
+        if color == Color::White { idx ^ 56 } else { idx }
     }
 
-    /// Check if we're in the endgame (for king PST selection)
-    fn is_endgame<T: BoardQuery>(&self, board: &T) -> bool {
-        let white_queens = board.piece_count(Piece::Queen, Color::White);
-        let black_queens = board.piece_count(Piece::Queen, Color::Black);
+    /// Calculate game phase (0 = endgame, 256 = opening/middlegame)
+    fn calculate_phase<T: BoardQuery>(board: &T) -> i32 {
+        let mut phase = TOTAL_PHASE;
 
-        // Endgame if both sides have no queens, or
-        // if a side has at most 1 minor piece besides pawns and king
-        if white_queens == 0 && black_queens == 0 {
-            return true;
-        }
+        phase -= board.piece_count(Piece::Knight, Color::White) as i32 * KNIGHT_PHASE;
+        phase -= board.piece_count(Piece::Knight, Color::Black) as i32 * KNIGHT_PHASE;
+        phase -= board.piece_count(Piece::Bishop, Color::White) as i32 * BISHOP_PHASE;
+        phase -= board.piece_count(Piece::Bishop, Color::Black) as i32 * BISHOP_PHASE;
+        phase -= board.piece_count(Piece::Rook, Color::White) as i32 * ROOK_PHASE;
+        phase -= board.piece_count(Piece::Rook, Color::Black) as i32 * ROOK_PHASE;
+        phase -= board.piece_count(Piece::Queen, Color::White) as i32 * QUEEN_PHASE;
+        phase -= board.piece_count(Piece::Queen, Color::Black) as i32 * QUEEN_PHASE;
 
-        let white_minors = board.piece_count(Piece::Knight, Color::White)
-            + board.piece_count(Piece::Bishop, Color::White);
-        let black_minors = board.piece_count(Piece::Knight, Color::Black)
-            + board.piece_count(Piece::Bishop, Color::Black);
-        let white_rooks = board.piece_count(Piece::Rook, Color::White);
-        let black_rooks = board.piece_count(Piece::Rook, Color::Black);
-
-        // Simple heuristic: endgame if limited material
-        white_queens + black_queens <= 1
-            && white_rooks + black_rooks <= 2
-            && white_minors + black_minors <= 2
+        // Normalize to 0-256 range
+        // phase = 0 means all pieces present (opening)
+        // phase = TOTAL_PHASE means no pieces (endgame)
+        // We want: 256 = opening, 0 = endgame
+        ((TOTAL_PHASE - phase) * 256 / TOTAL_PHASE).max(0)
     }
 
-    /// Get piece-square table value for a piece
-    fn piece_square_value(
-        &self,
-        piece: Piece,
-        square: Square,
-        color: Color,
-        is_endgame: bool,
-    ) -> i32 {
-        let idx = Self::pst_index(square, color);
-
+    /// Get PST values for middlegame and endgame
+    #[inline]
+    fn pst_values(piece: Piece, idx: usize) -> (i32, i32) {
         match piece {
-            Piece::Pawn => PAWN_PST[idx],
-            Piece::Knight => KNIGHT_PST[idx],
-            Piece::Bishop => BISHOP_PST[idx],
-            Piece::Rook => ROOK_PST[idx],
-            Piece::Queen => QUEEN_PST[idx],
-            Piece::King => {
-                if is_endgame {
-                    KING_ENDGAME_PST[idx]
-                } else {
-                    KING_MIDDLEGAME_PST[idx]
-                }
-            }
+            Piece::Pawn => (PAWN_PST_MG[idx], PAWN_PST_EG[idx]),
+            Piece::Knight => (KNIGHT_PST_MG[idx], KNIGHT_PST_EG[idx]),
+            Piece::Bishop => (BISHOP_PST_MG[idx], BISHOP_PST_EG[idx]),
+            Piece::Rook => (ROOK_PST_MG[idx], ROOK_PST_EG[idx]),
+            Piece::Queen => (QUEEN_PST_MG[idx], QUEEN_PST_EG[idx]),
+            Piece::King => (KING_PST_MG[idx], KING_PST_EG[idx]),
         }
     }
 
-    /// Complete evaluation including material and positional factors
+    /// Tapered evaluation
     fn evaluate_position<T: BoardQuery>(&self, board: &T) -> i32 {
-        let mut score = 0i32;
-        let is_endgame = self.is_endgame(board);
+        let mut mg_score = 0i32;
+        let mut eg_score = 0i32;
 
         for &square in &ALL_SQUARES {
             if let Some((piece, color)) = board.piece_at(square) {
                 let material = piece.value() as i32;
-                let positional = self.piece_square_value(piece, square, color, is_endgame);
+                let idx = Self::pst_index(square, color);
+                let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
 
-                let piece_score = material + positional;
+                let mg_piece = material + pst_mg;
+                let eg_piece = material + pst_eg;
 
                 if color == Color::White {
-                    score += piece_score;
+                    mg_score += mg_piece;
+                    eg_score += eg_piece;
                 } else {
-                    score -= piece_score;
+                    mg_score -= mg_piece;
+                    eg_score -= eg_piece;
                 }
             }
         }
 
-        // Bishop pair bonus
+        // Bishop pair bonus (slightly higher in endgame)
         if board.piece_count(Piece::Bishop, Color::White) >= 2 {
-            score += 30;
+            mg_score += 30;
+            eg_score += 50;
         }
         if board.piece_count(Piece::Bishop, Color::Black) >= 2 {
-            score -= 30;
+            mg_score -= 30;
+            eg_score -= 50;
         }
 
-        score
+        // Interpolate between middlegame and endgame scores
+        let phase = Self::calculate_phase(board);
+        (mg_score * phase + eg_score * (256 - phase)) / 256
     }
 }
 
@@ -210,19 +261,13 @@ mod tests {
 
     #[test]
     fn test_pst_index_symmetry() {
-        // a1 for white should map to a8 position (index 56)
         let a1 = Square::A1;
         assert_eq!(SimpleEvaluator::pst_index(a1, Color::White), 56);
-
-        // a1 for black stays at a1 (index 0)
         assert_eq!(SimpleEvaluator::pst_index(a1, Color::Black), 0);
 
-        // e4 for white
         let e4 = Square::E4;
         let white_idx = SimpleEvaluator::pst_index(e4, Color::White);
         let black_idx = SimpleEvaluator::pst_index(e4, Color::Black);
-
-        // They should be vertically mirrored
         assert_eq!(white_idx ^ 56, black_idx);
     }
 }

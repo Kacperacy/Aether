@@ -98,12 +98,6 @@ impl MoveOrderer {
             score += 100 + promo.value() as i32;
         }
 
-        // TODO:
-        // - Killer moves
-        // - History heuristic
-        // - Counter moves
-        // - PV moves
-
         score
     }
 
@@ -128,16 +122,6 @@ impl MoveOrderer {
         }
 
         self.history_score(mv)
-    }
-
-    pub fn order_moves_with_tt(&self, moves: &mut [Move], tt_move: Option<Move>) {
-        self.order_moves(moves);
-
-        if let Some(tt_mv) = tt_move {
-            if let Some(pos) = moves.iter().position(|&m| m == tt_mv) {
-                moves.swap(0, pos);
-            }
-        }
     }
 }
 
