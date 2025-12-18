@@ -7,8 +7,8 @@ use crate::search::{SearchInfo, SearchLimits, SearchResult};
 use aether_core::{Move, Score};
 use board::{Board, BoardOps};
 use movegen::{Generator, MoveGen};
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub struct Engine {
@@ -20,6 +20,7 @@ pub struct Engine {
 
 impl Engine {
     /// Create a new engine with specified hash size in MB
+    #[must_use]
     pub fn new(hash_size_mb: usize) -> Self {
         let evaluator = SimpleEvaluator::new();
         let searcher = AlphaBetaSearcher::new(evaluator, hash_size_mb);
@@ -31,6 +32,7 @@ impl Engine {
     }
 
     /// Get a clone of the stop flag for external control
+    #[must_use]
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         self.searcher.stop_flag()
     }
@@ -52,11 +54,13 @@ impl Engine {
     }
 
     /// Get hash table usage in permille
+    #[must_use]
     pub fn hashfull(&self) -> u16 {
         self.searcher.hashfull()
     }
 
     /// Generate all legal moves for a position
+    #[must_use]
     pub fn legal_moves(&self, board: &Board) -> Vec<Move> {
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);
@@ -113,7 +117,8 @@ impl Engine {
     /// Perft - count nodes at given depth
     ///
     /// This is a debugging/testing function that counts all leaf nodes
-    /// at a given depth. Useful for validating move generation.
+    /// at a given depth. Useful for validating move generation
+    #[must_use]
     pub fn perft(&self, board: &mut Board, depth: u8) -> u64 {
         if depth == 0 {
             return 1;
@@ -138,8 +143,9 @@ impl Engine {
 
     /// Perft divide - count nodes per move at given depth
     ///
-    /// Like perft, but returns the node count for each move separately.
-    /// Useful for debugging specific moves.
+    /// Like perft, but returns the node count for each move separately
+    /// Useful for debugging specific moves
+    #[must_use]
     pub fn perft_divide(&self, board: &mut Board, depth: u8) -> Vec<(Move, u64)> {
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);

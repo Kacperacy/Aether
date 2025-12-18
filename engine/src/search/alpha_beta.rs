@@ -1,24 +1,51 @@
 use crate::eval::Evaluator;
 use crate::search::move_ordering::MoveOrderer;
 use crate::search::{
-    MAX_PLY, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry, TranspositionTable,
+    NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry, TranspositionTable, MAX_PLY,
 };
-use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, QUEEN_VALUE, Score, mated_in};
+use aether_core::{mated_in, Move, Piece, Score, MATE_SCORE, NEG_MATE_SCORE, QUEEN_VALUE};
 use board::{BoardOps, BoardQuery};
 use movegen::{Generator, MoveGen};
 use std::mem;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+// --- Search Constants ---
 
+/// Number of nodes between time/stop checks
+/// Balances search responsiveness with checking overhead
 const NODE_CHECK_INTERVAL: u64 = 4096;
+
+/// Safety margin for delta pruning in quiescence search (centipawns)
+/// Accounts for positional factors beyond pure material count
 const DELTA_PRUNING_MARGIN: Score = 200;
+
+/// Depth reduction for null move pruning (R value)
+/// Standard value balancing pruning aggressiveness with tactical safety
 const NULL_MOVE_REDUCTION: u8 = 3;
+
+/// Minimum depth required to apply null move pruning
+/// Below this depth, null move overhead exceeds potential savings
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
+
+/// Number of moves searched at full depth before applying LMR
+/// First moves are likely best (due to move ordering) and deserve full analysis
 const LMR_FULL_DEPTH_MOVES: usize = 4;
+
+/// Minimum depth required to apply late move reductions
+/// At shallow depths, LMR provides minimal time savings
 const LMR_MIN_DEPTH: u8 = 3;
+
+/// Minimum depth for aspiration window search
+/// At shallow depths, aspiration windows cause more re-searches than savings
 const ASPIRATION_DEPTH: u8 = 5;
+
+/// Initial aspiration window size (centipawns)
+/// Narrow enough to save time, wide enough to avoid excessive re-searches
 const ASPIRATION_WINDOW: Score = 50;
+
+/// Maximum aspiration delta before falling back to full window search
+/// Beyond this value, re-searches waste more time than full-width search
 const ASPIRATION_MAX_DELTA: Score = 400;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
@@ -34,7 +61,7 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
-    /// Creates a new AlphaBetaSearcher with the given evaluator.
+    /// Creates a new AlphaBetaSearcher with the given evaluator
     pub fn new(evaluator: E, tt_size_mb: usize) -> Self {
         Self {
             evaluator,
@@ -230,6 +257,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
     }
 
+    /// Main alpha-beta search function (monolithic, Stockfish-style)
     fn alpha_beta<T: BoardOps + BoardQuery>(
         &mut self,
         board: &mut T,
@@ -240,69 +268,65 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         pv: &mut Vec<Move>,
         is_pv_node: bool,
     ) -> Score {
+        // =========================================================================
+        // Step 1. Initialize node
+        // =========================================================================
         self.info.nodes += 1;
+        pv.clear();
 
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
-            if self.should_stop() {
-                self.stop_flag.store(true, Ordering::Release);
-                return 0;
-            }
-        }
-
-        if self.stop_flag.load(Ordering::Acquire) {
+        if self.should_abort_search() {
             return 0;
         }
 
+        // =========================================================================
+        // Step 2. Check for quiescence
+        // =========================================================================
+        if depth == 0 {
+            return self.quiescence(board, ply, alpha, beta);
+        }
+
+        // =========================================================================
+        // Step 3. Check terminal conditions (max ply, repetition, 50-move, insufficient material)
+        // =========================================================================
         if ply >= MAX_PLY {
             return self.evaluator.evaluate(board);
         }
 
-        if ply > 0 {
-            if board.is_twofold_repetition() {
-                return 0;
-            }
-
-            if board.is_fifty_move_draw() {
-                return 0;
-            }
-
-            if board.is_insufficient_material() {
-                return 0;
-            }
+        if ply > 0
+            && (board.is_twofold_repetition()
+                || board.is_fifty_move_draw()
+                || board.is_insufficient_material())
+        {
+            return 0;
         }
 
+        // =========================================================================
+        // Step 4. Transposition table lookup
+        // =========================================================================
         let zobrist_key = board.zobrist_hash_raw();
         let mut tt_move: Option<Move> = None;
 
         if let Some(entry) = self.tt.probe(zobrist_key) {
             tt_move = entry.best_move;
 
+            // Use TT score for cutoffs in non-PV nodes with sufficient depth
             if entry.depth >= depth && !is_pv_node {
                 let tt_score = TTEntry::score_from_tt(entry.score, ply);
 
                 match entry.node_type {
                     NodeType::Exact => return tt_score,
-                    NodeType::LowerBound => {
-                        if tt_score >= beta {
-                            return beta;
-                        }
-                    }
-                    NodeType::UpperBound => {
-                        if tt_score <= alpha {
-                            return alpha;
-                        }
-                    }
+                    NodeType::LowerBound if tt_score >= beta => return beta,
+                    NodeType::UpperBound if tt_score <= alpha => return alpha,
+                    _ => {}
                 }
             }
         }
 
-        if depth == 0 {
-            return self.quiescence(board, ply, alpha, beta);
-        }
-
         let in_check = board.is_in_check(board.side_to_move());
 
-        // Null move pruning
+        // =========================================================================
+        // Step 5. Null move pruning
+        // =========================================================================
         if !is_pv_node
             && !in_check
             && depth >= NULL_MOVE_MIN_DEPTH
@@ -327,11 +351,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
+        // =========================================================================
+        // Step 6. Generate and order moves
+        // =========================================================================
         let mut moves = Vec::new();
         self.generator.legal(board, &mut moves);
 
         if moves.is_empty() {
-            return if board.is_in_check(board.side_to_move()) {
+            return if in_check {
                 mated_in(ply as u32)
             } else {
                 0 // Stalemate
@@ -340,28 +367,30 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         self.move_orderer.order_moves_full(&mut moves, tt_move, ply);
 
+        // =========================================================================
+        // Step 7. Main move loop
+        // =========================================================================
         let mut best_score = NEG_MATE_SCORE;
         let mut best_move: Option<Move> = None;
-        let mut local_pv: Vec<Move> = Vec::new();
         let mut node_type = NodeType::UpperBound;
-        let mut moves_searched = 0;
 
-        for mv in moves {
-            board
-                .make_move(&mv)
-                .expect("make_move failed in alpha_beta");
+        for (move_index, mv) in moves.iter().enumerate() {
+            // --- Step 7a. Make move ---
+            if board.make_move(mv).is_err() {
+                continue;
+            }
 
             let mut child_pv: Vec<Move> = Vec::new();
-            let mut score;
-
             let gives_check = board.is_in_check(board.side_to_move());
+            let extension: u8 = if gives_check { 1 } else { 0 };
 
-            let extended_depth = if gives_check { 1 } else { 0 };
+            let score;
 
-            if moves_searched == 0 {
+            if move_index == 0 {
+                // --- Step 7b. First move: full window search ---
                 score = -self.alpha_beta(
                     board,
-                    depth - 1 + extended_depth,
+                    depth - 1 + extension,
                     ply + 1,
                     -beta,
                     -alpha,
@@ -369,20 +398,22 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     is_pv_node,
                 );
             } else {
-                // Late Move Reductions (LMR)
-                let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
+                // --- Step 7c. Late Move Reductions (LMR) ---
+                let can_reduce = move_index >= LMR_FULL_DEPTH_MOVES
                     && depth >= LMR_MIN_DEPTH
                     && mv.capture.is_none()
                     && mv.promotion.is_none()
                     && !in_check
                     && !gives_check;
 
+                let mut lmr_score;
+
                 if can_reduce {
-                    // LMR + null window
-                    let reduction = 1 + (moves_searched as u8 / 6);
-                    score = -self.alpha_beta(
+                    // LMR: reduced depth + null window
+                    let reduction = 1 + (move_index as u8 / 6);
+                    lmr_score = -self.alpha_beta(
                         board,
-                        depth.saturating_sub(reduction + 1),
+                        depth.saturating_sub(reduction + 1) + extension,
                         ply + 1,
                         -alpha - 1,
                         -alpha,
@@ -390,10 +421,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                         false,
                     );
                 } else {
-                    // Normal search with null window (PVS)
-                    score = -self.alpha_beta(
+                    // PVS: null window at full depth
+                    lmr_score = -self.alpha_beta(
                         board,
-                        depth - 1 + extended_depth,
+                        depth - 1 + extension,
                         ply + 1,
                         -alpha - 1,
                         -alpha,
@@ -402,11 +433,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     );
                 }
 
-                if score > alpha && score < beta {
-                    // Re-search
-                    score = -self.alpha_beta(
+                // --- Step 7d. Re-search with full window if needed ---
+                if lmr_score > alpha && lmr_score < beta {
+                    lmr_score = -self.alpha_beta(
                         board,
-                        depth - 1 + extended_depth,
+                        depth - 1 + extension,
                         ply + 1,
                         -beta,
                         -alpha,
@@ -414,37 +445,40 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                         true,
                     );
                 }
+
+                score = lmr_score;
             }
 
-            board
-                .unmake_move(&mv)
-                .expect("unmake_move failed in alpha_beta");
-            moves_searched += 1;
+            // --- Step 7e. Unmake move ---
+            let _ = board.unmake_move(mv);
 
+            // --- Step 7f. Update best score ---
             if score > best_score {
                 best_score = score;
-                best_move = Some(mv);
+                best_move = Some(*mv);
 
-                local_pv.clear();
-                local_pv.push(mv);
-                local_pv.extend_from_slice(&child_pv);
+                // Update PV: current move + child PV
+                pv.clear();
+                pv.push(*mv);
+                pv.extend_from_slice(&child_pv);
             }
 
+            // --- Step 7g. Beta cutoff ---
             if score >= beta {
+                // Update move ordering heuristics for quiet moves
                 if mv.capture.is_none() && mv.promotion.is_none() {
-                    self.move_orderer.store_killer(mv, ply);
-                    self.move_orderer.update_history(mv, depth as usize);
+                    self.move_orderer.store_killer(*mv, ply);
+                    self.move_orderer.update_history(*mv, depth as usize);
                 }
 
-                node_type = NodeType::LowerBound;
-
+                // Store in TT
                 let tt_score = TTEntry::score_to_tt(beta, ply);
                 let entry = TTEntry::new(
                     zobrist_key,
                     best_move,
                     tt_score,
                     depth,
-                    node_type,
+                    NodeType::LowerBound,
                     self.tt.generation(),
                 );
                 self.tt.store(entry);
@@ -452,12 +486,16 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 return beta;
             }
 
+            // --- Step 7h. Update alpha ---
             if score > alpha {
                 alpha = score;
                 node_type = NodeType::Exact;
             }
         }
 
+        // =========================================================================
+        // Step 8. Store result in transposition table
+        // =========================================================================
         let tt_score = TTEntry::score_to_tt(best_score, ply);
         let entry = TTEntry::new(
             zobrist_key,
@@ -469,7 +507,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         );
         self.tt.store(entry);
 
-        *pv = local_pv;
         best_score
     }
 
@@ -483,14 +520,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     ) -> Score {
         self.info.nodes += 1;
 
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 {
-            if self.should_stop() {
-                self.stop_flag.store(true, Ordering::Release);
-                return 0;
-            }
-        }
-
-        if self.stop_flag.load(Ordering::Acquire) {
+        if self.should_abort_search() {
             return 0;
         }
 
@@ -540,10 +570,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 .unmake_move(&mv)
                 .expect("unmake_move failed in quiescence");
 
-            if self.stop_flag.load(Ordering::Acquire) {
-                return 0;
-            }
-
             if score >= beta {
                 return beta;
             }
@@ -556,11 +582,23 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         alpha
     }
 
-    fn should_stop(&self) -> bool {
-        if self.stop_flag.load(Ordering::Acquire) {
+    #[inline]
+    fn should_abort_search(&self) -> bool {
+        // Use Relaxed for quick check - we don't need strict ordering here
+        if self.stop_flag.load(Ordering::Relaxed) {
             return true;
         }
 
+        if self.info.nodes % NODE_CHECK_INTERVAL == 0 && self.should_stop() {
+            self.stop_flag.store(true, Ordering::Release);
+            return true;
+        }
+
+        false
+    }
+
+    #[inline]
+    fn should_stop(&self) -> bool {
         if let Some(start) = self.start_time {
             if let Some(limit) = self.hard_limit {
                 if start.elapsed() >= limit {
@@ -572,6 +610,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         false
     }
 
+    #[inline]
     fn has_non_pawn_material<T: BoardQuery>(&self, board: &T) -> bool {
         let side = board.side_to_move();
         board.piece_count(Piece::Knight, side) > 0

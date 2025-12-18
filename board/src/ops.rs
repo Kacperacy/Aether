@@ -2,22 +2,22 @@ use crate::error::MoveError;
 use crate::query::BoardQuery;
 use crate::{Board, BoardError, Result};
 use aether_core::{
-    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square,
+    BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square, ALL_COLORS, ALL_PIECES,
 };
 
 /// Trait for board operations
 pub trait BoardOps: BoardQuery + Clone {
-    /// Make a move on the board, updating the position accordingly.
+    /// Make a move on the board, updating the position accordingly
     fn make_move(&mut self, mv: &Move) -> Result<()>;
 
-    /// Unmake a move on the board, restoring the previous position.
+    /// Unmake a move on the board, restoring the previous position
     fn unmake_move(&mut self, mv: &Move) -> Result<()>;
-    ///  Make a null move (pass the turn without moving any piece).
+    ///  Make a null move (pass the turn without moving any piece)
     fn make_null_move(&mut self);
-    /// Unmake a null move.
+    /// Unmake a null move
     fn unmake_null_move(&mut self);
 
-    /// Is the position in check for the given color?
+    /// Is the position in check for the given color
     fn is_in_check(&self, color: Color) -> bool;
 }
 
@@ -192,14 +192,14 @@ impl BoardOps for Board {
 }
 
 impl Board {
-    /// Internal method to place a piece on the board without updating game state.
+    /// Internal method to place a piece on the board without updating game state
     #[inline(always)]
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = BitBoard::from_square(square);
         self.pieces[color as usize][piece as usize] |= bb;
     }
 
-    /// Internal method to remove a piece from the board without updating game state.
+    /// Internal method to remove a piece from the board without updating game state
     #[inline(always)]
     pub(crate) fn remove_piece_internal(&mut self, square: Square) -> Option<(Piece, Color)> {
         let bb = BitBoard::from_square(square);
@@ -216,7 +216,7 @@ impl Board {
         None
     }
 
-    /// Get the source and destination squares for the castling rook.
+    /// Get the source and destination squares for the castling rook
     #[inline]
     fn get_castling_rook_squares(king_to: Square, side: Color) -> Result<(Square, Square)> {
         match (side, king_to) {
@@ -231,7 +231,7 @@ impl Board {
         }
     }
 
-    /// Update castling rights after a move.
+    /// Update castling rights after a move
     fn update_castling_rights_after_move(&mut self, mv: &Move) {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();

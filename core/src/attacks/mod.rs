@@ -9,7 +9,7 @@ pub use magic::*;
 pub use magic_constants::*;
 pub use pieces::*;
 
-/// Computes all attackers to a given square for a specified color.
+/// Computes all attackers to a given square for a specified color
 #[inline(always)]
 pub fn attackers_to_square(
     square: Square,
@@ -30,7 +30,7 @@ pub fn attackers_to_square(
     pawn_attackers | knight_attackers | king_attackers | diagonal_attackers | straight_attackers
 }
 
-/// Determines if a given square is attacked by any piece of the specified color.
+/// Determines if a given square is attacked by any piece of the specified color
 #[inline]
 pub fn is_square_attacked(
     square: Square,

@@ -13,7 +13,7 @@ pub use fen::{FenOps, STARTING_POSITION_FEN};
 pub use ops::BoardOps;
 pub use query::BoardQuery;
 
-use aether_core::{BitBoard, Color, File, MoveState, Piece, Rank, Square, attackers_to_square};
+use aether_core::{attackers_to_square, BitBoard, Color, File, MoveState, Piece, Rank, Square};
 use cache::BoardCache;
 use game_state::GameState;
 use std::num::NonZeroU64;
@@ -112,12 +112,12 @@ impl Board {
         self.cache.color_combined[color as usize]
     }
 
-    /// Prints an ASCII diagram of the current board to stdout.
+    /// Prints an ASCII diagram of the current board to stdout
     pub fn print(&self) {
         println!("{}", self.as_ascii());
     }
 
-    /// Generates an ASCII diagram of the current board position.
+    /// Generates an ASCII diagram of the current board position
     pub fn as_ascii(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
@@ -187,7 +187,7 @@ mod tests {
     use super::*;
     use crate::FenOps;
 
-    // ... existing tests ...
+    // ... existing tests ...dd
 
     #[test]
     fn test_repetition_count_no_repetition() {

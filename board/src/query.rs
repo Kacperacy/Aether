@@ -1,38 +1,40 @@
 use crate::Board;
-use aether_core::{ALL_PIECES, BitBoard, Color, Piece, Square};
+use aether_core::{BitBoard, Color, Piece, Square, ALL_PIECES};
 
 pub trait BoardQuery {
-    /// Piece and color at square, if any.
+    /// Piece and color at square, if any
     fn piece_at(&self, square: Square) -> Option<(Piece, Color)>;
-    /// True if any piece occupies the square.
+    /// True if any piece occupies the square
     fn is_square_occupied(&self, square: Square) -> bool;
-    /// True if the given square is attacked by pieces of `by_color` under the current position.
+    /// True if the given square is attacked by pieces of `by_color` under the current position
     fn is_square_attacked(&self, square: Square, by_color: Color) -> bool;
-    /// Count of `piece` for `color`.
+    /// Count of `piece` for `color`
     fn piece_count(&self, piece: Piece, color: Color) -> u32;
-    /// King square for `color`, if present.
+    /// King square for `color`, if present
     fn get_king_square(&self, color: Color) -> Option<Square>;
-    /// BitBoard of all squares occupied by `color`.
+    /// BitBoard of all squares occupied by `color`
     fn occupied_by(&self, color: Color) -> BitBoard;
-    /// Whether side can castle short (right exists); path safety is validated by consumers.
+    /// BitBoard of all squares occupied by `piece` of `color`
+    fn piece_bb(&self, piece: Piece, color: Color) -> BitBoard;
+    /// Whether side can castle short (right exists); path safety is validated by consumers
     fn can_castle_short(&self, color: Color) -> bool;
-    /// Whether side can castle long (right exists); path safety is validated by consumers.
+    /// Whether side can castle long (right exists); path safety is validated by consumers
     fn can_castle_long(&self, color: Color) -> bool;
-    /// En-passant target square, if any.
+    /// En-passant target square, if any
     fn en_passant_square(&self) -> Option<Square>;
-    /// Side to move.
+    /// Side to move
     fn side_to_move(&self) -> Color;
     /// Returns the Zobrist hash of the current position
     fn zobrist_hash_raw(&self) -> u64;
-    /// Checks for insufficient material to continue the game.
+    /// Checks for insufficient material to continue the game
     fn is_insufficient_material(&self) -> bool;
-    /// Checks for threefold repetition.
+    /// Checks for threefold repetition
     fn is_threefold_repetition(&self) -> bool;
-    /// Checks for twofold repetition.
+    /// Checks for twofold repetition
     fn is_twofold_repetition(&self) -> bool;
-    /// Checks for fifty-move rule draw.
+    /// Checks for fifty-move rule draw
     fn is_fifty_move_draw(&self) -> bool;
-    /// Checks for all draw conditions.
+    /// Checks for all draw conditions
     fn is_draw(&self) -> bool;
 }
 
@@ -75,6 +77,11 @@ impl BoardQuery for Board {
 
     fn occupied_by(&self, color: Color) -> BitBoard {
         self.cache.color_combined[color as usize]
+    }
+
+    #[inline]
+    fn piece_bb(&self, piece: Piece, color: Color) -> BitBoard {
+        self.pieces[color as usize][piece as usize]
     }
 
     fn can_castle_short(&self, color: Color) -> bool {

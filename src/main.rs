@@ -1,7 +1,7 @@
 //! Aether Chess Engine
 //!
-//! A modular chess engine written in Rust.
-//! Run without arguments to start UCI mode.
+//! A modular chess engine written in Rust
+//! Run without arguments to start UCI mode
 
 use interface::UciHandler;
 use std::env;

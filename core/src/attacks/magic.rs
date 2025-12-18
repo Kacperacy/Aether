@@ -1,19 +1,19 @@
-use crate::{BISHOP_MAGICS, BISHOP_MOVES, BitBoard, ROOK_MAGICS, ROOK_MOVES, Square};
+use crate::{BitBoard, Square, BISHOP_MAGICS, BISHOP_MOVES, ROOK_MAGICS, ROOK_MOVES};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MagicEntry {
-    /// Mask of relevant occupancy bits for the piece on the square.
+    /// Mask of relevant occupancy bits for the piece on the square
     pub mask: u64,
 
-    /// Magic multiplier for hashing blocker configurations.
+    /// Magic multiplier for hashing blocker configurations
     pub magic: u64,
 
-    /// Number of bits used for indexing into the attack table.
+    /// Number of bits used for indexing into the attack table
     pub index_bits: u8,
 }
 
 impl MagicEntry {
-    /// Computes the index into the attack table based on the occupied squares.
+    /// Computes the index into the attack table based on the occupied squares
     #[inline(always)]
     const fn index(&self, occupied: u64) -> u64 {
         let relevant = occupied & self.mask;
@@ -22,7 +22,7 @@ impl MagicEntry {
     }
 }
 
-/// Computes rook attacks for a given square and occupied bitboard using magic bitboards.
+/// Computes rook attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -34,7 +34,7 @@ pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
-/// Computes bishop attacks for a given square and occupied bitboard using magic bitboards.
+/// Computes bishop attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -46,13 +46,13 @@ pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
-/// Computes queen attacks for a given square and occupied bitboard using magic bitboards.
+/// Computes queen attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn queen_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     rook_attacks(square, occupied) | bishop_attacks(square, occupied)
 }
 
-/// Batch computes rook attacks for multiple squares given an occupied bitboard.
+/// Batch computes rook attacks for multiple squares given an occupied bitboard
 pub fn rook_attacks_batch(
     squares: &[Square],
     occupied: BitBoard,
@@ -60,7 +60,7 @@ pub fn rook_attacks_batch(
     squares.iter().map(move |&sq| rook_attacks(sq, occupied))
 }
 
-/// Batch computes bishop attacks for multiple squares given an occupied bitboard.
+/// Batch computes bishop attacks for multiple squares given an occupied bitboard
 pub fn bishop_attacks_batch(
     squares: &[Square],
     occupied: BitBoard,

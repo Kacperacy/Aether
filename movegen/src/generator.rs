@@ -1,8 +1,8 @@
 use crate::MoveGen;
 use aether_core::{
-    BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
-    is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves,
-    queen_attacks, rook_attacks,
+    bishop_attacks, is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
+    BitBoard, Color, Move, MoveFlags, Piece, Square,
+    ALL_PIECES, PROMOTION_PIECES,
 };
 use board::BoardQuery;
 
@@ -15,19 +15,18 @@ impl Generator {
         Self
     }
 
-    /// Build occupancy bitboards for move generation
+    /// Builds occupancy bitboards for move generation
     #[inline]
     fn occupancies<T: BoardQuery>(&self, board: &T, side: Color) -> (BitBoard, BitBoard, BitBoard) {
         let own = board.occupied_by(side);
-        let opp = board.occupied_by(side.opponent());
-        let all = own | opp;
-
-        (all, own, opp)
+        let opponent = board.occupied_by(side.opponent());
+        let all = own | opponent;
+        (all, own, opponent)
     }
 
-    /// Pushes a move into the move list
+    /// Appends a move to the move list
     #[inline(always)]
-    fn push(
+    fn push_move(
         moves: &mut Vec<Move>,
         from: Square,
         to: Square,
@@ -36,87 +35,110 @@ impl Generator {
         flags: MoveFlags,
         promotion: Option<Piece>,
     ) {
-        let mut mv = Move::new(from, to, piece).with_flags(flags);
+        let mut chess_move = Move::new(from, to, piece).with_flags(flags);
 
-        if let Some(cap) = capture {
-            mv = mv.with_capture(cap);
+        if let Some(captured_piece) = capture {
+            chess_move = chess_move.with_capture(captured_piece);
         }
 
-        if let Some(prom) = promotion {
-            mv = mv.with_promotion(prom);
+        if let Some(promotion_piece) = promotion {
+            chess_move = chess_move.with_promotion(promotion_piece);
         }
 
-        moves.push(mv);
+        moves.push(chess_move);
     }
 
-    /// Generate pawn moves
-    fn gen_pawn_moves<T: BoardQuery>(
+    /// Generates standard piece moves from an attack bitboard
+    /// Handles captures automatically by checking occupancy
+    #[inline]
+    fn generate_piece_moves<T: BoardQuery>(
+        &self,
+        board: &T,
+        from: Square,
+        piece: Piece,
+        mut targets: BitBoard,
+        occupied: BitBoard,
+        moves: &mut Vec<Move>,
+    ) {
+        let flags = MoveFlags::default();
+
+        while let Some(to) = targets.next() {
+            let capture = if occupied.has(to) {
+                board.piece_at(to).map(|(p, _)| p)
+            } else {
+                None
+            };
+            Self::push_move(moves, from, to, piece, capture, flags, None);
+        }
+    }
+
+    /// Generates all pawn moves including pushes, captures, promotions, and en passant
+    fn generate_pawn_moves<T: BoardQuery>(
         &self,
         board: &T,
         from: Square,
         side: Color,
         occupied: BitBoard,
-        opponent: BitBoard,
+        opponent_pieces: BitBoard,
         moves: &mut Vec<Move>,
     ) {
         let normal_flags = MoveFlags::default();
-        let double_flags = MoveFlags {
+        let double_push_flags = MoveFlags {
             is_double_pawn_push: true,
             ..MoveFlags::default()
         };
 
-        let mut pushes = pawn_moves(from, side, occupied);
-        while let Some(to) = pushes.next() {
-            let is_promo = is_promotion_rank(to, side);
-            let delta = (to.rank() as i8).abs_diff(from.rank() as i8);
-
-            let flags = if delta == 2 {
-                double_flags
+        // Generate pawn pushes
+        let mut push_targets = pawn_moves(from, side, occupied);
+        while let Some(to) = push_targets.next() {
+            let is_promotion = is_promotion_rank(to, side);
+            let is_double_push = (to.rank() as i8).abs_diff(from.rank() as i8) == 2;
+            let flags = if is_double_push {
+                double_push_flags
             } else {
                 normal_flags
             };
 
-            if is_promo {
-                for &promo in &PROMOTION_PIECES {
-                    Self::push(moves, from, to, Piece::Pawn, None, flags, Some(promo));
+            if is_promotion {
+                for &promo_piece in &PROMOTION_PIECES {
+                    Self::push_move(moves, from, to, Piece::Pawn, None, flags, Some(promo_piece));
                 }
             } else {
-                Self::push(moves, from, to, Piece::Pawn, None, flags, None);
+                Self::push_move(moves, from, to, Piece::Pawn, None, flags, None);
             }
         }
 
-        let mut attacks = pawn_attacks(from, side) & opponent;
-        while let Some(to) = attacks.next() {
+        // Generate pawn captures
+        let mut capture_targets = pawn_attacks(from, side) & opponent_pieces;
+        while let Some(to) = capture_targets.next() {
             let captured = board.piece_at(to).map(|(p, _)| p);
-            let is_promo = is_promotion_rank(to, side);
+            let is_promotion = is_promotion_rank(to, side);
 
-            if is_promo {
-                for &promo in &PROMOTION_PIECES {
-                    Self::push(
+            if is_promotion {
+                for &promo_piece in &PROMOTION_PIECES {
+                    Self::push_move(
                         moves,
                         from,
                         to,
                         Piece::Pawn,
                         captured,
                         normal_flags,
-                        Some(promo),
+                        Some(promo_piece),
                     );
                 }
-            } else {
-                if captured.is_some() {
-                    Self::push(moves, from, to, Piece::Pawn, captured, normal_flags, None);
-                }
+            } else if captured.is_some() {
+                Self::push_move(moves, from, to, Piece::Pawn, captured, normal_flags, None);
             }
         }
 
+        // Generate en passant captures
         if let Some(ep_square) = board.en_passant_square() {
             if pawn_attacks(from, side).has(ep_square) {
                 let ep_flags = MoveFlags {
                     is_en_passant: true,
                     ..MoveFlags::default()
                 };
-
-                Self::push(
+                Self::push_move(
                     moves,
                     from,
                     ep_square,
@@ -129,37 +151,27 @@ impl Generator {
         }
     }
 
-    /// Generate knight moves
-    fn gen_knight_moves<T: BoardQuery>(
+    /// Generates knight moves
+    fn generate_knight_moves<T: BoardQuery>(
         &self,
         board: &T,
         from: Square,
         occupied: BitBoard,
-        own: BitBoard,
+        own_pieces: BitBoard,
         moves: &mut Vec<Move>,
     ) {
-        let mut targets = knight_attacks(from) & !own;
-        let flags = MoveFlags::default();
-
-        while let Some(to) = targets.next() {
-            let captured = if occupied.has(to) {
-                board.piece_at(to).map(|(p, _)| p)
-            } else {
-                None
-            };
-
-            Self::push(moves, from, to, Piece::Knight, captured, flags, None);
-        }
+        let targets = knight_attacks(from) & !own_pieces;
+        self.generate_piece_moves(board, from, Piece::Knight, targets, occupied, moves);
     }
 
-    /// Generate slider moves (Bishop, Rook, Queen)
-    fn gen_slider_moves<T: BoardQuery>(
+    /// Generates sliding piece moves (bishop, rook, queen)
+    fn generate_slider_moves<T: BoardQuery>(
         &self,
         board: &T,
         from: Square,
         piece: Piece,
         occupied: BitBoard,
-        own: BitBoard,
+        own_pieces: BitBoard,
         moves: &mut Vec<Move>,
     ) {
         let attacks = match piece {
@@ -168,53 +180,32 @@ impl Generator {
             Piece::Queen => queen_attacks(from, occupied),
             _ => return,
         };
-
-        let mut targets = attacks & !own;
-        let flags = MoveFlags::default();
-
-        while let Some(to) = targets.next() {
-            let captured = if occupied.has(to) {
-                board.piece_at(to).map(|(p, _)| p)
-            } else {
-                None
-            };
-
-            Self::push(moves, from, to, piece, captured, flags, None);
-        }
+        let targets = attacks & !own_pieces;
+        self.generate_piece_moves(board, from, piece, targets, occupied, moves);
     }
 
-    /// Generate king moves
-    fn gen_king_moves<T: BoardQuery>(
+    /// Generates king moves including normal moves (castling handled separately)
+    fn generate_king_moves<T: BoardQuery>(
         &self,
         board: &T,
         from: Square,
         occupied: BitBoard,
-        own: BitBoard,
+        own_pieces: BitBoard,
         moves: &mut Vec<Move>,
     ) {
-        let mut targets = king_attacks(from) & !own;
-        let flags = MoveFlags::default();
-
-        while let Some(to) = targets.next() {
-            let captured = if occupied.has(to) {
-                board.piece_at(to).map(|(p, _)| p)
-            } else {
-                None
-            };
-
-            Self::push(moves, from, to, Piece::King, captured, flags, None);
-        }
+        let targets = king_attacks(from) & !own_pieces;
+        self.generate_piece_moves(board, from, Piece::King, targets, occupied, moves);
 
         if let Some((_, side)) = board.piece_at(from) {
-            self.gen_castling(board, from, side, moves);
+            self.generate_castling_moves(board, from, side, moves);
         }
     }
 
-    /// Generate castling moves
-    fn gen_castling<T: BoardQuery>(
+    /// Generates castling moves if legal
+    fn generate_castling_moves<T: BoardQuery>(
         &self,
         board: &T,
-        king_sq: Square,
+        king_square: Square,
         side: Color,
         moves: &mut Vec<Move>,
     ) {
@@ -224,38 +215,56 @@ impl Generator {
             ..MoveFlags::default()
         };
 
+        // Kingside castling
         if board.can_castle_short(side) {
-            let (e, f, g) = match side {
+            let (king_start, f_square, g_square) = match side {
                 Color::White => (Square::E1, Square::F1, Square::G1),
                 Color::Black => (Square::E8, Square::F8, Square::G8),
             };
 
-            if king_sq == e
-                && !board.is_square_occupied(f)
-                && !board.is_square_occupied(g)
-                && !board.is_square_attacked(e, opponent)
-                && !board.is_square_attacked(f, opponent)
-                && !board.is_square_attacked(g, opponent)
-            {
-                Self::push(moves, e, g, Piece::King, None, castle_flags, None);
+            let path_clear =
+                !board.is_square_occupied(f_square) && !board.is_square_occupied(g_square);
+            let path_safe = !board.is_square_attacked(king_start, opponent)
+                && !board.is_square_attacked(f_square, opponent)
+                && !board.is_square_attacked(g_square, opponent);
+
+            if king_square == king_start && path_clear && path_safe {
+                Self::push_move(
+                    moves,
+                    king_start,
+                    g_square,
+                    Piece::King,
+                    None,
+                    castle_flags,
+                    None,
+                );
             }
         }
 
+        // Queenside castling
         if board.can_castle_long(side) {
-            let (e, d, c, b) = match side {
+            let (king_start, d_square, c_square, b_square) = match side {
                 Color::White => (Square::E1, Square::D1, Square::C1, Square::B1),
                 Color::Black => (Square::E8, Square::D8, Square::C8, Square::B8),
             };
 
-            if king_sq == e
-                && !board.is_square_occupied(d)
-                && !board.is_square_occupied(c)
-                && !board.is_square_occupied(b)
-                && !board.is_square_attacked(e, opponent)
-                && !board.is_square_attacked(d, opponent)
-                && !board.is_square_attacked(c, opponent)
-            {
-                Self::push(moves, e, c, Piece::King, None, castle_flags, None);
+            let path_clear = !board.is_square_occupied(d_square)
+                && !board.is_square_occupied(c_square)
+                && !board.is_square_occupied(b_square);
+            let path_safe = !board.is_square_attacked(king_start, opponent)
+                && !board.is_square_attacked(d_square, opponent)
+                && !board.is_square_attacked(c_square, opponent);
+
+            if king_square == king_start && path_clear && path_safe {
+                Self::push_move(
+                    moves,
+                    king_start,
+                    c_square,
+                    Piece::King,
+                    None,
+                    castle_flags,
+                    None,
+                );
             }
         }
     }
@@ -267,17 +276,27 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         moves.reserve(256);
 
         let side = board.side_to_move();
-        let (occupied, own, opponent) = self.occupancies(board, side);
+        let (occupied, own_pieces, opponent_pieces) = self.occupancies(board, side);
 
-        for sq in own {
-            if let Some((piece, _)) = board.piece_at(sq) {
+        for square in own_pieces {
+            if let Some((piece, _)) = board.piece_at(square) {
                 match piece {
-                    Piece::Pawn => self.gen_pawn_moves(board, sq, side, occupied, opponent, moves),
-                    Piece::Knight => self.gen_knight_moves(board, sq, occupied, own, moves),
-                    Piece::Bishop | Piece::Rook | Piece::Queen => {
-                        self.gen_slider_moves(board, sq, piece, occupied, own, moves)
+                    Piece::Pawn => self.generate_pawn_moves(
+                        board,
+                        square,
+                        side,
+                        occupied,
+                        opponent_pieces,
+                        moves,
+                    ),
+                    Piece::Knight => {
+                        self.generate_knight_moves(board, square, occupied, own_pieces, moves)
                     }
-                    Piece::King => self.gen_king_moves(board, sq, occupied, own, moves),
+                    Piece::Bishop | Piece::Rook | Piece::Queen => self
+                        .generate_slider_moves(board, square, piece, occupied, own_pieces, moves),
+                    Piece::King => {
+                        self.generate_king_moves(board, square, occupied, own_pieces, moves)
+                    }
                 }
             }
         }
@@ -287,7 +306,6 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         self.pseudo_legal(board, moves);
         let side = board.side_to_move();
         let map = PieceMap::from_board(board);
-
         moves.retain(|mv| is_move_legal(&map, side, mv));
     }
 
@@ -312,24 +330,15 @@ struct PieceMap {
 
 impl PieceMap {
     fn from_board<T: BoardQuery>(board: &T) -> Self {
+        // Copy bitboards directly - O(12) vs O(32) piece_at lookups
         let mut pieces = [[BitBoard::EMPTY; 6]; 2];
+        for &piece in &ALL_PIECES {
+            pieces[Color::White as usize][piece as usize] = board.piece_bb(piece, Color::White);
+            pieces[Color::Black as usize][piece as usize] = board.piece_bb(piece, Color::Black);
+        }
 
-        // Get occupancy BitBoards directly from board - avoids fold() computation
         let white_occ = board.occupied_by(Color::White);
         let black_occ = board.occupied_by(Color::Black);
-
-        // Iterate only over occupied squares (~32) instead of all 64
-        for sq in white_occ {
-            if let Some((piece, _)) = board.piece_at(sq) {
-                pieces[Color::White as usize][piece as usize] |= BitBoard::from_square(sq);
-            }
-        }
-
-        for sq in black_occ {
-            if let Some((piece, _)) = board.piece_at(sq) {
-                pieces[Color::Black as usize][piece as usize] |= BitBoard::from_square(sq);
-            }
-        }
 
         Self {
             pieces,
@@ -411,9 +420,6 @@ fn is_move_legal(map: &PieceMap, side: Color, mv: &Move) -> bool {
 mod tests {
     use super::*;
     use board::Board;
-
-    // Note: Proper tests would require a BoardQuery implementation
-    // These are structural tests only
 
     #[test]
     fn test_generator_creation() {
