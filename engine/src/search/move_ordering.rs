@@ -41,6 +41,7 @@ impl MoveOrderer {
         }
     }
 
+    #[inline]
     fn history_score(&self, mv: &Move) -> i32 {
         if mv.capture.is_some() {
             return 0;
@@ -50,6 +51,7 @@ impl MoveOrderer {
         self.history[mv.piece as usize][idx]
     }
 
+    #[inline]
     pub fn store_killer(&mut self, mv: Move, ply: usize) {
         if ply >= MAX_PLY || mv.capture.is_some() {
             return;
@@ -61,6 +63,7 @@ impl MoveOrderer {
         }
     }
 
+    #[inline]
     pub fn is_killer(&self, mv: &Move, ply: usize) -> bool {
         if ply >= MAX_PLY {
             return false;
@@ -70,7 +73,7 @@ impl MoveOrderer {
     }
 
     pub fn order_moves(&self, moves: &mut [Move]) {
-        moves.sort_by(|a, b| {
+        moves.sort_unstable_by(|a, b| {
             let a_score = self.move_score(a);
             let b_score = self.move_score(b);
             b_score.cmp(&a_score)
@@ -78,13 +81,14 @@ impl MoveOrderer {
     }
 
     pub fn order_moves_full(&self, moves: &mut [Move], tt_move: Option<Move>, ply: usize) {
-        moves.sort_by(|a, b| {
+        moves.sort_unstable_by(|a, b| {
             let a_score = self.move_score_full(a, tt_move, ply);
             let b_score = self.move_score_full(b, tt_move, ply);
             b_score.cmp(&a_score)
         });
     }
 
+    #[inline]
     fn move_score(&self, mv: &Move) -> i32 {
         let mut score = 0;
 
@@ -101,6 +105,7 @@ impl MoveOrderer {
         score
     }
 
+    #[inline]
     fn move_score_full(&self, mv: &Move, tt_move: Option<Move>, ply: usize) -> i32 {
         // Highest priority for TT move
         if Some(*mv) == tt_move {

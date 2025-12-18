@@ -53,6 +53,7 @@ impl TTEntry {
     }
 
     /// Adjust mate scores based on ply (for correct mate distance)
+    #[inline]
     pub fn score_to_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
             score + ply as Score
@@ -64,6 +65,7 @@ impl TTEntry {
     }
 
     /// Adjust mate scores when retrieving from TT
+    #[inline]
     pub fn score_from_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
             score - ply as Score
@@ -111,12 +113,14 @@ impl TranspositionTable {
     }
 
     /// Probe the transposition table
+    #[inline]
     pub fn probe(&self, key: u64) -> Option<&TTEntry> {
         let idx = self.index(key);
         self.entries[idx].as_ref().filter(|e| e.key == key)
     }
 
     /// Store an entry in the transposition table
+    #[inline]
     pub fn store(&mut self, entry: TTEntry) {
         let idx = self.index(entry.key);
 
