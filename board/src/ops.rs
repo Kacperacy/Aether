@@ -1,9 +1,7 @@
 use crate::error::MoveError;
 use crate::query::BoardQuery;
 use crate::{Board, BoardError, Result};
-use aether_core::{
-    BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square, ALL_COLORS, ALL_PIECES,
-};
+use aether_core::{BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square};
 
 /// Trait for board operations
 pub trait BoardOps: BoardQuery + Clone {
@@ -44,18 +42,18 @@ impl BoardOps for Board {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        // 3. Remove piece from source
-        self.remove_piece_internal(mv.from);
+        // 3. Remove piece from source (we know the piece type and color)
+        self.remove_piece_known(mv.from, mv.piece, side);
         self.zobrist_toggle_piece(mv.from, mv.piece, side);
 
-        // 4. Handle captures
+        // 4. Handle captures (we know the captured piece type)
         if let Some(captured) = mv.capture {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
-                self.remove_piece_internal(captured_sq);
+                self.remove_piece_known(captured_sq, Piece::Pawn, opponent);
                 self.zobrist_toggle_piece(captured_sq, Piece::Pawn, opponent);
             } else {
-                self.remove_piece_internal(mv.to);
+                self.remove_piece_known(mv.to, captured, opponent);
                 self.zobrist_toggle_piece(mv.to, captured, opponent);
             }
         }
@@ -68,7 +66,7 @@ impl BoardOps for Board {
         // 6. Handle castling rook movement
         if mv.flags.is_castle {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
-            self.remove_piece_internal(rook_from);
+            self.remove_piece_known(rook_from, Piece::Rook, side);
             self.place_piece_internal(rook_to, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_from, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_to, Piece::Rook, side);
@@ -103,9 +101,6 @@ impl BoardOps for Board {
         self.game_state.switch_side();
         self.zobrist_toggle_side();
 
-        // 11. Refresh cache
-        self.cache.refresh(&self.pieces);
-
         Ok(())
     }
 
@@ -116,8 +111,9 @@ impl BoardOps for Board {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         let side = self.game_state.side_to_move;
 
-        // Remove piece from destination
-        self.remove_piece_internal(mv.to);
+        // Remove piece from destination (we know the piece - it's the moved piece or promotion)
+        let final_piece = mv.promotion.unwrap_or(mv.piece);
+        self.remove_piece_known(mv.to, final_piece, side);
 
         // Place original piece at source
         self.place_piece_internal(mv.from, mv.piece, side);
@@ -135,7 +131,7 @@ impl BoardOps for Board {
         // Unmake castling rook movement
         if mv.flags.is_castle {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
-            self.remove_piece_internal(rook_to);
+            self.remove_piece_known(rook_to, Piece::Rook, side);
             self.place_piece_internal(rook_from, Piece::Rook, side);
         }
 
@@ -144,9 +140,6 @@ impl BoardOps for Board {
         self.game_state.castling_rights = state.old_castling_rights;
         self.game_state.halfmove_clock = state.old_halfmove_clock;
         self.zobrist_hash = state.old_zobrist_hash;
-
-        // Refresh cache
-        self.cache.refresh(&self.pieces);
 
         Ok(())
     }
@@ -197,23 +190,15 @@ impl Board {
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = BitBoard::from_square(square);
         self.pieces[color as usize][piece as usize] |= bb;
+        self.cache.add_piece(square, color);
     }
 
-    /// Internal method to remove a piece from the board without updating game state
+    /// Fast remove when piece type and color are known
     #[inline(always)]
-    pub(crate) fn remove_piece_internal(&mut self, square: Square) -> Option<(Piece, Color)> {
+    pub(crate) fn remove_piece_known(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = BitBoard::from_square(square);
-
-        for color in ALL_COLORS {
-            for (piece_idx, piece_bb) in self.pieces[color as usize].iter_mut().enumerate() {
-                if piece_bb.has(square) {
-                    *piece_bb &= !bb;
-                    return Some((ALL_PIECES[piece_idx], color));
-                }
-            }
-        }
-
-        None
+        self.pieces[color as usize][piece as usize] &= !bb;
+        self.cache.remove_piece(square, color);
     }
 
     /// Get the source and destination squares for the castling rook
