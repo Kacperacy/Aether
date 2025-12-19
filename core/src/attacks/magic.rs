@@ -1,4 +1,4 @@
-use crate::{BitBoard, Square, BISHOP_MAGICS, BISHOP_MOVES, ROOK_MAGICS, ROOK_MOVES};
+use crate::{BISHOP_MAGICS, BISHOP_MOVES, BitBoard, ROOK_MAGICS, ROOK_MOVES, Square};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MagicEntry {

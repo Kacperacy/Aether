@@ -7,8 +7,8 @@ use crate::search::{SearchInfo, SearchLimits, SearchResult};
 use aether_core::{Move, Score};
 use board::{Board, BoardOps};
 use movegen::{Generator, MoveGen};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 pub struct Engine {

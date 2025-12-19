@@ -1,8 +1,8 @@
 use crate::MoveGen;
 use aether_core::{
-    bishop_attacks, is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
-    BitBoard, Color, Move, MoveFlags, Piece, Square,
-    ALL_PIECES, PROMOTION_PIECES,
+    ALL_PIECES, BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
+    is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves,
+    queen_attacks, rook_attacks,
 };
 use board::BoardQuery;
 

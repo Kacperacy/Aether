@@ -13,7 +13,7 @@ pub use fen::{FenOps, STARTING_POSITION_FEN};
 pub use ops::BoardOps;
 pub use query::BoardQuery;
 
-use aether_core::{attackers_to_square, BitBoard, Color, File, MoveState, Piece, Rank, Square};
+use aether_core::{BitBoard, Color, File, MoveState, Piece, Rank, Square, attackers_to_square};
 use cache::BoardCache;
 use game_state::GameState;
 use std::num::NonZeroU64;
