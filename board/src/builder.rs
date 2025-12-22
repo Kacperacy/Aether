@@ -2,7 +2,9 @@ use crate::error::BoardError::{
     InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
 };
 use crate::{Result, cache::BoardCache, game_state::GameState};
-use aether_core::{ALL_COLORS, BitBoard, CastlingRights, Color, File, Piece, Rank, Square};
+use aether_core::{
+    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Piece, Rank, Square,
+};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; 6]; 2],
@@ -66,12 +68,22 @@ impl BoardBuilder {
 
         let zobrist_hash = self.compute_zobrist_hash();
 
+        let mut mailbox = [None; 64];
+        for color in ALL_COLORS {
+            for &piece in &ALL_PIECES {
+                for square in self.pieces[color as usize][piece as usize] {
+                    mailbox[square.to_index() as usize] = Some((piece, color));
+                }
+            }
+        }
+
         Ok(super::Board {
             pieces: self.pieces,
             game_state: self.game_state,
             cache,
             zobrist_hash,
             move_history: Vec::new(),
+            mailbox,
         })
     }
 

@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_core::{ALL_PIECES, BitBoard, Color, Piece, Square};
+use aether_core::{BitBoard, Color, Piece, Square};
 
 pub trait BoardQuery {
     /// Piece and color at square, if any
@@ -40,23 +40,7 @@ pub trait BoardQuery {
 
 impl BoardQuery for Board {
     fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        if !self.cache.occupied.has(square) {
-            return None;
-        }
-
-        let color = if self.cache.color_combined[Color::White as usize].has(square) {
-            Color::White
-        } else {
-            Color::Black
-        };
-
-        for (i, piece_bb) in self.pieces[color as usize].iter().enumerate() {
-            if piece_bb.has(square) {
-                return Some((ALL_PIECES[i], color));
-            }
-        }
-
-        None
+        self.mailbox[square.to_index() as usize]
     }
 
     fn is_square_occupied(&self, square: Square) -> bool {

@@ -28,6 +28,8 @@ pub struct Board {
     zobrist_hash: u64,
     /// Stack to store move states for unmake operations
     move_history: Vec<MoveState>,
+    /// Mailbox representation for easy piece lookup
+    mailbox: [Option<(Piece, Color)>; 64],
 }
 
 impl Board {
@@ -39,6 +41,7 @@ impl Board {
             cache: BoardCache::new(),
             zobrist_hash: 0,
             move_history: Vec::new(),
+            mailbox: [None; 64],
         }
     }
 
@@ -80,6 +83,11 @@ impl Board {
     #[inline]
     pub fn move_history(&self) -> &[MoveState] {
         &self.move_history
+    }
+
+    /// Returns the piece and color at the given square without bounds checking
+    pub fn piece_at_fast(&self, square: Square) -> Option<(Piece, Color)> {
+        self.mailbox[square.to_index() as usize]
     }
 
     /// Returns reference to the cache

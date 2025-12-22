@@ -191,6 +191,7 @@ impl Board {
         let bb = BitBoard::from_square(square);
         self.pieces[color as usize][piece as usize] |= bb;
         self.cache.add_piece(square, color);
+        self.mailbox[square.to_index() as usize] = Some((piece, color));
     }
 
     /// Fast remove when piece type and color are known
@@ -199,6 +200,7 @@ impl Board {
         let bb = BitBoard::from_square(square);
         self.pieces[color as usize][piece as usize] &= !bb;
         self.cache.remove_piece(square, color);
+        self.mailbox[square.to_index() as usize] = None;
     }
 
     /// Get the source and destination squares for the castling rook
