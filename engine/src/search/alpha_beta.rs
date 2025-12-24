@@ -186,7 +186,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
                     if result <= alpha {
                         // Failed low, widen window downwards
-                        beta = (alpha + beta) / 2; // Shrink beta towards alpha
                         alpha = (alpha - delta).max(NEG_MATE_SCORE);
                         delta *= 2;
 
@@ -282,7 +281,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // Step 2. Check for quiescence
         // =========================================================================
         if depth == 0 {
-            return self.quiescence(board, ply, alpha, beta);
+            return self.quiescence(board, ply, 0, alpha, beta);
         }
 
         // =========================================================================
@@ -511,10 +510,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     }
 
     /// Quiescence search - search captures until a quiet position is reached
+    /// depth: quiescence depth (0 = first call, -1, -2, ... for deeper levels)
     fn quiescence<T: BoardOps + BoardQuery>(
         &mut self,
         board: &mut T,
         ply: usize,
+        depth: i32,
         mut alpha: Score,
         beta: Score,
     ) -> Score {
@@ -556,7 +557,13 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 return mated_in(ply as u32);
             }
         } else {
+            // Generate captures
             self.generator.captures(board, &mut moves);
+
+            // Generate checks at root quiescence
+            if depth == 0 {
+                self.generator.checks(board, &mut moves);
+            }
         }
 
         self.move_orderer.order_moves(&mut moves);
@@ -565,7 +572,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             board
                 .make_move(&mv)
                 .expect("make_move failed in quiescence");
-            let score = -self.quiescence(board, ply + 1, -beta, -alpha);
+            let score = -self.quiescence(board, ply + 1, depth - 1, -beta, -alpha);
             board
                 .unmake_move(&mv)
                 .expect("unmake_move failed in quiescence");

@@ -318,6 +318,46 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         self.pseudo_legal(board, moves);
         moves.retain(|m| !m.is_capture() && !m.flags.is_en_passant && !m.flags.is_castle);
     }
+
+    fn checks(&self, board: &T, moves: &mut Vec<Move>) {
+        let opponent = board.side_to_move().opponent();
+        let king_sq = match board.get_king_square(opponent) {
+            Some(sq) => sq,
+            None => return, // No king (shouldn't happen)
+        };
+
+        let all_occ = board.occupied_by(board.side_to_move()) | board.occupied_by(opponent);
+
+        // Pre-calculate check squares for each piece type
+        let knight_checks = knight_attacks(king_sq);
+        let bishop_checks = bishop_attacks(king_sq, all_occ);
+        let rook_checks = rook_attacks(king_sq, all_occ);
+        let queen_checks = bishop_checks | rook_checks;
+
+        // Generate quiet moves and filter for checks
+        let mut quiet = Vec::new();
+        self.quiet_moves(board, &mut quiet);
+
+        for mv in quiet {
+            // Skip pawns - rare to give useful checks in quiescence
+            if mv.piece == Piece::Pawn {
+                continue;
+            }
+
+            // Check if move lands on a check square
+            let is_check = match mv.piece {
+                Piece::Knight => knight_checks.has(mv.to),
+                Piece::Bishop => bishop_checks.has(mv.to),
+                Piece::Rook => rook_checks.has(mv.to),
+                Piece::Queen => queen_checks.has(mv.to),
+                _ => false,
+            };
+
+            if is_check {
+                moves.push(mv);
+            }
+        }
+    }
 }
 
 /// Piece map for legality checking

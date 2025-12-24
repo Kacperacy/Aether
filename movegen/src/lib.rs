@@ -15,4 +15,7 @@ pub trait MoveGen<T: BoardQuery> {
 
     /// Quiet (non-capture, non-EP, non-castle) moves only
     fn quiet_moves(&self, board: &T, moves: &mut Vec<Move>);
+
+    /// Quiet checking moves (non-captures that give check)
+    fn checks(&self, board: &T, moves: &mut Vec<Move>);
 }
