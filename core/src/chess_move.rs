@@ -10,27 +10,6 @@ pub struct Move {
     pub flags: MoveFlags,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct MoveFlags {
-    pub is_castle: bool,
-    pub is_en_passant: bool,
-    pub is_double_pawn_push: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct MoveState {
-    pub captured_piece: Option<(Piece, Color)>,
-    pub mv_from: Square,
-    pub mv_to: Square,
-    pub promotion: Option<Piece>,
-
-    /* game-state members */
-    pub old_zobrist_hash: u64,
-    pub old_en_passant: Option<Square>,
-    pub old_castling_rights: [CastlingRights; 2], // [color][side]
-    pub old_halfmove_clock: u16,
-}
-
 impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // 1. origin + destination squares
@@ -98,5 +77,41 @@ impl Move {
     #[inline]
     pub const fn is_capture(&self) -> bool {
         self.capture.is_some()
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct MoveFlags {
+    pub is_castle: bool,
+    pub is_en_passant: bool,
+    pub is_double_pawn_push: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MoveState {
+    pub captured_piece: Option<(Piece, Color)>,
+    pub mv_from: Square,
+    pub mv_to: Square,
+    pub promotion: Option<Piece>,
+
+    /* game-state members */
+    pub old_zobrist_hash: u64,
+    pub old_en_passant: Option<Square>,
+    pub old_castling_rights: [CastlingRights; 2], // [color][side]
+    pub old_halfmove_clock: u16,
+}
+
+impl Default for MoveState {
+    fn default() -> Self {
+        MoveState {
+            captured_piece: None,
+            mv_from: Square::A1,
+            mv_to: Square::A1,
+            promotion: None,
+            old_zobrist_hash: 0,
+            old_en_passant: None,
+            old_castling_rights: [CastlingRights::EMPTY; 2],
+            old_halfmove_clock: 0,
+        }
     }
 }

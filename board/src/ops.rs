@@ -1,6 +1,6 @@
 use crate::error::MoveError;
 use crate::query::BoardQuery;
-use crate::{Board, BoardError, Result};
+use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
 use aether_core::{BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square};
 
 /// Trait for board operations
@@ -24,8 +24,13 @@ impl BoardOps for Board {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();
 
+        debug_assert!(
+            self.history_count < MAX_SEARCH_DEPTH,
+            "Exceeded maximum search depth"
+        );
+
         // 1. Save state for unmake
-        let state = MoveState {
+        self.move_history[self.history_count] = MoveState {
             captured_piece: mv.capture.map(|p| (p, opponent)),
             mv_from: mv.from,
             mv_to: mv.to,
@@ -35,7 +40,8 @@ impl BoardOps for Board {
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
         };
-        self.move_history.push(state);
+
+        self.history_count += 1;
 
         // 2. Update zobrist for en passant (remove old)
         if let Some(ep_sq) = self.game_state.en_passant_square {
@@ -105,7 +111,12 @@ impl BoardOps for Board {
     }
 
     fn unmake_move(&mut self, mv: &Move) -> Result<()> {
-        let state = self.move_history.pop().ok_or(MoveError::NoMoveToUnmake)?;
+        if self.history_count == 0 {
+            return Err(BoardError::ChessMoveError(MoveError::NoMoveToUnmake));
+        }
+
+        self.history_count -= 1;
+        let state = self.move_history[self.history_count];
 
         // Restore side to move (switch back)
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
@@ -155,7 +166,8 @@ impl BoardOps for Board {
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
         };
-        self.move_history.push(state);
+        self.move_history[self.history_count] = state;
+        self.history_count += 1;
 
         if let Some(ep_sq) = self.game_state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
@@ -167,11 +179,15 @@ impl BoardOps for Board {
     }
 
     fn unmake_null_move(&mut self) {
-        if let Some(state) = self.move_history.pop() {
-            self.game_state.side_to_move = self.game_state.side_to_move.opponent();
-            self.game_state.en_passant_square = state.old_en_passant;
-            self.zobrist_hash = state.old_zobrist_hash;
+        if self.history_count == 0 {
+            return;
         }
+        self.history_count -= 1;
+
+        let state = self.move_history[self.history_count];
+        self.game_state.side_to_move = self.game_state.side_to_move.opponent();
+        self.game_state.en_passant_square = state.old_en_passant;
+        self.zobrist_hash = state.old_zobrist_hash;
     }
 
     fn is_in_check(&self, color: Color) -> bool {

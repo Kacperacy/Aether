@@ -4,15 +4,16 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum File {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
+    A = 0,
+    B = 1,
+    C = 2,
+    D = 3,
+    E = 4,
+    F = 5,
+    G = 6,
+    H = 7,
 }
 
 /// All files on a chessboard
@@ -73,18 +74,13 @@ impl File {
     }
 
     /// Unsafe conversion from index (0-7) to File
+    #[inline(always)]
     pub const fn from_index(file: i8) -> Self {
-        match file {
-            0 => Self::A,
-            1 => Self::B,
-            2 => Self::C,
-            3 => Self::D,
-            4 => Self::E,
-            5 => Self::F,
-            6 => Self::G,
-            7 => Self::H,
-            _ => panic!("Invalid file index"),
-        }
+        debug_assert!(file >= 0 && file < 8, "File index out of bounds");
+        // SAFETY:
+        // - File is repr(u8) with explicit values 0-7
+        // - debug_assert checks bounds in debug mode
+        unsafe { std::mem::transmute(file as u8) }
     }
 
     /// Returns the character representation of the File
@@ -154,7 +150,8 @@ impl File {
     }
 
     /// Converts the File to its corresponding index (0-7)
-    pub const fn to_index(self) -> i8 {
-        self as i8
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self as u8
     }
 }

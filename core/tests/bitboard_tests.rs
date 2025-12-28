@@ -118,15 +118,15 @@ mod tests {
     #[test]
     fn test_next() {
         let mut bb = BitBoard(0xaaaaaaaaaaaaaaaa);
-        let square = bb.next().unwrap();
+        let square = bb.iter().next().unwrap();
         assert_eq!(square, Square::B1);
-        assert_eq!(bb.value(), 0xaaaaaaaaaaaaaaa8);
+        assert_eq!(bb.value(), 0xaaaaaaaaaaaaaaaa);
     }
 
     #[test]
     fn test_iter() {
         let bb = BitBoard(0xffffffffffffffff);
-        let mut iter = bb.into_iter();
+        let mut iter = bb.iter();
         assert_eq!(iter.next().unwrap(), Square::A1);
         assert_eq!(iter.next().unwrap(), Square::B1);
         assert_eq!(iter.next().unwrap(), Square::C1);

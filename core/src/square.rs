@@ -4,15 +4,16 @@ use std::str::FromStr;
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum Square {
-    A1, B1, C1, D1, E1, F1, G1, H1,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A8, B8, C8, D8, E8, F8, G8, H8,
+    A1 =  0, B1 =  1, C1 =  2, D1 =  3, E1 =  4, F1 =  5, G1 =  6, H1 =  7,
+    A2 =  8, B2 =  9, C2 = 10, D2 = 11, E2 = 12, F2 = 13, G2 = 14, H2 = 15,
+    A3 = 16, B3 = 17, C3 = 18, D3 = 19, E3 = 20, F3 = 21, G3 = 22, H3 = 23,
+    A4 = 24, B4 = 25, C4 = 26, D4 = 27, E4 = 28, F4 = 29, G4 = 30, H4 = 31,
+    A5 = 32, B5 = 33, C5 = 34, D5 = 35, E5 = 36, F5 = 37, G5 = 38, H5 = 39,
+    A6 = 40, B6 = 41, C6 = 42, D6 = 43, E6 = 44, F6 = 45, G6 = 46, H6 = 47,
+    A7 = 48, B7 = 49, C7 = 50, D7 = 51, E7 = 52, F7 = 53, G7 = 54, H7 = 55,
+    A8 = 56, B8 = 57, C8 = 58, D8 = 59, E8 = 60, F8 = 61, G8 = 62, H8 = 63,
 }
 
 #[rustfmt::skip]
@@ -70,18 +71,20 @@ impl Square {
     pub const NUM: usize = 64;
 
     /// Create a new Square from a File and Rank
-    #[rustfmt::skip]
+    #[inline(always)]
     pub const fn new(file: File, rank: Rank) -> Self {
-        let index = rank as i8 * 8 + file as i8;
-        ALL_SQUARES[index as usize]
+        let index = (rank as u8) * 8 + (file as u8);
+        Self::from_index(index as i8)
     }
 
     /// Create a Square from an index (0-63)
+    #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
-        let file = File::from_index(index % 8);
-        let rank = Rank::from_index(index / 8);
-        Self::new(file, rank)
+        // SAFETY:
+        // - Square is repr(u8) with explicit values 0-63
+        // - debug_assert checks bounds in debug mode
+        unsafe { std::mem::transmute(index as u8) }
     }
 
     pub const fn try_from_index(index: i8) -> Option<Self> {
@@ -93,41 +96,25 @@ impl Square {
     }
 
     /// Convert the Square to an index (0-63)
+    #[inline(always)]
     pub const fn to_index(self) -> u8 {
-        (self as u8) % 64
+        self as u8
     }
 
     /// Get the File of the Square
-    #[rustfmt::skip]
+    #[inline(always)]
     pub const fn file(self) -> File {
-        match self {
-            Self::A1 | Self::A2 | Self::A3 | Self::A4 | Self::A5 | Self::A6 | Self::A7 | Self::A8 => File::A,
-            Self::B1 | Self::B2 | Self::B3 | Self::B4 | Self::B5 | Self::B6 | Self::B7 | Self::B8 => File::B,
-            Self::C1 | Self::C2 | Self::C3 | Self::C4 | Self::C5 | Self::C6 | Self::C7 | Self::C8 => File::C,
-            Self::D1 | Self::D2 | Self::D3 | Self::D4 | Self::D5 | Self::D6 | Self::D7 | Self::D8 => File::D,
-            Self::E1 | Self::E2 | Self::E3 | Self::E4 | Self::E5 | Self::E6 | Self::E7 | Self::E8 => File::E,
-            Self::F1 | Self::F2 | Self::F3 | Self::F4 | Self::F5 | Self::F6 | Self::F7 | Self::F8 => File::F,
-            Self::G1 | Self::G2 | Self::G3 | Self::G4 | Self::G5 | Self::G6 | Self::G7 | Self::G8 => File::G,
-            Self::H1 | Self::H2 | Self::H3 | Self::H4 | Self::H5 | Self::H6 | Self::H7 | Self::H8 => File::H,
-        }
+        File::from_index(((self as u8) % 8) as i8)
     }
 
     /// Get the Rank of the Square
-    #[rustfmt::skip]
+    #[inline(always)]
     pub const fn rank(self) -> Rank {
-        match self {
-            Self::A1 | Self::B1 | Self::C1 | Self::D1 | Self::E1 | Self::F1 | Self::G1 | Self::H1 => Rank::One,
-            Self::A2 | Self::B2 | Self::C2 | Self::D2 | Self::E2 | Self::F2 | Self::G2 | Self::H2 => Rank::Two,
-            Self::A3 | Self::B3 | Self::C3 | Self::D3 | Self::E3 | Self::F3 | Self::G3 | Self::H3 => Rank::Three,
-            Self::A4 | Self::B4 | Self::C4 | Self::D4 | Self::E4 | Self::F4 | Self::G4 | Self::H4 => Rank::Four,
-            Self::A5 | Self::B5 | Self::C5 | Self::D5 | Self::E5 | Self::F5 | Self::G5 | Self::H5 => Rank::Five,
-            Self::A6 | Self::B6 | Self::C6 | Self::D6 | Self::E6 | Self::F6 | Self::G6 | Self::H6 => Rank::Six,
-            Self::A7 | Self::B7 | Self::C7 | Self::D7 | Self::E7 | Self::F7 | Self::G7 | Self::H7 => Rank::Seven,
-            Self::A8 | Self::B8 | Self::C8 | Self::D8 | Self::E8 | Self::F8 | Self::G8 | Self::H8 => Rank::Eight,
-        }
+        Rank::from_index(((self as u8) / 8) as i8)
     }
 
     /// Get the BitBoard representation of the Square
+    #[inline(always)]
     pub const fn bitboard(self) -> BitBoard {
         BitBoard(1 << self as u8)
     }

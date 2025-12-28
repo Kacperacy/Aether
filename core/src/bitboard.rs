@@ -128,6 +128,18 @@ impl BitBoard {
         self.0.count_ones()
     }
 
+    /// Returns an iterator over all set squares (non-mutating)
+    #[inline(always)]
+    pub const fn iter(self) -> BitBoardIter {
+        BitBoardIter { bits: self.0 }
+    }
+
+    /// Counts the number of set bits (returns usize for convenience)
+    #[inline(always)]
+    pub const fn count(self) -> usize {
+        self.0.count_ones() as usize
+    }
+
     pub const fn is_empty(self) -> bool {
         self.0 == Self::EMPTY.0
     }
@@ -179,12 +191,36 @@ impl BitBoard {
     }
 }
 
-impl Iterator for BitBoard {
+/// Iterator over set bits in a BitBoard (non-mutating)
+#[derive(Debug, Clone, Copy)]
+pub struct BitBoardIter {
+    bits: u64,
+}
+
+impl Iterator for BitBoardIter {
     type Item = Square;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Square> {
-        let square = self.next_square();
-        *self -= square?.bitboard();
-        square
+        if self.bits == 0 {
+            return None;
+        }
+
+        let idx = self.bits.trailing_zeros();
+        self.bits &= self.bits - 1; // Clear lowest set bit (efficient bit trick)
+        Some(Square::from_index(idx as i8))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let count = self.bits.count_ones() as usize;
+        (count, Some(count))
+    }
+}
+
+impl ExactSizeIterator for BitBoardIter {
+    #[inline]
+    fn len(&self) -> usize {
+        self.bits.count_ones() as usize
     }
 }

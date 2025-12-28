@@ -4,15 +4,16 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum Rank {
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
+    One = 0,
+    Two = 1,
+    Three = 2,
+    Four = 3,
+    Five = 4,
+    Six = 5,
+    Seven = 6,
+    Eight = 7,
 }
 
 /// All ranks on a chessboard
@@ -73,18 +74,13 @@ impl Rank {
     }
 
     /// Unsafe conversion from index (0-7) to Rank
+    #[inline(always)]
     pub const fn from_index(rank: i8) -> Self {
-        match rank {
-            0 => Self::One,
-            1 => Self::Two,
-            2 => Self::Three,
-            3 => Self::Four,
-            4 => Self::Five,
-            5 => Self::Six,
-            6 => Self::Seven,
-            7 => Self::Eight,
-            _ => panic!("Invalid rank"),
-        }
+        debug_assert!(rank >= 0 && rank < 8, "Rank index out of bounds");
+        // SAFETY:
+        // - Rank is repr(u8) with explicit values 0-7
+        // - debug_assert checks bounds in debug mode
+        unsafe { std::mem::transmute(rank as u8) }
     }
 
     /// Returns the character representation of the Rank
@@ -145,5 +141,11 @@ impl Rank {
             Color::White => self,
             Color::Black => self.flip(),
         }
+    }
+
+    /// Converts the Rank to its corresponding index (0-7)
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self as u8
     }
 }

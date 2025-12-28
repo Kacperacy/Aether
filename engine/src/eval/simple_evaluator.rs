@@ -262,7 +262,7 @@ impl SimpleEvaluator {
             let material = piece.value() as i32;
 
             // White pieces
-            for square in board.piece_bb(piece, Color::White) {
+            for square in board.piece_bb(piece, Color::White).iter() {
                 let idx = Self::pst_index(square, Color::White);
                 let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
                 mg_score += material + pst_mg;
@@ -270,7 +270,7 @@ impl SimpleEvaluator {
             }
 
             // Black pieces
-            for square in board.piece_bb(piece, Color::Black) {
+            for square in board.piece_bb(piece, Color::Black).iter() {
                 let idx = Self::pst_index(square, Color::Black);
                 let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
                 mg_score -= material + pst_mg;

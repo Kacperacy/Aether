@@ -56,13 +56,13 @@ impl Generator {
         board: &T,
         from: Square,
         piece: Piece,
-        mut targets: BitBoard,
+        targets: BitBoard,
         occupied: BitBoard,
         moves: &mut Vec<Move>,
     ) {
         let flags = MoveFlags::default();
 
-        while let Some(to) = targets.next() {
+        for to in targets.iter() {
             let capture = if occupied.has(to) {
                 board.piece_at(to).map(|(p, _)| p)
             } else {
@@ -89,10 +89,10 @@ impl Generator {
         };
 
         // Generate pawn pushes
-        let mut push_targets = pawn_moves(from, side, occupied);
-        while let Some(to) = push_targets.next() {
+        let push_targets = pawn_moves(from, side, occupied);
+        for to in push_targets.iter() {
             let is_promotion = is_promotion_rank(to, side);
-            let is_double_push = (to.rank() as i8).abs_diff(from.rank() as i8) == 2;
+            let is_double_push = to.rank().to_index().abs_diff(from.rank().to_index()) == 2;
             let flags = if is_double_push {
                 double_push_flags
             } else {
@@ -109,8 +109,8 @@ impl Generator {
         }
 
         // Generate pawn captures
-        let mut capture_targets = pawn_attacks(from, side) & opponent_pieces;
-        while let Some(to) = capture_targets.next() {
+        let capture_targets = pawn_attacks(from, side) & opponent_pieces;
+        for to in capture_targets.iter() {
             let captured = board.piece_at(to).map(|(p, _)| p);
             let is_promotion = is_promotion_rank(to, side);
 
@@ -278,7 +278,7 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         let side = board.side_to_move();
         let (occupied, own_pieces, opponent_pieces) = self.occupancies(board, side);
 
-        for square in own_pieces {
+        for square in own_pieces.iter() {
             if let Some((piece, _)) = board.piece_at(square) {
                 match piece {
                     Piece::Pawn => self.generate_pawn_moves(

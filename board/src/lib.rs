@@ -20,6 +20,8 @@ use std::num::NonZeroU64;
 
 pub type Result<T> = std::result::Result<T, BoardError>;
 
+const MAX_SEARCH_DEPTH: usize = 256;
+
 #[derive(Debug, Clone)]
 pub struct Board {
     pieces: [[BitBoard; 6]; 2],
@@ -27,7 +29,8 @@ pub struct Board {
     cache: BoardCache,
     zobrist_hash: u64,
     /// Stack to store move states for unmake operations
-    move_history: Vec<MoveState>,
+    move_history: [MoveState; MAX_SEARCH_DEPTH],
+    history_count: usize,
     /// Mailbox representation for easy piece lookup
     mailbox: [Option<(Piece, Color)>; 64],
 }
@@ -40,7 +43,8 @@ impl Board {
             game_state: GameState::new(),
             cache: BoardCache::new(),
             zobrist_hash: 0,
-            move_history: Vec::new(),
+            move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
+            history_count: 0,
             mailbox: [None; 64],
         }
     }

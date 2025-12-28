@@ -47,7 +47,7 @@ pub fn main() {
 
     let attacks = BitBoard(moves[index as usize]);
     println!("\nAttack squares:");
-    for sq in attacks {
+    for sq in attacks.iter() {
         println!("  {}", sq);
     }
 
@@ -55,7 +55,7 @@ pub fn main() {
     println!("\n\nUsing bishop_attacks function:");
     let lib_attacks = bishop_attacks(f1, occupied);
     println!("Attacks: {:064b}", lib_attacks.value());
-    for sq in lib_attacks {
+    for sq in lib_attacks.iter() {
         println!("  {}", sq);
     }
 
