@@ -51,19 +51,23 @@ impl BoardQuery for Board {
         !self.attackers_to_square(square, by_color).is_empty()
     }
 
+    #[inline(always)]
     fn piece_count(&self, piece: Piece, color: Color) -> u32 {
         self.pieces[color as usize][piece as usize].len()
     }
 
+    #[inline(always)]
     fn get_king_square(&self, color: Color) -> Option<Square> {
-        self.pieces[color as usize][Piece::King as usize].to_square()
+        // Use cached king square for O(1) lookup instead of bitboard iteration
+        self.cache.king_square(color)
     }
 
+    #[inline(always)]
     fn occupied_by(&self, color: Color) -> BitBoard {
         self.cache.color_combined[color as usize]
     }
 
-    #[inline]
+    #[inline(always)]
     fn piece_bb(&self, piece: Piece, color: Color) -> BitBoard {
         self.pieces[color as usize][piece as usize]
     }
@@ -142,11 +146,22 @@ impl BoardQuery for Board {
         false
     }
 
+    /// Returns true if the current position has occurred 3+ times in the game.
+    ///
+    /// Note: `repetition_count()` returns the number of PREVIOUS occurrences
+    /// (not including the current position). So:
+    /// - repetition_count() == 0: position seen for the 1st time
+    /// - repetition_count() == 1: position seen for the 2nd time (twofold)
+    /// - repetition_count() >= 2: position seen for the 3rd+ time (threefold)
     #[inline]
     fn is_threefold_repetition(&self) -> bool {
         self.repetition_count() >= 2
     }
 
+    /// Returns true if the current position has occurred 2+ times in the game.
+    ///
+    /// Useful for search to detect potential draws before they occur.
+    /// See `is_threefold_repetition()` for semantics of `repetition_count()`.
     #[inline]
     fn is_twofold_repetition(&self) -> bool {
         self.repetition_count() >= 1

@@ -78,12 +78,18 @@ impl Square {
     }
 
     /// Create a Square from an index (0-63)
+    ///
+    /// # Safety invariant
+    /// This function uses unsafe transmute for performance in hot paths (called
+    /// millions of times per second in search). The safety is guaranteed by:
+    /// - Square is #[repr(u8)] with values 0-63 matching the index
+    /// - All callers within this crate use valid indices (e.g., from bitboard iteration)
+    /// - External callers should use `try_from_index()` for untrusted input
+    /// - debug_assert validates bounds in debug builds
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
-        // SAFETY:
-        // - Square is repr(u8) with explicit values 0-63
-        // - debug_assert checks bounds in debug mode
+        // SAFETY: Square is repr(u8) with explicit values 0-63, callers ensure valid index
         unsafe { std::mem::transmute(index as u8) }
     }
 

@@ -48,6 +48,9 @@ const ASPIRATION_WINDOW: Score = 50;
 /// Beyond this value, re-searches waste more time than full-width search
 const ASPIRATION_MAX_DELTA: Score = 400;
 
+/// Average number of legal moves in a chess position (~35)
+const AVG_LEGAL_MOVES: usize = 40;
+
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
     generator: Generator,
@@ -121,9 +124,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         let mut best_move: Option<Move> = None;
         let mut best_score: Score = NEG_MATE_SCORE;
-        let mut pv = Vec::new();
+        let mut pv = Vec::with_capacity(max_depth as usize);
 
-        let mut legal_moves = Vec::new();
+        let mut legal_moves = Vec::with_capacity(AVG_LEGAL_MOVES);
         self.generator.legal(board, &mut legal_moves);
 
         if legal_moves.is_empty() {
@@ -163,7 +166,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
 
             self.info.depth = depth;
-            let mut current_pv = Vec::new();
+            let mut current_pv = Vec::with_capacity(depth as usize);
 
             let score;
 
@@ -171,7 +174,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 let mut delta = ASPIRATION_WINDOW;
                 let mut alpha = (prev_score - delta).max(NEG_MATE_SCORE);
                 let mut beta = (prev_score + delta).min(MATE_SCORE);
-                let mut best_pv = Vec::new();
+                let mut best_pv = Vec::with_capacity(depth as usize);
 
                 loop {
                     current_pv.clear();
@@ -333,6 +336,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         {
             board.make_null_move();
 
+            // Null-window search doesn't need PV, use empty vec (no allocation until push)
             let null_score = -self.alpha_beta(
                 board,
                 depth.saturating_sub(NULL_MOVE_REDUCTION + 1),
@@ -353,7 +357,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // =========================================================================
         // Step 6. Generate and order moves
         // =========================================================================
-        let mut moves = Vec::new();
+        let mut moves = Vec::with_capacity(AVG_LEGAL_MOVES);
         self.generator.legal(board, &mut moves);
 
         if moves.is_empty() {
@@ -379,7 +383,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 continue;
             }
 
-            let mut child_pv: Vec<Move> = Vec::new();
+            // Pre-allocate child PV with remaining depth (max possible PV length)
+            let mut child_pv = Vec::with_capacity(depth as usize);
             let gives_check = board.is_in_check(board.side_to_move());
             let extension: u8 = if gives_check { 1 } else { 0 };
 
@@ -549,7 +554,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        let mut moves = Vec::new();
+        // Pre-allocate for captures (~10-15 typical) or all moves if in check
+        let mut moves = Vec::with_capacity(if in_check { AVG_LEGAL_MOVES } else { 16 });
         if in_check {
             self.generator.legal(board, &mut moves);
 

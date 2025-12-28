@@ -46,28 +46,28 @@ impl Board {
     }
 
     /// XOR piece key into hash (for adding or removing a piece)
-    #[inline]
+    #[inline(always)]
     pub(crate) fn zobrist_toggle_piece(&mut self, square: Square, piece: Piece, color: Color) {
         let keys = zobrist_keys();
         self.zobrist_hash ^= keys.piece_key(square, piece, color);
     }
 
     /// XOR side to move key into hash
-    #[inline]
+    #[inline(always)]
     pub(crate) fn zobrist_toggle_side(&mut self) {
         let keys = zobrist_keys();
         self.zobrist_hash ^= keys.side_to_move;
     }
 
     /// XOR castling key into hash
-    #[inline]
+    #[inline(always)]
     pub(crate) fn zobrist_toggle_castling(&mut self, color: Color, kingside: bool) {
         let keys = zobrist_keys();
         self.zobrist_hash ^= keys.castling_key(color, kingside);
     }
 
     /// XOR en passant key into hash
-    #[inline]
+    #[inline(always)]
     pub(crate) fn zobrist_toggle_en_passant(&mut self, file: File) {
         let keys = zobrist_keys();
         self.zobrist_hash ^= keys.en_passant_key(file);

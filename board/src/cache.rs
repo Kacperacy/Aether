@@ -1,4 +1,4 @@
-use aether_core::{ALL_COLORS, BitBoard, Color, Square};
+use aether_core::{ALL_COLORS, BitBoard, Color, Piece, Square};
 
 /// Cached aggregate bitboards for fast access during move generation and evaluation
 #[derive(Debug, Clone, PartialEq)]
@@ -7,6 +7,8 @@ pub struct BoardCache {
     pub color_combined: [BitBoard; 2],
     /// All occupied squares
     pub occupied: BitBoard,
+    /// Cached king squares for each color (avoids bitboard iteration)
+    pub king_squares: [Option<Square>; 2],
 }
 
 impl BoardCache {
@@ -16,6 +18,7 @@ impl BoardCache {
         Self {
             color_combined: [BitBoard::EMPTY; 2],
             occupied: BitBoard::EMPTY,
+            king_squares: [None; 2],
         }
     }
 
@@ -28,8 +31,22 @@ impl BoardCache {
                 | pieces[color as usize][3]
                 | pieces[color as usize][4]
                 | pieces[color as usize][5];
+            // Cache king square (King is piece index 5)
+            self.king_squares[color as usize] = pieces[color as usize][Piece::King as usize].to_square();
         }
         self.occupied = self.color_combined[0] | self.color_combined[1];
+    }
+
+    /// Updates cached king square when king moves
+    #[inline(always)]
+    pub fn update_king_square(&mut self, color: Color, square: Option<Square>) {
+        self.king_squares[color as usize] = square;
+    }
+
+    /// Gets cached king square for color
+    #[inline(always)]
+    pub fn king_square(&self, color: Color) -> Option<Square> {
+        self.king_squares[color as usize]
     }
 
     /// Incrementally updates the cache when a piece is added

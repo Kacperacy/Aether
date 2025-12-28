@@ -54,17 +54,20 @@ impl ZobristKeys {
     }
 
     /// Get piece key for specific square, piece, and color
+    #[inline(always)]
     pub fn piece_key(&self, square: Square, piece: Piece, color: Color) -> u64 {
         self.pieces[square.to_index() as usize][piece as usize][color as usize]
     }
 
     /// Get castling key for specific color and side
+    #[inline(always)]
     pub fn castling_key(&self, color: Color, kingside: bool) -> u64 {
         let side = if kingside { 0 } else { 1 };
         self.castling[color as usize][side]
     }
 
     /// Get en passant key for specific file
+    #[inline(always)]
     pub fn en_passant_key(&self, file: File) -> u64 {
         self.en_passant[file.to_index() as usize]
     }

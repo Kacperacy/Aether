@@ -41,7 +41,7 @@ impl MoveOrderer {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn history_score(&self, mv: &Move) -> i32 {
         if mv.capture.is_some() {
             return 0;
@@ -88,7 +88,7 @@ impl MoveOrderer {
         });
     }
 
-    #[inline]
+    #[inline(always)]
     fn move_score(&self, mv: &Move) -> i32 {
         let mut score = 0;
 
@@ -105,7 +105,7 @@ impl MoveOrderer {
         score
     }
 
-    #[inline]
+    #[inline(always)]
     fn move_score_full(&self, mv: &Move, tt_move: Option<Move>, ply: usize) -> i32 {
         // Highest priority for TT move
         if Some(*mv) == tt_move {

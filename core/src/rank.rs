@@ -73,13 +73,16 @@ impl Rank {
         }
     }
 
-    /// Unsafe conversion from index (0-7) to Rank
+    /// Fast conversion from index (0-7) to Rank
+    ///
+    /// # Safety invariant
+    /// Uses unsafe transmute for performance. Safety guaranteed by:
+    /// - Rank is #[repr(u8)] with values 0-7 matching the index
+    /// - External callers should use `try_from_index()` for untrusted input
     #[inline(always)]
     pub const fn from_index(rank: i8) -> Self {
         debug_assert!(rank >= 0 && rank < 8, "Rank index out of bounds");
-        // SAFETY:
-        // - Rank is repr(u8) with explicit values 0-7
-        // - debug_assert checks bounds in debug mode
+        // SAFETY: Rank is repr(u8) with explicit values 0-7
         unsafe { std::mem::transmute(rank as u8) }
     }
 
