@@ -1,9 +1,15 @@
 use crate::search::MAX_PLY;
 use aether_core::{Move, Piece, Square};
 
+/// Penalty applied to moves that would lead to a repeated position
+const REPETITION_PENALTY: i32 = -5000;
+
 pub struct MoveOrderer {
     killers: [[Option<Move>; 2]; MAX_PLY],
     history: [[i32; 64]; 6],
+    /// Tracks moves that led to repetitions (indexed by from-to square pair)
+    /// Uses a simple hash: from * 64 + to
+    repetition_moves: [bool; 64 * 64],
 }
 
 impl MoveOrderer {
@@ -11,12 +17,33 @@ impl MoveOrderer {
         Self {
             killers: [[None; 2]; MAX_PLY],
             history: [[0; 64]; 6],
+            repetition_moves: [false; 64 * 64],
         }
     }
 
     pub fn clear(&mut self) {
         self.killers = [[None; 2]; MAX_PLY];
         self.history = [[0; 64]; 6];
+        self.repetition_moves = [false; 64 * 64];
+    }
+
+    /// Clears only the repetition moves tracking (call at start of each search)
+    pub fn clear_repetitions(&mut self) {
+        self.repetition_moves = [false; 64 * 64];
+    }
+
+    /// Marks a move as leading to a repeated position
+    #[inline]
+    pub fn mark_repetition_move(&mut self, mv: &Move) {
+        let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
+        self.repetition_moves[idx] = true;
+    }
+
+    /// Checks if a move was previously found to lead to a repetition
+    #[inline]
+    fn is_repetition_move(&self, mv: &Move) -> bool {
+        let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
+        self.repetition_moves[idx]
     }
 
     pub fn update_history(&mut self, mv: Move, depth: usize) {
@@ -124,6 +151,11 @@ impl MoveOrderer {
 
         if self.is_killer(mv, ply) {
             return 8_000;
+        }
+
+        // Penalize moves that previously led to repetitions
+        if self.is_repetition_move(mv) {
+            return REPETITION_PENALTY;
         }
 
         self.history_score(mv)

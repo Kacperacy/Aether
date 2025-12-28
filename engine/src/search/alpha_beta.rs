@@ -118,6 +118,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.start_time = Some(Instant::now());
         self.soft_limit = limits.time;
         self.hard_limit = limits.hard_time;
+        self.move_orderer.clear_repetitions();
 
         let start_time = self.start_time.unwrap();
         let max_depth = limits.depth.unwrap_or(MAX_PLY as u8).min(MAX_PLY as u8);
@@ -294,8 +295,16 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return self.evaluator.evaluate(board);
         }
 
+        // Draw detection: use threefold for actual draw, twofold only at root to avoid repetitions
+        // This prevents accepting draws too early while still avoiding repetition loops
+        let dominated_repetition = if ply <= 2 {
+            board.is_twofold_repetition() // At root: avoid repeating positions
+        } else {
+            board.is_threefold_repetition() // Deeper: only actual threefold is draw
+        };
+
         if ply > 0
-            && (board.is_twofold_repetition()
+            && (dominated_repetition
                 || board.is_fifty_move_draw()
                 || board.is_insufficient_material())
         {
@@ -381,6 +390,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             // --- Step 7a. Make move ---
             if board.make_move(mv).is_err() {
                 continue;
+            }
+
+            // Mark moves that lead to twofold repetition for future ordering
+            if board.is_twofold_repetition() {
+                self.move_orderer.mark_repetition_move(mv);
             }
 
             // Pre-allocate child PV with remaining depth (max possible PV length)
