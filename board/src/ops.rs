@@ -208,10 +208,6 @@ impl Board {
         self.pieces[color as usize][piece as usize] |= bb;
         self.cache.add_piece(square, color);
         self.mailbox[square.to_index() as usize] = Some((piece, color));
-        // Update cached king square
-        if piece == Piece::King {
-            self.cache.update_king_square(color, Some(square));
-        }
     }
 
     /// Fast remove when piece type and color are known
@@ -221,7 +217,6 @@ impl Board {
         self.pieces[color as usize][piece as usize] &= !bb;
         self.cache.remove_piece(square, color);
         self.mailbox[square.to_index() as usize] = None;
-        // Note: King square will be updated when placed at new position
     }
 
     /// Get the source and destination squares for the castling rook

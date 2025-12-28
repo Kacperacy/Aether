@@ -58,8 +58,8 @@ impl BoardQuery for Board {
 
     #[inline(always)]
     fn get_king_square(&self, color: Color) -> Option<Square> {
-        // Use cached king square for O(1) lookup instead of bitboard iteration
-        self.cache.king_square(color)
+        // Use bitboard lookup (cache version had issues)
+        self.pieces[color as usize][Piece::King as usize].to_square()
     }
 
     #[inline(always)]
