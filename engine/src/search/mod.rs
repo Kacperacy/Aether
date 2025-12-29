@@ -2,6 +2,7 @@
 
 pub mod alpha_beta;
 mod move_ordering;
+pub mod see;
 pub mod tt;
 
 pub use tt::{NodeType, TTEntry, TranspositionTable};

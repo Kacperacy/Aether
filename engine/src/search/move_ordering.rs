@@ -1,14 +1,14 @@
+use crate::search::see::{see_ge, see_value};
 use crate::search::MAX_PLY;
-use aether_core::{Move, Piece, Square};
+use aether_core::{BitBoard, Color, Move, Piece, Square};
 
-/// Penalty applied to moves that would lead to a repeated position
 const REPETITION_PENALTY: i32 = -5000;
+const GOOD_CAPTURE_SCORE: i32 = 10_000;
+const BAD_CAPTURE_SCORE: i32 = -2_000;
 
 pub struct MoveOrderer {
     killers: [[Option<Move>; 2]; MAX_PLY],
     history: [[i32; 64]; 6],
-    /// Tracks moves that led to repetitions (indexed by from-to square pair)
-    /// Uses a simple hash: from * 64 + to
     repetition_moves: [bool; 64 * 64],
 }
 
@@ -27,19 +27,16 @@ impl MoveOrderer {
         self.repetition_moves = [false; 64 * 64];
     }
 
-    /// Clears only the repetition moves tracking (call at start of each search)
     pub fn clear_repetitions(&mut self) {
         self.repetition_moves = [false; 64 * 64];
     }
 
-    /// Marks a move as leading to a repeated position
     #[inline]
     pub fn mark_repetition_move(&mut self, mv: &Move) {
         let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
         self.repetition_moves[idx] = true;
     }
 
-    /// Checks if a move was previously found to lead to a repetition
     #[inline]
     fn is_repetition_move(&self, mv: &Move) -> bool {
         let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
@@ -73,9 +70,7 @@ impl MoveOrderer {
         if mv.capture.is_some() {
             return 0;
         }
-
-        let idx = mv.to.to_index() as usize;
-        self.history[mv.piece as usize][idx]
+        self.history[mv.piece as usize][mv.to.to_index() as usize]
     }
 
     #[inline]
@@ -95,7 +90,6 @@ impl MoveOrderer {
         if ply >= MAX_PLY {
             return false;
         }
-
         self.killers[ply][0] == Some(*mv) || self.killers[ply][1] == Some(*mv)
     }
 
@@ -107,44 +101,46 @@ impl MoveOrderer {
         });
     }
 
-    pub fn order_moves_full(&self, moves: &mut [Move], tt_move: Option<Move>, ply: usize) {
+    pub fn order_moves_with_see(
+        &self,
+        moves: &mut [Move],
+        tt_move: Option<Move>,
+        ply: usize,
+        side: Color,
+        occupied: BitBoard,
+        pieces: &[[BitBoard; 6]; 2],
+    ) {
         moves.sort_unstable_by(|a, b| {
-            let a_score = self.move_score_full(a, tt_move, ply);
-            let b_score = self.move_score_full(b, tt_move, ply);
+            let a_score = self.move_score_with_see(a, tt_move, ply, side, occupied, pieces);
+            let b_score = self.move_score_with_see(b, tt_move, ply, side, occupied, pieces);
             b_score.cmp(&a_score)
         });
     }
 
     #[inline(always)]
-    fn move_score(&self, mv: &Move) -> i32 {
-        let mut score = 0;
-
-        // Captures: MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
-        if let Some(captured) = mv.capture {
-            score += 10 * captured.value() as i32 - mv.piece.value() as i32;
-        }
-
-        // Promotions
-        if let Some(promo) = mv.promotion {
-            score += 100 + promo.value() as i32;
-        }
-
-        score
-    }
-
-    #[inline(always)]
-    fn move_score_full(&self, mv: &Move, tt_move: Option<Move>, ply: usize) -> i32 {
-        // Highest priority for TT move
+    fn move_score_with_see(
+        &self,
+        mv: &Move,
+        tt_move: Option<Move>,
+        ply: usize,
+        side: Color,
+        occupied: BitBoard,
+        pieces: &[[BitBoard; 6]; 2],
+    ) -> i32 {
         if Some(*mv) == tt_move {
             return 20_000;
         }
 
-        // Captures: MVV-LVA
-        if let Some(captured) = mv.capture {
-            return 10_000 + 10 * captured.value() as i32 - mv.piece.value() as i32;
+        if mv.capture.is_some() {
+            if see_ge(mv, side, 0, occupied, pieces) {
+                let captured = mv.capture.unwrap();
+                return GOOD_CAPTURE_SCORE + 10 * captured.value() as i32 - mv.piece.value() as i32;
+            } else {
+                let see = see_value(mv, side, occupied, pieces);
+                return BAD_CAPTURE_SCORE + see;
+            }
         }
 
-        // Promotions
         if let Some(promo) = mv.promotion {
             return 9_000 + promo.value() as i32;
         }
@@ -153,12 +149,26 @@ impl MoveOrderer {
             return 8_000;
         }
 
-        // Penalize moves that previously led to repetitions
         if self.is_repetition_move(mv) {
             return REPETITION_PENALTY;
         }
 
         self.history_score(mv)
+    }
+
+    #[inline(always)]
+    fn move_score(&self, mv: &Move) -> i32 {
+        let mut score = 0;
+
+        if let Some(captured) = mv.capture {
+            score += 10 * captured.value() as i32 - mv.piece.value() as i32;
+        }
+
+        if let Some(promo) = mv.promotion {
+            score += 100 + promo.value() as i32;
+        }
+
+        score
     }
 }
 
@@ -177,18 +187,13 @@ mod tests {
     fn test_move_ordering_captures() {
         let orderer = MoveOrderer::new();
 
-        // Create moves: pawn takes queen vs knight takes pawn
         let pawn_takes_queen = Move {
             from: Square::E4,
             to: Square::D5,
             piece: Piece::Pawn,
             capture: Some(Piece::Queen),
             promotion: None,
-            flags: MoveFlags {
-                is_castle: false,
-                is_en_passant: false,
-                is_double_pawn_push: false,
-            },
+            flags: MoveFlags::default(),
         };
 
         let knight_takes_pawn = Move {
@@ -197,21 +202,13 @@ mod tests {
             piece: Piece::Knight,
             capture: Some(Piece::Pawn),
             promotion: None,
-            flags: MoveFlags {
-                is_castle: false,
-                is_en_passant: false,
-                is_double_pawn_push: false,
-            },
+            flags: MoveFlags::default(),
         };
 
-        // Pawn takes queen should score higher
         let score1 = orderer.move_score(&pawn_takes_queen);
         let score2 = orderer.move_score(&knight_takes_pawn);
 
-        assert!(
-            score1 > score2,
-            "Pawn takes queen should score higher than knight takes pawn"
-        );
+        assert!(score1 > score2);
     }
 
     #[test]
@@ -224,11 +221,7 @@ mod tests {
             piece: Piece::Pawn,
             capture: None,
             promotion: Some(Piece::Queen),
-            flags: MoveFlags {
-                is_castle: false,
-                is_en_passant: false,
-                is_double_pawn_push: false,
-            },
+            flags: MoveFlags::default(),
         };
 
         let normal_move = Move {

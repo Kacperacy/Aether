@@ -14,8 +14,12 @@ pub trait BoardQuery {
     fn get_king_square(&self, color: Color) -> Option<Square>;
     /// BitBoard of all squares occupied by `color`
     fn occupied_by(&self, color: Color) -> BitBoard;
+    /// BitBoard of all occupied squares
+    fn occupied(&self) -> BitBoard;
     /// BitBoard of all squares occupied by `piece` of `color`
     fn piece_bb(&self, piece: Piece, color: Color) -> BitBoard;
+    /// Returns reference to piece bitboards [color][piece]
+    fn pieces(&self) -> &[[BitBoard; 6]; 2];
     /// Whether side can castle short (right exists); path safety is validated by consumers
     fn can_castle_short(&self, color: Color) -> bool;
     /// Whether side can castle long (right exists); path safety is validated by consumers
@@ -68,8 +72,18 @@ impl BoardQuery for Board {
     }
 
     #[inline(always)]
+    fn occupied(&self) -> BitBoard {
+        self.cache.occupied
+    }
+
+    #[inline(always)]
     fn piece_bb(&self, piece: Piece, color: Color) -> BitBoard {
         self.pieces[color as usize][piece as usize]
+    }
+
+    #[inline(always)]
+    fn pieces(&self) -> &[[BitBoard; 6]; 2] {
+        &self.pieces
     }
 
     fn can_castle_short(&self, color: Color) -> bool {

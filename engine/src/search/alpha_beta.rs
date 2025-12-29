@@ -261,7 +261,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
     }
 
-    /// Main alpha-beta search function (monolithic, Stockfish-style)
+    /// Main alpha-beta search function
     fn alpha_beta<T: BoardOps + BoardQuery>(
         &mut self,
         board: &mut T,
@@ -378,7 +378,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             };
         }
 
-        self.move_orderer.order_moves_full(&mut moves, tt_move, ply);
+        // Use SEE-based ordering for better capture prioritization
+        let side = board.side_to_move();
+        let occupied = board.occupied();
+        let pieces = board.pieces();
+        self.move_orderer
+            .order_moves_with_see(&mut moves, tt_move, ply, side, occupied, pieces);
 
         // =========================================================================
         // Step 7. Main move loop
