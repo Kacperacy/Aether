@@ -41,8 +41,9 @@ const LMR_MIN_DEPTH: u8 = 3;
 const ASPIRATION_DEPTH: u8 = 5;
 
 /// Initial aspiration window size (centipawns)
-/// Narrow enough to save time, wide enough to avoid excessive re-searches
-const ASPIRATION_WINDOW: Score = 50;
+/// Narrow window = more cutoffs but risk of re-searches
+/// 25 cp is a good balance for most positions
+const ASPIRATION_WINDOW: Score = 25;
 
 /// Maximum aspiration delta before falling back to full window search
 /// Beyond this value, re-searches waste more time than full-width search

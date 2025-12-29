@@ -186,13 +186,13 @@ const QUEEN_PHASE: i32 = 4;
 const TOTAL_PHASE: i32 = KNIGHT_PHASE * 4 + BISHOP_PHASE * 4 + ROOK_PHASE * 4 + QUEEN_PHASE * 2;
 
 /// Bishop pair bonus in middlegame (centipawns)
-const BISHOP_PAIR_MG: i32 = 23;
+const BISHOP_PAIR_MG: i32 = 30;
 /// Bishop pair bonus in endgame (centipawns)
-const BISHOP_PAIR_EG: i32 = 62;
+const BISHOP_PAIR_EG: i32 = 50;
 
 /// Passed pawn bonus by rank (from pawn's perspective, index 0 = rank 2, index 5 = rank 7)
-const PASSED_PAWN_BONUS_MG: [i32; 6] = [10, 15, 25, 45, 80, 130];
-const PASSED_PAWN_BONUS_EG: [i32; 6] = [20, 30, 50, 90, 150, 250];
+const PASSED_PAWN_BONUS_MG: [i32; 6] = [5, 12, 25, 50, 100, 180];
+const PASSED_PAWN_BONUS_EG: [i32; 6] = [15, 30, 55, 95, 160, 260];
 
 /// Precomputed masks for passed pawn detection
 /// For white pawn on square S, WHITE_PASSED_MASKS[S] contains all squares
