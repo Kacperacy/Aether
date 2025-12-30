@@ -21,6 +21,7 @@ pub trait BoardQuery {
     fn is_twofold_repetition(&self) -> bool;
     fn is_fifty_move_draw(&self) -> bool;
     fn is_draw(&self) -> bool;
+    fn game_phase(&self) -> i32;
 }
 
 impl BoardQuery for Board {
@@ -161,6 +162,11 @@ impl BoardQuery for Board {
         self.is_fifty_move_draw()
             || self.is_threefold_repetition()
             || self.is_insufficient_material()
+    }
+
+    #[inline]
+    fn game_phase(&self) -> i32 {
+        self.game_phase as i32
     }
 }
 

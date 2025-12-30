@@ -1,7 +1,10 @@
 use crate::error::BoardError::{
     InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
 };
-use crate::{MAX_SEARCH_DEPTH, Result, cache::BoardCache, game_state::GameState};
+use crate::{
+    MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK, PHASE_TOTAL, Result,
+    cache::BoardCache, game_state::GameState,
+};
 use aether_core::{
     ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, MoveState, Piece, Rank, Square,
 };
@@ -67,6 +70,7 @@ impl BoardBuilder {
         cache.refresh(&self.pieces);
 
         let zobrist_hash = self.compute_zobrist_hash();
+        let game_phase = self.compute_game_phase();
 
         let mut mailbox = [None; 64];
         for color in ALL_COLORS {
@@ -85,7 +89,26 @@ impl BoardBuilder {
             move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
             history_count: 0,
             mailbox,
+            game_phase,
         })
+    }
+
+    fn compute_game_phase(&self) -> i16 {
+        let knights = (self.pieces[0][Piece::Knight as usize].len()
+            + self.pieces[1][Piece::Knight as usize].len()) as i32;
+        let bishops = (self.pieces[0][Piece::Bishop as usize].len()
+            + self.pieces[1][Piece::Bishop as usize].len()) as i32;
+        let rooks = (self.pieces[0][Piece::Rook as usize].len()
+            + self.pieces[1][Piece::Rook as usize].len()) as i32;
+        let queens = (self.pieces[0][Piece::Queen as usize].len()
+            + self.pieces[1][Piece::Queen as usize].len()) as i32;
+
+        let material = knights * PHASE_KNIGHT as i32
+            + bishops * PHASE_BISHOP as i32
+            + rooks * PHASE_ROOK as i32
+            + queens * PHASE_QUEEN as i32;
+
+        ((material * 256) / PHASE_TOTAL as i32).min(256) as i16
     }
 
     fn validate(&self) -> Result<()> {

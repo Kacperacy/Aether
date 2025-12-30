@@ -311,41 +311,58 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
     }
 
     fn checks(&self, board: &T, moves: &mut Vec<Move>) {
-        let opponent = board.side_to_move().opponent();
+        let side = board.side_to_move();
+        let opponent = side.opponent();
         let king_sq = match board.get_king_square(opponent) {
             Some(sq) => sq,
-            None => return, // No king (shouldn't happen)
+            None => return,
         };
 
-        let all_occ = board.occupied_by(board.side_to_move()) | board.occupied_by(opponent);
+        let own_pieces = board.occupied_by(side);
+        let opp_pieces = board.occupied_by(opponent);
+        let all_occ = own_pieces | opp_pieces;
 
         // Pre-calculate check squares for each piece type
-        let knight_checks = knight_attacks(king_sq);
-        let bishop_checks = bishop_attacks(king_sq, all_occ);
-        let rook_checks = rook_attacks(king_sq, all_occ);
-        let queen_checks = bishop_checks | rook_checks;
+        let knight_check_sqs = knight_attacks(king_sq);
+        let bishop_check_sqs = bishop_attacks(king_sq, all_occ);
+        let rook_check_sqs = rook_attacks(king_sq, all_occ);
 
-        // Generate quiet moves and filter for checks
-        let mut quiet = Vec::new();
-        self.quiet_moves(board, &mut quiet);
+        let flags = MoveFlags::default();
 
-        for mv in quiet {
-            // Skip pawns - rare to give useful checks in quiescence
-            if mv.piece == Piece::Pawn {
-                continue;
+        // Generate knight checks directly
+        let knights = board.piece_bb(Piece::Knight, side);
+        for from in knights.iter() {
+            let targets = knight_attacks(from) & knight_check_sqs & !all_occ;
+            for to in targets.iter() {
+                Self::push_move(moves, from, to, Piece::Knight, None, flags, None);
             }
+        }
 
-            // Check if move lands on a check square
-            let is_check = match mv.piece {
-                Piece::Knight => knight_checks.has(mv.to),
-                Piece::Bishop => bishop_checks.has(mv.to),
-                Piece::Rook => rook_checks.has(mv.to),
-                Piece::Queen => queen_checks.has(mv.to),
-                _ => false,
-            };
+        // Generate bishop checks directly
+        let bishops = board.piece_bb(Piece::Bishop, side);
+        for from in bishops.iter() {
+            let targets = bishop_attacks(from, all_occ) & bishop_check_sqs & !all_occ;
+            for to in targets.iter() {
+                Self::push_move(moves, from, to, Piece::Bishop, None, flags, None);
+            }
+        }
 
-            if is_check {
-                moves.push(mv);
+        // Generate rook checks directly
+        let rooks = board.piece_bb(Piece::Rook, side);
+        for from in rooks.iter() {
+            let targets = rook_attacks(from, all_occ) & rook_check_sqs & !all_occ;
+            for to in targets.iter() {
+                Self::push_move(moves, from, to, Piece::Rook, None, flags, None);
+            }
+        }
+
+        // Generate queen checks directly (both bishop and rook patterns)
+        let queens = board.piece_bb(Piece::Queen, side);
+        let queen_check_sqs = bishop_check_sqs | rook_check_sqs;
+        for from in queens.iter() {
+            let targets = queen_attacks(from, all_occ) & queen_check_sqs & !all_occ;
+            for to in targets.iter() {
+                Self::push_move(moves, from, to, Piece::Queen, None, flags, None);
             }
         }
     }

@@ -22,6 +22,13 @@ pub type Result<T> = std::result::Result<T, BoardError>;
 
 const MAX_SEARCH_DEPTH: usize = 256;
 
+// Phase weights for tapered evaluation (middlegame/endgame interpolation)
+pub(crate) const PHASE_KNIGHT: i16 = 1;
+pub(crate) const PHASE_BISHOP: i16 = 1;
+pub(crate) const PHASE_ROOK: i16 = 2;
+pub(crate) const PHASE_QUEEN: i16 = 4;
+pub(crate) const PHASE_TOTAL: i16 = 24; // 4*1 + 4*1 + 4*2 + 2*4
+
 #[derive(Debug, Clone)]
 pub struct Board {
     pieces: [[BitBoard; 6]; 2],
@@ -33,6 +40,8 @@ pub struct Board {
     history_count: usize,
     /// Mailbox representation for easy piece lookup
     mailbox: [Option<(Piece, Color)>; 64],
+    /// Cached game phase (0 = endgame, 256 = opening)
+    game_phase: i16,
 }
 
 impl Board {
@@ -45,6 +54,18 @@ impl Board {
             move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
             history_count: 0,
             mailbox: [None; 64],
+            game_phase: 0,
+        }
+    }
+
+    #[inline]
+    pub(crate) const fn phase_weight(piece: Piece) -> i16 {
+        match piece {
+            Piece::Knight => PHASE_KNIGHT,
+            Piece::Bishop => PHASE_BISHOP,
+            Piece::Rook => PHASE_ROOK,
+            Piece::Queen => PHASE_QUEEN,
+            _ => 0,
         }
     }
 

@@ -160,17 +160,6 @@ const KING_PST_EG: [i32; 64] = [
     -50, -30, -20, -10, -10, -20, -30, -50,
 ];
 
-/// Phase weight for knights (minor pieces)
-const KNIGHT_PHASE: i32 = 1;
-/// Phase weight for bishops (minor pieces)
-const BISHOP_PHASE: i32 = 1;
-/// Phase weight for rooks (major pieces)
-const ROOK_PHASE: i32 = 2;
-/// Phase weight for queens (strongest piece)
-const QUEEN_PHASE: i32 = 4;
-/// Total phase at game start (4 knights + 4 bishops + 4 rooks + 2 queens)
-const TOTAL_PHASE: i32 = KNIGHT_PHASE * 4 + BISHOP_PHASE * 4 + ROOK_PHASE * 4 + QUEEN_PHASE * 2;
-
 /// Bishop pair bonus in middlegame (centipawns)
 const BISHOP_PAIR_MG: i32 = 30;
 /// Bishop pair bonus in endgame (centipawns)
@@ -281,21 +270,6 @@ impl SimpleEvaluator {
         if color == Color::White { idx ^ 56 } else { idx }
     }
 
-    fn calculate_phase<T: BoardQuery>(board: &T) -> i32 {
-        let mut phase = TOTAL_PHASE;
-
-        phase -= board.piece_count(Piece::Knight, Color::White) as i32 * KNIGHT_PHASE;
-        phase -= board.piece_count(Piece::Knight, Color::Black) as i32 * KNIGHT_PHASE;
-        phase -= board.piece_count(Piece::Bishop, Color::White) as i32 * BISHOP_PHASE;
-        phase -= board.piece_count(Piece::Bishop, Color::Black) as i32 * BISHOP_PHASE;
-        phase -= board.piece_count(Piece::Rook, Color::White) as i32 * ROOK_PHASE;
-        phase -= board.piece_count(Piece::Rook, Color::Black) as i32 * ROOK_PHASE;
-        phase -= board.piece_count(Piece::Queen, Color::White) as i32 * QUEEN_PHASE;
-        phase -= board.piece_count(Piece::Queen, Color::Black) as i32 * QUEEN_PHASE;
-
-        ((TOTAL_PHASE - phase) * 256 / TOTAL_PHASE).max(0)
-    }
-
     #[inline]
     fn pst_values(piece: Piece, idx: usize) -> (i32, i32) {
         match piece {
@@ -394,7 +368,7 @@ impl SimpleEvaluator {
         mg_score += passed_mg;
         eg_score += passed_eg;
 
-        let phase = Self::calculate_phase(board);
+        let phase = board.game_phase();
         (mg_score * phase + eg_score * (256 - phase)) / 256
     }
 }

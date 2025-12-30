@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-const NODE_CHECK_INTERVAL: u64 = 4096;
+const NODE_CHECK_MASK: u64 = 0xFFF; // Check every 4096 nodes (power of 2 for fast bitwise AND)
 const DELTA_PRUNING_MARGIN: Score = 200;
 const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
@@ -272,19 +272,24 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return self.evaluator.evaluate(board);
         }
 
-        // Draw detection
-        let dominated_repetition = if ply <= 2 {
-            board.is_twofold_repetition()
-        } else {
-            board.is_threefold_repetition()
-        };
+        // Draw detection (ordered from O(1) to O(n) complexity)
+        if ply > 0 {
+            if board.is_fifty_move_draw() {
+                return 0;
+            }
 
-        if ply > 0
-            && (dominated_repetition
-                || board.is_fifty_move_draw()
-                || board.is_insufficient_material())
-        {
-            return 0;
+            let dominated_repetition = if ply <= 2 {
+                board.is_twofold_repetition()
+            } else {
+                board.is_threefold_repetition()
+            };
+            if dominated_repetition {
+                return 0;
+            }
+
+            if board.is_insufficient_material() {
+                return 0;
+            }
         }
 
         // ===== Transposition table probe =====
@@ -603,7 +608,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return true;
         }
 
-        if self.info.nodes % NODE_CHECK_INTERVAL == 0 && self.should_stop() {
+        if (self.info.nodes & NODE_CHECK_MASK) == 0 && self.should_stop() {
             self.stop_flag.store(true, Ordering::Release);
             return true;
         }

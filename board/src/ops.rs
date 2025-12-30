@@ -38,9 +38,22 @@ impl BoardOps for Board {
             old_en_passant: self.game_state.en_passant_square,
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
+            old_game_phase: self.game_phase,
         };
 
         self.history_count += 1;
+
+        if let Some(captured) = mv.capture {
+            let phase_delta =
+                (Self::phase_weight(captured) as i32 * 256 / crate::PHASE_TOTAL as i32) as i16;
+            self.game_phase = (self.game_phase - phase_delta).max(0);
+        }
+
+        if let Some(promo) = mv.promotion {
+            let phase_delta =
+                (Self::phase_weight(promo) as i32 * 256 / crate::PHASE_TOTAL as i32) as i16;
+            self.game_phase = (self.game_phase + phase_delta).min(256);
+        }
 
         if let Some(ep_sq) = self.game_state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
@@ -140,6 +153,7 @@ impl BoardOps for Board {
         self.game_state.castling_rights = state.old_castling_rights;
         self.game_state.halfmove_clock = state.old_halfmove_clock;
         self.zobrist_hash = state.old_zobrist_hash;
+        self.game_phase = state.old_game_phase;
 
         Ok(())
     }
@@ -154,6 +168,7 @@ impl BoardOps for Board {
             old_en_passant: self.game_state.en_passant_square,
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
+            old_game_phase: self.game_phase,
         };
         self.move_history[self.history_count] = state;
         self.history_count += 1;
