@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_next() {
-        let mut bb = BitBoard(0xaaaaaaaaaaaaaaaa);
+        let bb = BitBoard(0xaaaaaaaaaaaaaaaa);
         let square = bb.iter().next().unwrap();
         assert_eq!(square, Square::B1);
         assert_eq!(bb.value(), 0xaaaaaaaaaaaaaaaa);

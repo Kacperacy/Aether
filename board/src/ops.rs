@@ -1,4 +1,5 @@
 use crate::error::MoveError;
+use crate::pst;
 use crate::query::BoardQuery;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
 use aether_core::{BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square};
@@ -20,6 +21,7 @@ pub trait BoardOps: BoardQuery + Clone {
 }
 
 impl BoardOps for Board {
+    #[inline(always)]
     fn make_move(&mut self, mv: &Move) -> Result<()> {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();
@@ -39,6 +41,8 @@ impl BoardOps for Board {
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
             old_game_phase: self.game_phase,
+            old_pst_mg: self.pst_mg,
+            old_pst_eg: self.pst_eg,
         };
 
         self.history_count += 1;
@@ -59,26 +63,42 @@ impl BoardOps for Board {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
+        let (from_mg, from_eg) = pst::piece_value(mv.piece, mv.from, side);
+        self.pst_mg -= from_mg;
+        self.pst_eg -= from_eg;
         self.remove_piece_known(mv.from, mv.piece, side);
         self.zobrist_toggle_piece(mv.from, mv.piece, side);
 
         if let Some(captured) = mv.capture {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
+                let (cap_mg, cap_eg) = pst::piece_value(Piece::Pawn, captured_sq, opponent);
+                self.pst_mg -= cap_mg;
+                self.pst_eg -= cap_eg;
                 self.remove_piece_known(captured_sq, Piece::Pawn, opponent);
                 self.zobrist_toggle_piece(captured_sq, Piece::Pawn, opponent);
             } else {
+                let (cap_mg, cap_eg) = pst::piece_value(captured, mv.to, opponent);
+                self.pst_mg -= cap_mg;
+                self.pst_eg -= cap_eg;
                 self.remove_piece_known(mv.to, captured, opponent);
                 self.zobrist_toggle_piece(mv.to, captured, opponent);
             }
         }
 
         let final_piece = mv.promotion.unwrap_or(mv.piece);
+        let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to, side);
+        self.pst_mg += to_mg;
+        self.pst_eg += to_eg;
         self.place_piece_internal(mv.to, final_piece, side);
         self.zobrist_toggle_piece(mv.to, final_piece, side);
 
         if mv.flags.is_castle {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
+            let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, rook_from, side);
+            let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, rook_to, side);
+            self.pst_mg += rt_mg - rf_mg;
+            self.pst_eg += rt_eg - rf_eg;
             self.remove_piece_known(rook_from, Piece::Rook, side);
             self.place_piece_internal(rook_to, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_from, Piece::Rook, side);
@@ -112,6 +132,7 @@ impl BoardOps for Board {
         Ok(())
     }
 
+    #[inline(always)]
     fn unmake_move(&mut self, mv: &Move) -> Result<()> {
         if self.history_count == 0 {
             return Err(BoardError::ChessMoveError(MoveError::NoMoveToUnmake));
@@ -120,18 +141,14 @@ impl BoardOps for Board {
         self.history_count -= 1;
         let state = self.move_history[self.history_count];
 
-        // Restore side to move (switch back)
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         let side = self.game_state.side_to_move;
 
-        // Remove piece from destination (we know the piece - it's the moved piece or promotion)
         let final_piece = mv.promotion.unwrap_or(mv.piece);
         self.remove_piece_known(mv.to, final_piece, side);
 
-        // Place original piece at source
         self.place_piece_internal(mv.from, mv.piece, side);
 
-        // Restore captured piece
         if let Some((captured_piece, captured_color)) = state.captured_piece {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
@@ -141,19 +158,19 @@ impl BoardOps for Board {
             }
         }
 
-        // Unmake castling rook movement
         if mv.flags.is_castle {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
             self.remove_piece_known(rook_to, Piece::Rook, side);
             self.place_piece_internal(rook_from, Piece::Rook, side);
         }
 
-        // Restore game state
         self.game_state.en_passant_square = state.old_en_passant;
         self.game_state.castling_rights = state.old_castling_rights;
         self.game_state.halfmove_clock = state.old_halfmove_clock;
         self.zobrist_hash = state.old_zobrist_hash;
         self.game_phase = state.old_game_phase;
+        self.pst_mg = state.old_pst_mg;
+        self.pst_eg = state.old_pst_eg;
 
         Ok(())
     }
@@ -169,6 +186,8 @@ impl BoardOps for Board {
             old_castling_rights: self.game_state.castling_rights,
             old_halfmove_clock: self.game_state.halfmove_clock,
             old_game_phase: self.game_phase,
+            old_pst_mg: self.pst_mg,
+            old_pst_eg: self.pst_eg,
         };
         self.move_history[self.history_count] = state;
         self.history_count += 1;
@@ -192,8 +211,12 @@ impl BoardOps for Board {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         self.game_state.en_passant_square = state.old_en_passant;
         self.zobrist_hash = state.old_zobrist_hash;
+        // PST doesn't change during null move, but restore for consistency
+        self.pst_mg = state.old_pst_mg;
+        self.pst_eg = state.old_pst_eg;
     }
 
+    #[inline(always)]
     fn is_in_check(&self, color: Color) -> bool {
         let king_sq = match self.get_king_square(color) {
             Some(sq) => sq,

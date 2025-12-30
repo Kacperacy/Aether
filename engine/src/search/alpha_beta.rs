@@ -27,6 +27,7 @@ const FUTILITY_MAX_DEPTH: u8 = 3;
 const RFP_MARGIN: Score = 120;
 const RFP_MAX_DEPTH: u8 = 3;
 const PV_COLLECTION_LIMIT: usize = 32;
+const MOVE_LIST_POOL_SIZE: usize = 128;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -40,10 +41,15 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     hard_limit: Option<Duration>,
     pv_table: [[Move; MAX_PV_LENGTH]; MAX_PV_LENGTH],
     pv_length: [usize; MAX_PV_LENGTH],
+    move_lists: Vec<Vec<Move>>,
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
     pub fn new(evaluator: E, tt_size_mb: usize) -> Self {
+        let move_lists = (0..MOVE_LIST_POOL_SIZE)
+            .map(|_| Vec::with_capacity(AVG_LEGAL_MOVES))
+            .collect();
+
         Self {
             evaluator,
             generator: Generator::new(),
@@ -56,6 +62,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             hard_limit: None,
             pv_table: [[Move::default(); MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
+            move_lists,
         }
     }
 
@@ -358,10 +365,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             && static_eval + FUTILITY_MARGIN[depth as usize] <= alpha;
 
         // ===== Generate and order moves =====
-        let mut moves = Vec::with_capacity(AVG_LEGAL_MOVES);
+        let mut moves = mem::take(&mut self.move_lists[ply]);
+        moves.clear();
         self.generator.legal(board, &mut moves);
 
         if moves.is_empty() {
+            self.move_lists[ply] = moves; // Return to pool
             return if in_check { mated_in(ply as u32) } else { 0 };
         }
 
@@ -498,6 +507,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 );
                 self.tt.store(entry);
 
+                self.move_lists[ply] = moves; // Return to pool
                 return beta;
             }
 
@@ -519,6 +529,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         );
         self.tt.store(entry);
 
+        self.move_lists[ply] = moves; // Return to pool
         best_score
     }
 

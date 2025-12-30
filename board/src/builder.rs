@@ -3,7 +3,7 @@ use crate::error::BoardError::{
 };
 use crate::{
     MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK, PHASE_TOTAL, Result,
-    cache::BoardCache, game_state::GameState,
+    cache::BoardCache, game_state::GameState, pst,
 };
 use aether_core::{
     ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, MoveState, Piece, Rank, Square,
@@ -71,6 +71,7 @@ impl BoardBuilder {
 
         let zobrist_hash = self.compute_zobrist_hash();
         let game_phase = self.compute_game_phase();
+        let (pst_mg, pst_eg) = pst::compute_pst_score(&self.pieces);
 
         let mut mailbox = [None; 64];
         for color in ALL_COLORS {
@@ -90,6 +91,8 @@ impl BoardBuilder {
             history_count: 0,
             mailbox,
             game_phase,
+            pst_mg,
+            pst_eg,
         })
     }
 

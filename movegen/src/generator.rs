@@ -395,6 +395,7 @@ impl PieceMap {
         }
     }
 
+    #[inline(always)]
     fn is_king_attacked(&self, side: Color) -> bool {
         let king_bb = self.pieces[side as usize][Piece::King as usize];
         if let Some(king_sq) = king_bb.to_square() {
@@ -406,6 +407,7 @@ impl PieceMap {
         }
     }
 
+    #[inline(always)]
     fn simulate_move(mut self, side: Color, mv: &Move) -> Self {
         let us = side as usize;
         let them = side.opponent() as usize;
@@ -458,7 +460,7 @@ impl PieceMap {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn is_move_legal(map: &PieceMap, side: Color, mv: &Move) -> bool {
     let next_map = map.simulate_move(side, mv);
     !next_map.is_king_attacked(side)

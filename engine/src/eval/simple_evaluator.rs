@@ -1,164 +1,6 @@
 use crate::eval::Evaluator;
-use aether_core::{ALL_PIECES, Color, Piece, Square};
+use aether_core::{Color, Piece};
 use board::BoardQuery;
-
-// Piece-Square Tables (centipawns, from white's perspective)
-
-/// Pawn middlegame PST
-#[rustfmt::skip]
-const PAWN_PST_MG: [i32; 64] = [
-      0,   0,   0,   0,   0,   0,   0,   0,
-     50,  50,  50,  50,  50,  50,  50,  50,
-     20,  20,  30,  40,  40,  30,  20,  20,
-     10,  10,  20,  30,  30,  20,  10,  10,
-      5,   5,  15,  25,  25,  15,   5,   5,
-      0,   0,  10,  20,  20,  10,   0,   0,
-      5,  10,   0,  -5,  -5,   0,  10,   5,
-      0,   0,   0,   0,   0,   0,   0,   0,
-];
-
-/// Knight middlegame PST
-#[rustfmt::skip]
-const KNIGHT_PST_MG: [i32; 64] = [
-    -50, -40, -30, -30, -30, -30, -40, -50,
-    -40, -20,   0,   5,   5,   0, -20, -40,
-    -30,   5,  15,  20,  20,  15,   5, -30,
-    -30,   0,  20,  25,  25,  20,   0, -30,
-    -30,   5,  20,  25,  25,  20,   5, -30,
-    -30,   0,  15,  20,  20,  15,   0, -30,
-    -40, -20,   0,   5,   5,   0, -20, -40,
-    -50, -40, -30, -30, -30, -30, -40, -50,
-];
-
-/// Bishop middlegame PST
-#[rustfmt::skip]
-const BISHOP_PST_MG: [i32; 64] = [
-    -20, -10, -10, -10, -10, -10, -10, -20,
-    -10,   5,   0,   0,   0,   0,   5, -10,
-    -10,  10,  10,  10,  10,  10,  10, -10,
-    -10,   0,  15,  15,  15,  15,   0, -10,
-    -10,   5,  15,  15,  15,  15,   5, -10,
-    -10,   0,  10,  15,  15,  10,   0, -10,
-    -10,  10,   0,   5,   5,   0,  10, -10,
-    -20, -10, -10, -10, -10, -10, -10, -20,
-];
-
-/// Rook middlegame PST
-#[rustfmt::skip]
-const ROOK_PST_MG: [i32; 64] = [
-      0,   0,   0,   5,   5,   0,   0,   0,
-     10,  15,  15,  20,  20,  15,  15,  10,
-      0,   0,   0,   5,   5,   0,   0,   0,
-      0,   0,   0,   5,   5,   0,   0,   0,
-      0,   0,   0,   5,   5,   0,   0,   0,
-      0,   0,   0,   5,   5,   0,   0,   0,
-      0,   0,   0,   5,   5,   0,   0,   0,
-     -5,   0,   5,  10,  10,   5,   0,  -5,
-];
-
-/// Queen middlegame PST
-#[rustfmt::skip]
-const QUEEN_PST_MG: [i32; 64] = [
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-    -10,   0,   5,   5,   5,   5,   0, -10,
-    -10,   5,  10,  10,  10,  10,   5, -10,
-     -5,   0,  10,  10,  10,  10,   0,  -5,
-     -5,   0,  10,  10,  10,  10,   0,  -5,
-    -10,   0,   5,  10,  10,   5,   0, -10,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-];
-
-/// King middlegame PST
-#[rustfmt::skip]
-const KING_PST_MG: [i32; 64] = [
-    -50, -40, -30, -20, -20, -30, -40, -50,
-    -30, -20, -10,   0,   0, -10, -20, -30,
-    -30, -10,  20,  30,  30,  20, -10, -30,
-    -30, -10,  30,  40,  40,  30, -10, -30,
-    -30, -10,  30,  40,  40,  30, -10, -30,
-    -30, -10,  20,  30,  30,  20, -10, -30,
-    -30, -30, -10,   0,   0, -10, -30, -30,
-     20,  30,  -5, -30, -10, -30,  30,  20,
-];
-
-/// Pawn endgame PST
-#[rustfmt::skip]
-const PAWN_PST_EG: [i32; 64] = [
-      0,   0,   0,   0,   0,   0,   0,   0,
-    100, 100, 100, 100, 100, 100, 100, 100,
-     60,  60,  60,  60,  60,  60,  60,  60,
-     40,  40,  40,  40,  40,  40,  40,  40,
-     20,  20,  20,  20,  20,  20,  20,  20,
-     10,  10,  10,  10,  10,  10,  10,  10,
-      5,   5,   5,   5,   5,   5,   5,   5,
-      0,   0,   0,   0,   0,   0,   0,   0,
-];
-
-/// Knight endgame PST
-#[rustfmt::skip]
-const KNIGHT_PST_EG: [i32; 64] = [
-    -50, -40, -30, -30, -30, -30, -40, -50,
-    -40, -20,   0,   0,   0,   0, -20, -40,
-    -30,   0,  10,  15,  15,  10,   0, -30,
-    -30,   5,  15,  20,  20,  15,   5, -30,
-    -30,   0,  15,  20,  20,  15,   0, -30,
-    -30,   5,  10,  15,  15,  10,   5, -30,
-    -40, -20,   0,   5,   5,   0, -20, -40,
-    -50, -40, -30, -30, -30, -30, -40, -50,
-];
-
-/// Bishop endgame PST
-#[rustfmt::skip]
-const BISHOP_PST_EG: [i32; 64] = [
-    -20, -10, -10, -10, -10, -10, -10, -20,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -10,   0,  10,  10,  10,  10,   0, -10,
-    -10,   5,  10,  15,  15,  10,   5, -10,
-    -10,   0,  10,  15,  15,  10,   0, -10,
-    -10,  10,  10,  10,  10,  10,  10, -10,
-    -10,   5,   0,   0,   0,   0,   5, -10,
-    -20, -10, -10, -10, -10, -10, -10, -20,
-];
-
-/// Rook endgame PST
-#[rustfmt::skip]
-const ROOK_PST_EG: [i32; 64] = [
-      0,   0,   0,   0,   0,   0,   0,   0,
-     15,  15,  15,  15,  15,  15,  15,  15,
-      0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   0,   0,   0,
-      0,   0,   0,   0,   0,   0,   0,   0,
-];
-
-/// Queen endgame PST
-#[rustfmt::skip]
-const QUEEN_PST_EG: [i32; 64] = [
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-    -10,   0,   5,   5,   5,   5,   0, -10,
-    -10,   5,  10,  15,  15,  10,   5, -10,
-     -5,   0,  15,  20,  20,  15,   0,  -5,
-     -5,   0,  15,  20,  20,  15,   0,  -5,
-    -10,   5,  10,  15,  15,  10,   5, -10,
-    -10,   0,   0,   5,   5,   0,   0, -10,
-    -20, -10, -10,  -5,  -5, -10, -10, -20,
-];
-
-/// King endgame PST
-#[rustfmt::skip]
-const KING_PST_EG: [i32; 64] = [
-    -50, -30, -20, -10, -10, -20, -30, -50,
-    -30, -10,   0,  10,  10,   0, -10, -30,
-    -20,   0,  20,  30,  30,  20,   0, -20,
-    -10,  10,  30,  40,  40,  30,  10, -10,
-    -10,  10,  30,  40,  40,  30,  10, -10,
-    -20,   0,  20,  30,  30,  20,   0, -20,
-    -30, -10,   0,  10,  10,   0, -10, -30,
-    -50, -30, -20, -10, -10, -20, -30, -50,
-];
 
 /// Bishop pair bonus in middlegame (centipawns)
 const BISHOP_PAIR_MG: i32 = 30;
@@ -264,24 +106,6 @@ impl SimpleEvaluator {
         Self
     }
 
-    #[inline]
-    fn pst_index(square: Square, color: Color) -> usize {
-        let idx = square.to_index() as usize;
-        if color == Color::White { idx ^ 56 } else { idx }
-    }
-
-    #[inline]
-    fn pst_values(piece: Piece, idx: usize) -> (i32, i32) {
-        match piece {
-            Piece::Pawn => (PAWN_PST_MG[idx], PAWN_PST_EG[idx]),
-            Piece::Knight => (KNIGHT_PST_MG[idx], KNIGHT_PST_EG[idx]),
-            Piece::Bishop => (BISHOP_PST_MG[idx], BISHOP_PST_EG[idx]),
-            Piece::Rook => (ROOK_PST_MG[idx], ROOK_PST_EG[idx]),
-            Piece::Queen => (QUEEN_PST_MG[idx], QUEEN_PST_EG[idx]),
-            Piece::King => (KING_PST_MG[idx], KING_PST_EG[idx]),
-        }
-    }
-
     fn bishop_pair_bonus<T: BoardQuery>(board: &T) -> (i32, i32) {
         let white_pair = board.piece_count(Piece::Bishop, Color::White) >= 2;
         let black_pair = board.piece_count(Piece::Bishop, Color::Black) >= 2;
@@ -338,27 +162,10 @@ impl SimpleEvaluator {
         (mg_score, eg_score)
     }
 
+    #[inline(always)]
     fn evaluate_position<T: BoardQuery>(&self, board: &T) -> i32 {
-        let mut mg_score = 0i32;
-        let mut eg_score = 0i32;
-
-        for &piece in &ALL_PIECES {
-            let material = piece.value();
-
-            for square in board.piece_bb(piece, Color::White).iter() {
-                let idx = Self::pst_index(square, Color::White);
-                let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
-                mg_score += material + pst_mg;
-                eg_score += material + pst_eg;
-            }
-
-            for square in board.piece_bb(piece, Color::Black).iter() {
-                let idx = Self::pst_index(square, Color::Black);
-                let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
-                mg_score -= material + pst_mg;
-                eg_score -= material + pst_eg;
-            }
-        }
+        // Use incrementally updated PST scores - O(1) instead of O(pieces)
+        let (mut mg_score, mut eg_score) = board.pst_scores();
 
         let (mg_bonus, eg_bonus) = Self::bishop_pair_bonus(board);
         mg_score += mg_bonus;
@@ -374,6 +181,7 @@ impl SimpleEvaluator {
 }
 
 impl Evaluator for SimpleEvaluator {
+    #[inline(always)]
     fn evaluate<T: BoardQuery>(&self, board: &T) -> i32 {
         let score = self.evaluate_position(board);
 
@@ -388,18 +196,6 @@ impl Evaluator for SimpleEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_pst_index_symmetry() {
-        let a1 = Square::A1;
-        assert_eq!(SimpleEvaluator::pst_index(a1, Color::White), 56);
-        assert_eq!(SimpleEvaluator::pst_index(a1, Color::Black), 0);
-
-        let e4 = Square::E4;
-        let white_idx = SimpleEvaluator::pst_index(e4, Color::White);
-        let black_idx = SimpleEvaluator::pst_index(e4, Color::Black);
-        assert_eq!(white_idx ^ 56, black_idx);
-    }
 
     #[test]
     fn test_white_passed_pawn_masks() {

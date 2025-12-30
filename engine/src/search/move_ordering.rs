@@ -129,18 +129,27 @@ impl MoveOrderer {
             return 20_000;
         }
 
-        if mv.capture.is_some() {
+        if let Some(captured) = mv.capture {
+            let mvv_lva = captured.value() - mv.piece.value();
+
+            // Only calculate SEE for potentially bad captures (when attacker >= victim)
+            // Good captures (pawn takes queen, etc.) don't need SEE verification
+            if mvv_lva >= 0 {
+                // Clearly good capture - skip SEE
+                return GOOD_CAPTURE_SCORE + 10 * captured.value() - mv.piece.value();
+            }
+
+            // Potentially bad capture - calculate SEE to verify
             let see = see_value(mv, side, occupied, pieces);
             if see >= 0 {
-                let captured = mv.capture.unwrap();
-                return GOOD_CAPTURE_SCORE + 10 * captured.value() as i32 - mv.piece.value() as i32;
+                return GOOD_CAPTURE_SCORE + 10 * captured.value() - mv.piece.value();
             } else {
                 return BAD_CAPTURE_SCORE + see;
             }
         }
 
         if let Some(promo) = mv.promotion {
-            return 9_000 + promo.value() as i32;
+            return 9_000 + promo.value();
         }
 
         if self.is_killer(mv, ply) {
@@ -159,11 +168,11 @@ impl MoveOrderer {
         let mut score = 0;
 
         if let Some(captured) = mv.capture {
-            score += 10 * captured.value() as i32 - mv.piece.value() as i32;
+            score += 10 * captured.value() - mv.piece.value();
         }
 
         if let Some(promo) = mv.promotion {
-            score += 100 + promo.value() as i32;
+            score += 100 + promo.value();
         }
 
         score

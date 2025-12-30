@@ -32,6 +32,15 @@ pub const ROOK_VALUE: Score = 500;
 pub const QUEEN_VALUE: Score = 900;
 pub const KING_VALUE: Score = 20000;
 
+pub const PIECE_VALUES: [Score; Piece::NUM] = [
+    PAWN_VALUE,
+    KNIGHT_VALUE,
+    BISHOP_VALUE,
+    ROOK_VALUE,
+    QUEEN_VALUE,
+    KING_VALUE,
+];
+
 impl FromStr for Piece {
     type Err = TypeError;
 

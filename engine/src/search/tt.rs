@@ -91,6 +91,29 @@ impl TranspositionTable {
         (key as usize) & (self.size - 1)
     }
 
+    /// Prefetch TT entry for the given key into CPU cache
+    /// This should be called before make_move to hide memory latency
+    #[inline]
+    pub fn prefetch(&self, key: u64) {
+        let idx = self.index(key);
+        let ptr = self.entries.as_ptr().wrapping_add(idx) as *const i8;
+
+        // Use platform-specific prefetch intrinsics
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            std::arch::x86_64::_mm_prefetch(ptr, std::arch::x86_64::_MM_HINT_T0);
+        }
+
+        #[cfg(target_arch = "x86")]
+        unsafe {
+            std::arch::x86::_mm_prefetch(ptr, std::arch::x86::_MM_HINT_T0);
+        }
+
+        // For other architectures, this is a no-op
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+        let _ = ptr;
+    }
+
     #[inline]
     pub fn probe(&self, key: u64) -> Option<&TTEntry> {
         let idx = self.index(key);

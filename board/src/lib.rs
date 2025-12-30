@@ -4,6 +4,7 @@ mod error;
 mod fen;
 mod game_state;
 mod ops;
+pub mod pst;
 mod query;
 mod zobrist;
 
@@ -42,6 +43,10 @@ pub struct Board {
     mailbox: [Option<(Piece, Color)>; 64],
     /// Cached game phase (0 = endgame, 256 = opening)
     game_phase: i16,
+    /// Incrementally updated PST score (middlegame) from white's perspective
+    pst_mg: i32,
+    /// Incrementally updated PST score (endgame) from white's perspective
+    pst_eg: i32,
 }
 
 impl Board {
@@ -55,7 +60,20 @@ impl Board {
             history_count: 0,
             mailbox: [None; 64],
             game_phase: 0,
+            pst_mg: 0,
+            pst_eg: 0,
         }
+    }
+
+    pub fn recalculate_pst(&mut self) {
+        let (mg, eg) = pst::compute_pst_score(&self.pieces);
+        self.pst_mg = mg;
+        self.pst_eg = eg;
+    }
+
+    #[inline(always)]
+    pub fn pst_scores(&self) -> (i32, i32) {
+        (self.pst_mg, self.pst_eg)
     }
 
     #[inline]
@@ -401,19 +419,11 @@ mod tests {
     #[test]
     fn test_insufficient_material_kb_vs_kb_same_color() {
         // K+B vs K+B on same color squares (both light squares)
-        let fen = "8/8/3b4/4k3/8/8/2B5/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
-        // Both bishops on light squares (c2 and d6)
-        // c2: (2+1) % 2 = 1 (dark)
-        // d6: (3+5) % 2 = 0 (light)
-        // Actually these are different colors, so NOT insufficient
-
-        // Let's use correct squares: a1 (light) and c3 (light)
-        let fen = "8/8/8/4k3/8/2b5/8/B3K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
+        // Use correct squares: a1 (light) and c3 (light)
         // a1: (0+0) % 2 = 0 (light)
         // c3: (2+2) % 2 = 0 (light)
+        let fen = "8/8/8/4k3/8/2b5/8/B3K3 w - - 0 1";
+        let board = Board::from_fen(fen).unwrap();
 
         assert!(board.is_insufficient_material());
     }

@@ -92,6 +92,8 @@ pub struct MoveState {
     pub old_castling_rights: [CastlingRights; 2], // [color][side]
     pub old_halfmove_clock: u16,
     pub old_game_phase: i16,
+    pub old_pst_mg: i32,
+    pub old_pst_eg: i32,
 }
 
 impl Default for MoveState {
@@ -106,6 +108,8 @@ impl Default for MoveState {
             old_castling_rights: [CastlingRights::EMPTY; 2],
             old_halfmove_clock: 0,
             old_game_phase: 0,
+            old_pst_mg: 0,
+            old_pst_eg: 0,
         }
     }
 }

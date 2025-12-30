@@ -4,18 +4,10 @@
 //! assuming both sides always recapture with their least valuable piece.
 
 use aether_core::{
-    BISHOP_VALUE, BitBoard, Color, KNIGHT_VALUE, Move, PAWN_VALUE, Piece, QUEEN_VALUE, ROOK_VALUE,
-    Score, Square, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
+    BISHOP_VALUE, BitBoard, Color, KNIGHT_VALUE, Move, PAWN_VALUE, PIECE_VALUES, Piece,
+    QUEEN_VALUE, ROOK_VALUE, Score, Square, bishop_attacks, king_attacks, knight_attacks,
+    pawn_attacks, rook_attacks,
 };
-
-const SEE_PIECE_VALUES: [Score; 6] = [
-    PAWN_VALUE,
-    KNIGHT_VALUE,
-    BISHOP_VALUE,
-    ROOK_VALUE,
-    QUEEN_VALUE,
-    20_000, // King - high value but not infinite
-];
 
 /// Returns true if the capture's SEE value is >= threshold.
 #[inline]
@@ -30,7 +22,7 @@ pub fn see_ge(
     let to = mv.to;
 
     let target_value = match mv.capture {
-        Some(piece) => SEE_PIECE_VALUES[piece as usize],
+        Some(piece) => PIECE_VALUES[piece as usize],
         None => return threshold <= 0,
     };
 
@@ -39,7 +31,7 @@ pub fn see_ge(
         return false;
     }
 
-    let attacker_value = SEE_PIECE_VALUES[mv.piece as usize];
+    let attacker_value = PIECE_VALUES[mv.piece as usize];
     swap = attacker_value - swap;
     if swap <= 0 {
         return true;
@@ -143,7 +135,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     let from = mv.from;
 
     let target_value = match mv.capture {
-        Some(piece) => SEE_PIECE_VALUES[piece as usize],
+        Some(piece) => PIECE_VALUES[piece as usize],
         None => return 0,
     };
 
@@ -166,7 +158,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     }
     attackers &= occ;
 
-    let mut current_piece_value = SEE_PIECE_VALUES[mv.piece as usize];
+    let mut current_piece_value = PIECE_VALUES[mv.piece as usize];
     let mut stm = side.opponent();
 
     while let Some((attacker_sq, attacker_piece)) =
@@ -190,7 +182,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
         }
 
         attackers &= occ;
-        current_piece_value = SEE_PIECE_VALUES[attacker_piece as usize];
+        current_piece_value = PIECE_VALUES[attacker_piece as usize];
         stm = stm.opponent();
     }
 

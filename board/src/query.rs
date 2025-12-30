@@ -22,17 +22,21 @@ pub trait BoardQuery {
     fn is_fifty_move_draw(&self) -> bool;
     fn is_draw(&self) -> bool;
     fn game_phase(&self) -> i32;
+    fn pst_scores(&self) -> (i32, i32);
 }
 
 impl BoardQuery for Board {
+    #[inline(always)]
     fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
         self.mailbox[square.to_index() as usize]
     }
 
+    #[inline(always)]
     fn is_square_occupied(&self, square: Square) -> bool {
         self.cache.occupied.has(square)
     }
 
+    #[inline(always)]
     fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
         !self.attackers_to_square(square, by_color).is_empty()
     }
@@ -167,6 +171,11 @@ impl BoardQuery for Board {
     #[inline]
     fn game_phase(&self) -> i32 {
         self.game_phase as i32
+    }
+
+    #[inline(always)]
+    fn pst_scores(&self) -> (i32, i32) {
+        (self.pst_mg, self.pst_eg)
     }
 }
 
