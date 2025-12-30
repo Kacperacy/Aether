@@ -148,15 +148,12 @@ impl Board {
         let mut count = 0;
 
         let start_idx = self
-            .move_history
-            .len()
+            .history_count
             .saturating_sub(self.game_state.halfmove_clock as usize);
 
-        for i in (start_idx..self.move_history.len()).step_by(2) {
-            if let Some(state) = self.move_history.get(i) {
-                if state.old_zobrist_hash == current_hash {
-                    count += 1;
-                }
+        for i in (start_idx..self.history_count).step_by(2) {
+            if self.move_history[i].old_zobrist_hash == current_hash {
+                count += 1;
             }
         }
 
@@ -179,18 +176,23 @@ impl Default for Board {
 mod tests {
     use super::*;
     use crate::FenOps;
-
-    // ... existing tests ...dd
+    use aether_core::{Move, Piece, Square};
 
     #[test]
     fn test_repetition_count_no_repetition() {
         let mut board = Board::starting_position().unwrap();
 
-        // Make some moves that don't repeat
-        let moves_str = vec!["e2e4", "e7e5", "Ng1f3", "Nb8c6"];
+        // Make moves that don't repeat: 1. Nf3 Nf6 2. Nc3 Nc6
+        let moves = [
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::B1, Square::C3, Piece::Knight),
+            Move::new(Square::B8, Square::C6, Piece::Knight),
+        ];
 
-        // Parse and make moves (simplified - in reality need proper move parsing)
-        // For this test, assume we can make these moves
+        for mv in &moves {
+            board.make_move(mv).unwrap();
+        }
 
         assert_eq!(board.repetition_count(), 0);
         assert!(!board.is_twofold_repetition());
@@ -198,26 +200,117 @@ mod tests {
     }
 
     #[test]
+    fn test_twofold_repetition_detected() {
+        let mut board = Board::starting_position().unwrap();
+
+        // Create twofold repetition with knight shuffle:
+        // 1. Nf3 Nf6 2. Ng1 Ng8 - back to starting position (2nd occurrence)
+        let moves = [
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::F3, Square::G1, Piece::Knight),
+            Move::new(Square::F6, Square::G8, Piece::Knight),
+        ];
+
+        for mv in &moves {
+            board.make_move(mv).unwrap();
+        }
+
+        // Now we're back at starting position - should be twofold
+        assert_eq!(board.repetition_count(), 1);
+        assert!(board.is_twofold_repetition());
+        assert!(!board.is_threefold_repetition());
+    }
+
+    #[test]
     fn test_threefold_repetition_detected() {
         let mut board = Board::starting_position().unwrap();
 
-        // Simulate a position that repeats 3 times
-        // This requires making moves back and forth
+        // Create threefold repetition with knight shuffle:
+        // 1. Nf3 Nf6 2. Ng1 Ng8 (2nd) 3. Nf3 Nf6 4. Ng1 Ng8 (3rd)
+        let moves = [
+            // First cycle
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::F3, Square::G1, Piece::Knight),
+            Move::new(Square::F6, Square::G8, Piece::Knight),
+            // Second cycle
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::F3, Square::G1, Piece::Knight),
+            Move::new(Square::F6, Square::G8, Piece::Knight),
+        ];
 
-        // Setup: e4 e5 Nf3 Nf6
-        // Then: Ng1 Ng8 (back to near-starting)
-        // Then: Nf3 Nf6 (repeat 1)
-        // Then: Ng1 Ng8 (repeat 2)
+        for mv in &moves {
+            board.make_move(mv).unwrap();
+        }
 
-        // After these moves, we should have threefold repetition
-        // (Implementation note: actual test needs proper move making)
+        // Now we're at starting position for 3rd time
+        assert_eq!(board.repetition_count(), 2);
+        assert!(board.is_twofold_repetition());
+        assert!(board.is_threefold_repetition());
+    }
 
-        // For now, test the logic with a simple FEN position
-        let fen = "rnbqkbnr/pppppppp/8/8/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
-        let mut board = Board::from_fen(fen).unwrap();
+    #[test]
+    fn test_repetition_broken_by_pawn_move() {
+        let mut board = Board::starting_position().unwrap();
 
-        // We'd need to manually build move_history to test this properly
-        // This is a conceptual test - full implementation needs proper setup
+        // 1. Nf3 Nf6 2. Ng1 Ng8 (2nd occurrence of start)
+        let moves_cycle1 = [
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::F3, Square::G1, Piece::Knight),
+            Move::new(Square::F6, Square::G8, Piece::Knight),
+        ];
+
+        for mv in &moves_cycle1 {
+            board.make_move(mv).unwrap();
+        }
+
+        assert!(board.is_twofold_repetition());
+
+        // Now make a pawn move which resets halfmove clock
+        let pawn_move = Move::new(Square::E2, Square::E4, Piece::Pawn)
+            .with_flags(aether_core::MoveFlags {
+                is_double_pawn_push: true,
+                is_castle: false,
+                is_en_passant: false,
+            });
+        board.make_move(&pawn_move).unwrap();
+
+        // After pawn move, repetition count should be 0
+        assert_eq!(board.repetition_count(), 0);
+        assert!(!board.is_twofold_repetition());
+    }
+
+    #[test]
+    fn test_repetition_only_counts_same_side_to_move() {
+        let mut board = Board::starting_position().unwrap();
+
+        // 1. Nf3 - white moved, position changed
+        let mv1 = Move::new(Square::G1, Square::F3, Piece::Knight);
+        board.make_move(&mv1).unwrap();
+
+        // 1... Nf6 - black moved
+        let mv2 = Move::new(Square::G8, Square::F6, Piece::Knight);
+        board.make_move(&mv2).unwrap();
+
+        // 2. Ng1 - white moved back
+        let mv3 = Move::new(Square::F3, Square::G1, Piece::Knight);
+        board.make_move(&mv3).unwrap();
+
+        // Position after 1. Nf3 and after 2. Ng1 are different
+        // (black knight on f6 vs g8), so no repetition yet
+        // But more importantly, we're checking that we only compare
+        // positions with the same side to move
+
+        // 2... Ng8 - back to starting position with white to move
+        let mv4 = Move::new(Square::F6, Square::G8, Piece::Knight);
+        board.make_move(&mv4).unwrap();
+
+        // Now it's white to move, same as starting position
+        assert_eq!(board.repetition_count(), 1);
+        assert!(board.is_twofold_repetition());
     }
 
     #[test]
