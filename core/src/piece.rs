@@ -54,7 +54,6 @@ impl Piece {
     /// Number of piece types in chess
     pub const NUM: usize = 6;
 
-    /// Returns the character representation of the piece (lowercase)
     pub const fn as_char(self) -> char {
         match self {
             Self::Pawn => 'p',
@@ -66,7 +65,6 @@ impl Piece {
         }
     }
 
-    /// Creates a Piece from its character representation (lowercase)
     pub const fn from_char(c: char) -> Option<Self> {
         match c {
             'p' => Some(Self::Pawn),
@@ -79,7 +77,7 @@ impl Piece {
         }
     }
 
-    /// Returns the standard material value of the piece in centipawns
+    /// Material value in centipawns
     pub const fn value(self) -> Score {
         match self {
             Self::Pawn => PAWN_VALUE,
@@ -91,17 +89,14 @@ impl Piece {
         }
     }
 
-    /// Returns true if the piece is a sliding piece (Bishop, Rook, Queen)
     pub const fn is_sliding(self) -> bool {
         matches!(self, Self::Bishop | Self::Rook | Self::Queen)
     }
 
-    /// Returns true if the piece is a major piece (Rook, Queen)
     pub const fn is_major(self) -> bool {
         matches!(self, Self::Rook | Self::Queen)
     }
 
-    /// Returns true if the piece is a minor piece (Knight, Bishop)
     pub const fn is_minor(self) -> bool {
         matches!(self, Self::Knight | Self::Bishop)
     }

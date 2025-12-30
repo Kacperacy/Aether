@@ -86,7 +86,6 @@ impl File {
         unsafe { std::mem::transmute(file as u8) }
     }
 
-    /// Returns the character representation of the File
     pub const fn as_char(self) -> char {
         match self {
             Self::A => 'a',
@@ -100,7 +99,6 @@ impl File {
         }
     }
 
-    /// Returns a new File offset by the given amount, or None if out of bounds
     pub const fn offset(self, offset: i8) -> Option<Self> {
         let new_file = self as i8 + offset;
         if new_file < 0 || new_file > 7 {
@@ -110,7 +108,6 @@ impl File {
         }
     }
 
-    /// Returns the File flipped horizontally (A<->H, B<->G, etc.)
     pub const fn flip(self) -> Self {
         match self {
             Self::A => Self::H,
@@ -124,7 +121,6 @@ impl File {
         }
     }
 
-    /// Returns the BitBoard representation of the File
     pub const fn bitboard(self) -> BitBoard {
         match self {
             Self::A => BitBoard(0x0101010101010101),
@@ -138,7 +134,6 @@ impl File {
         }
     }
 
-    /// Returns the BitBoard of squares adjacent to this File
     pub const fn adjacent(self) -> BitBoard {
         match self {
             Self::A => BitBoard(0x202020202020202),
@@ -152,7 +147,6 @@ impl File {
         }
     }
 
-    /// Converts the File to its corresponding index (0-7)
     #[inline(always)]
     pub const fn to_index(self) -> u8 {
         self as u8

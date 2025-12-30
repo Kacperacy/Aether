@@ -86,7 +86,6 @@ impl Rank {
         unsafe { std::mem::transmute(rank as u8) }
     }
 
-    /// Returns the character representation of the Rank
     pub const fn as_char(self) -> char {
         match self {
             Self::One => '1',
@@ -100,7 +99,6 @@ impl Rank {
         }
     }
 
-    /// Returns a new Rank offset by the given amount, or None if out of bounds
     pub const fn offset(self, offset: i8) -> Option<Self> {
         let new_rank = self as i8 + offset;
         if new_rank < 0 || new_rank > 7 {
@@ -110,7 +108,6 @@ impl Rank {
         }
     }
 
-    /// Flips the rank vertically (mirrors across the horizontal axisr)
     pub const fn flip(self) -> Self {
         match self {
             Self::One => Self::Eight,
@@ -124,7 +121,6 @@ impl Rank {
         }
     }
 
-    /// Returns the bitboard representing all squares on this rank
     pub const fn bitboard(self) -> BitBoard {
         match self {
             Self::One => BitBoard(0x00000000000000ff),
@@ -138,7 +134,6 @@ impl Rank {
         }
     }
 
-    /// Returns the rank relative to the given color (White's perspective)
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -146,7 +141,6 @@ impl Rank {
         }
     }
 
-    /// Converts the Rank to its corresponding index (0-7)
     #[inline(always)]
     pub const fn to_index(self) -> u8 {
         self as u8

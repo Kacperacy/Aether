@@ -30,7 +30,6 @@ impl Color {
     /// Number of colors in chess
     pub const NUM: usize = 2;
 
-    /// Returns the character representation of the color ('w' or 'b')
     pub const fn as_char(self) -> char {
         match self {
             Self::White => 'w',
@@ -38,7 +37,6 @@ impl Color {
         }
     }
 
-    /// Creates a Color from its character representation ('w' or 'b')
     pub const fn from_char(c: char) -> Option<Self> {
         match c {
             'w' => Some(Self::White),
@@ -47,7 +45,6 @@ impl Color {
         }
     }
 
-    /// Returns the opponent color
     #[inline]
     pub const fn opponent(self) -> Self {
         match self {
@@ -56,7 +53,6 @@ impl Color {
         }
     }
 
-    /// Returns the starting rank for pawns of this color
     pub const fn pawn_start_rank(self) -> crate::Rank {
         match self {
             Self::White => crate::Rank::Two,
@@ -64,7 +60,6 @@ impl Color {
         }
     }
 
-    /// Returns the promotion rank for pawns of this color
     pub const fn pawn_promotion_rank(self) -> crate::Rank {
         match self {
             Self::White => crate::Rank::Eight,
@@ -72,7 +67,6 @@ impl Color {
         }
     }
 
-    /// Returns the forward direction for this color (1 for White, -1 for Black)
     pub const fn forward_direction(self) -> i8 {
         match self {
             Self::White => 1,
@@ -80,7 +74,6 @@ impl Color {
         }
     }
 
-    /// Returns the back rank for this color
     pub const fn back_rank(self) -> crate::Rank {
         match self {
             Self::White => crate::Rank::One,

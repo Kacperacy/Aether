@@ -12,14 +12,11 @@ use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 pub struct Engine {
-    /// Move generator
     generator: Generator,
-    /// Alpha-beta searcher (handles all search logic)
     searcher: AlphaBetaSearcher<SimpleEvaluator>,
 }
 
 impl Engine {
-    /// Create a new engine with specified hash size in MB
     #[must_use]
     pub fn new(hash_size_mb: usize) -> Self {
         let evaluator = SimpleEvaluator::new();
@@ -31,35 +28,29 @@ impl Engine {
         }
     }
 
-    /// Get a clone of the stop flag for external control
     #[must_use]
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         self.searcher.stop_flag()
     }
 
-    /// Stop the current search
     pub fn stop(&mut self) {
         self.searcher.stop();
     }
 
-    /// Clear transposition table (call on ucinewgame)
     pub fn new_game(&mut self) {
         self.searcher.clear_tt();
         self.searcher.clear_move_ordering();
     }
 
-    /// Resize transposition table
     pub fn resize_tt(&mut self, size_mb: usize) {
         self.searcher.resize_tt(size_mb);
     }
 
-    /// Get hash table usage in permille
     #[must_use]
     pub fn hashfull(&self) -> u16 {
         self.searcher.hashfull()
     }
 
-    /// Generate all legal moves for a position
     #[must_use]
     pub fn legal_moves(&self, board: &Board) -> Vec<Move> {
         let mut moves = Vec::new();
@@ -67,16 +58,6 @@ impl Engine {
         moves
     }
 
-    /// Search for the best move
-    ///
-    /// # Arguments
-    /// * `board` - The position to search
-    /// * `depth` - Optional depth limit
-    /// * `time_limit` - Optional soft time limit (will finish current iteration)
-    /// * `on_info` - Callback for search info updates
-    ///
-    /// # Returns
-    /// SearchResult containing best move, score, and search statistics
     pub fn search(
         &mut self,
         board: &mut Board,
@@ -91,7 +72,6 @@ impl Engine {
         self.searcher.search(board, &limits, on_info)
     }
 
-    /// Create SearchLimits from legacy parameters
     fn create_search_limits(
         &self,
         depth: Option<u8>,
@@ -114,10 +94,6 @@ impl Engine {
         }
     }
 
-    /// Perft - count nodes at given depth
-    ///
-    /// This is a debugging/testing function that counts all leaf nodes
-    /// at a given depth. Useful for validating move generation
     #[must_use]
     pub fn perft(&self, board: &mut Board, depth: u8) -> u64 {
         if depth == 0 {
@@ -141,10 +117,6 @@ impl Engine {
         nodes
     }
 
-    /// Perft divide - count nodes per move at given depth
-    ///
-    /// Like perft, but returns the node count for each move separately
-    /// Useful for debugging specific moves
     #[must_use]
     pub fn perft_divide(&self, board: &mut Board, depth: u8) -> Vec<(Move, u64)> {
         let mut moves = Vec::new();

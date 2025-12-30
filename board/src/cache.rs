@@ -1,16 +1,12 @@
 use aether_core::{ALL_COLORS, BitBoard, Color, Square};
 
-/// Cached aggregate bitboards for fast access during move generation and evaluation
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoardCache {
-    /// Combined bitboard for each color (all pieces of that color)
     pub color_combined: [BitBoard; 2],
-    /// All occupied squares
     pub occupied: BitBoard,
 }
 
 impl BoardCache {
-    /// Creates a new, empty BoardCache
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -19,7 +15,6 @@ impl BoardCache {
         }
     }
 
-    /// Fully refreshes the cache based on the provided piece bitboards
     pub fn refresh(&mut self, pieces: &[[BitBoard; 6]; 2]) {
         for color in ALL_COLORS {
             self.color_combined[color as usize] = pieces[color as usize][0]
@@ -32,7 +27,6 @@ impl BoardCache {
         self.occupied = self.color_combined[0] | self.color_combined[1];
     }
 
-    /// Incrementally updates the cache when a piece is added
     #[inline]
     pub fn add_piece(&mut self, square: Square, color: Color) {
         let bb = BitBoard::from_square(square);
@@ -40,7 +34,6 @@ impl BoardCache {
         self.occupied |= bb;
     }
 
-    /// Incrementally updates the cache when a piece is removed
     #[inline]
     pub fn remove_piece(&mut self, square: Square, color: Color) {
         let bb = BitBoard::from_square(square);
@@ -48,7 +41,6 @@ impl BoardCache {
         self.occupied &= !bb;
     }
 
-    /// Incrementally updates the cache when a piece moves
     #[inline]
     pub fn move_piece(&mut self, from: Square, to: Square, color: Color) {
         let from_bb = BitBoard::from_square(from);
@@ -59,19 +51,16 @@ impl BoardCache {
         self.occupied ^= combined;
     }
 
-    /// Returns true if the square is occupied
     #[inline]
     pub fn is_occupied(&self, square: Square) -> bool {
         self.occupied.has(square)
     }
 
-    /// Returns true if the square is occupied by a piece of the given color
     #[inline]
     pub fn is_occupied_by(&self, square: Square, color: Color) -> bool {
         self.color_combined[color as usize].has(square)
     }
 
-    /// Returns the color of the piece on the square, if any
     #[inline]
     pub fn color_at(&self, square: Square) -> Option<Color> {
         if self.color_combined[Color::White as usize].has(square) {

@@ -2,12 +2,9 @@ use crate::eval::Evaluator;
 use aether_core::{ALL_PIECES, Color, Piece, Square};
 use board::BoardQuery;
 
-// --- Piece-Square Tables ---
-// Values represent positional bonuses/penalties in centipawns.
-// Tables are from white's perspective; black's values are mirrored.
+// Piece-Square Tables (centipawns, from white's perspective)
 
-/// Pawn middlegame piece-square table
-/// Encourages central pawn control and advancement
+/// Pawn middlegame PST
 #[rustfmt::skip]
 const PAWN_PST_MG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -20,8 +17,7 @@ const PAWN_PST_MG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Knight middlegame piece-square table
-/// Knights are strongest in the center with maximum mobility
+/// Knight middlegame PST
 #[rustfmt::skip]
 const KNIGHT_PST_MG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
@@ -34,8 +30,7 @@ const KNIGHT_PST_MG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
 ];
 
-/// Bishop middlegame piece-square table
-/// Bishops prefer long diagonals and active positions
+/// Bishop middlegame PST
 #[rustfmt::skip]
 const BISHOP_PST_MG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
@@ -48,8 +43,7 @@ const BISHOP_PST_MG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
 ];
 
-/// Rook middlegame piece-square table
-/// Rooks gain value on open files and the seventh rank
+/// Rook middlegame PST
 #[rustfmt::skip]
 const ROOK_PST_MG: [i32; 64] = [
       0,   0,   0,   5,   5,   0,   0,   0,
@@ -62,8 +56,7 @@ const ROOK_PST_MG: [i32; 64] = [
      -5,   0,   5,  10,  10,   5,   0,  -5,
 ];
 
-/// Queen middlegame piece-square table
-/// Queen should avoid early development but control center when active
+/// Queen middlegame PST
 #[rustfmt::skip]
 const QUEEN_PST_MG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
@@ -76,8 +69,7 @@ const QUEEN_PST_MG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
 ];
 
-/// King middlegame piece-square table
-/// King safety is paramount; stay castled and protected
+/// King middlegame PST
 #[rustfmt::skip]
 const KING_PST_MG: [i32; 64] = [
     -50, -40, -30, -20, -20, -30, -40, -50,
@@ -90,8 +82,7 @@ const KING_PST_MG: [i32; 64] = [
      20,  30,  -5, -30, -10, -30,  30,  20,
 ];
 
-/// Pawn endgame piece-square table
-/// Passed pawns and advancement become critical
+/// Pawn endgame PST
 #[rustfmt::skip]
 const PAWN_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -104,8 +95,7 @@ const PAWN_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Knight endgame piece-square table
-/// Central knights maintain good mobility
+/// Knight endgame PST
 #[rustfmt::skip]
 const KNIGHT_PST_EG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
@@ -118,8 +108,7 @@ const KNIGHT_PST_EG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
 ];
 
-/// Bishop endgame piece-square table
-/// Diagonal control remains important for restricting enemy king
+/// Bishop endgame PST
 #[rustfmt::skip]
 const BISHOP_PST_EG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
@@ -132,8 +121,7 @@ const BISHOP_PST_EG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
 ];
 
-/// Rook endgame piece-square table
-/// Seventh rank remains strong for attacking pawns and restricting king
+/// Rook endgame PST
 #[rustfmt::skip]
 const ROOK_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -146,8 +134,7 @@ const ROOK_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Queen endgame piece-square table
-/// Centralization maximizes queen activity in open endgames
+/// Queen endgame PST
 #[rustfmt::skip]
 const QUEEN_PST_EG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
@@ -160,8 +147,7 @@ const QUEEN_PST_EG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
 ];
 
-/// King endgame piece-square table
-/// Active centralized king is essential for both offense and defense
+/// King endgame PST
 #[rustfmt::skip]
 const KING_PST_EG: [i32; 64] = [
     -50, -30, -20, -10, -10, -20, -30, -50,
@@ -284,22 +270,17 @@ const fn compute_black_passed_masks() -> [u64; 64] {
 pub struct SimpleEvaluator;
 
 impl SimpleEvaluator {
-    /// Creates a new SimpleEvaluator instance
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Converts a square index for PST lookup based on color
-    /// White pieces use flipped index (from white's perspective)
     #[inline]
     fn pst_index(square: Square, color: Color) -> usize {
         let idx = square.to_index() as usize;
         if color == Color::White { idx ^ 56 } else { idx }
     }
 
-    /// Calculates game phase based on remaining material
-    /// Returns value from 0 (endgame) to 256 (opening/middlegame)
     fn calculate_phase<T: BoardQuery>(board: &T) -> i32 {
         let mut phase = TOTAL_PHASE;
 
@@ -315,7 +296,6 @@ impl SimpleEvaluator {
         ((TOTAL_PHASE - phase) * 256 / TOTAL_PHASE).max(0)
     }
 
-    /// Returns middlegame and endgame PST values for a piece at given index
     #[inline]
     fn pst_values(piece: Piece, idx: usize) -> (i32, i32) {
         match piece {
@@ -328,7 +308,6 @@ impl SimpleEvaluator {
         }
     }
 
-    /// Calculates bishop pair bonus for both sides
     fn bishop_pair_bonus<T: BoardQuery>(board: &T) -> (i32, i32) {
         let white_pair = board.piece_count(Piece::Bishop, Color::White) >= 2;
         let black_pair = board.piece_count(Piece::Bishop, Color::Black) >= 2;
@@ -341,8 +320,6 @@ impl SimpleEvaluator {
         (mg, eg)
     }
 
-    /// Evaluates passed pawns for both sides using precomputed masks
-    /// A passed pawn is a pawn with no enemy pawns on its file or adjacent files ahead of it
     #[inline]
     fn evaluate_passed_pawns<T: BoardQuery>(board: &T) -> (i32, i32) {
         let mut mg_score = 0;
@@ -387,16 +364,13 @@ impl SimpleEvaluator {
         (mg_score, eg_score)
     }
 
-    /// Evaluates position from white's perspective
     fn evaluate_position<T: BoardQuery>(&self, board: &T) -> i32 {
         let mut mg_score = 0i32;
         let mut eg_score = 0i32;
 
-        // Iterate directly through piece bitboards - avoids piece_at() lookup per square
         for &piece in &ALL_PIECES {
             let material = piece.value();
 
-            // White pieces
             for square in board.piece_bb(piece, Color::White).iter() {
                 let idx = Self::pst_index(square, Color::White);
                 let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
@@ -404,7 +378,6 @@ impl SimpleEvaluator {
                 eg_score += material + pst_eg;
             }
 
-            // Black pieces
             for square in board.piece_bb(piece, Color::Black).iter() {
                 let idx = Self::pst_index(square, Color::Black);
                 let (pst_mg, pst_eg) = Self::pst_values(piece, idx);
@@ -413,12 +386,10 @@ impl SimpleEvaluator {
             }
         }
 
-        // Bishop pair bonus
         let (mg_bonus, eg_bonus) = Self::bishop_pair_bonus(board);
         mg_score += mg_bonus;
         eg_score += eg_bonus;
 
-        // Passed pawn bonus
         let (passed_mg, passed_eg) = Self::evaluate_passed_pawns(board);
         mg_score += passed_mg;
         eg_score += passed_eg;
@@ -429,7 +400,6 @@ impl SimpleEvaluator {
 }
 
 impl Evaluator for SimpleEvaluator {
-    /// Evaluates position from the side to move's perspective
     fn evaluate<T: BoardQuery>(&self, board: &T) -> i32 {
         let score = self.evaluate_position(board);
 

@@ -29,7 +29,6 @@ impl BoardOps for Board {
             "Exceeded maximum search depth"
         );
 
-        // 1. Save state for unmake
         self.move_history[self.history_count] = MoveState {
             captured_piece: mv.capture.map(|p| (p, opponent)),
             mv_from: mv.from,
@@ -43,16 +42,13 @@ impl BoardOps for Board {
 
         self.history_count += 1;
 
-        // 2. Update zobrist for en passant (remove old)
         if let Some(ep_sq) = self.game_state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        // 3. Remove piece from source (we know the piece type and color)
         self.remove_piece_known(mv.from, mv.piece, side);
         self.zobrist_toggle_piece(mv.from, mv.piece, side);
 
-        // 4. Handle captures (we know the captured piece type)
         if let Some(captured) = mv.capture {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
@@ -64,12 +60,10 @@ impl BoardOps for Board {
             }
         }
 
-        // 5. Place piece at destination (with promotion if applicable)
         let final_piece = mv.promotion.unwrap_or(mv.piece);
         self.place_piece_internal(mv.to, final_piece, side);
         self.zobrist_toggle_piece(mv.to, final_piece, side);
 
-        // 6. Handle castling rook movement
         if mv.flags.is_castle {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
             self.remove_piece_known(rook_from, Piece::Rook, side);
@@ -78,32 +72,27 @@ impl BoardOps for Board {
             self.zobrist_toggle_piece(rook_to, Piece::Rook, side);
         }
 
-        // 7. Update castling rights
         let old_castling = self.game_state.castling_rights;
         self.update_castling_rights_after_move(mv);
         let new_castling = self.game_state.castling_rights;
         self.zobrist_update_castling(&old_castling, &new_castling);
 
-        // 8. Update en passant square
         self.game_state.en_passant_square = if mv.flags.is_double_pawn_push {
             mv.from.up(side)
         } else {
             None
         };
 
-        // Update zobrist for new en passant
         if let Some(ep_sq) = self.game_state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        // 9. Update halfmove clock
         if mv.piece == Piece::Pawn || mv.capture.is_some() {
             self.game_state.halfmove_clock = 0;
         } else {
             self.game_state.halfmove_clock += 1;
         }
 
-        // 10. Switch side to move
         self.game_state.switch_side();
         self.zobrist_toggle_side();
 
@@ -219,7 +208,6 @@ impl Board {
         self.mailbox[square.to_index() as usize] = None;
     }
 
-    /// Get the source and destination squares for the castling rook
     #[inline]
     fn get_castling_rook_squares(king_to: Square, side: Color) -> Result<(Square, Square)> {
         match (side, king_to) {

@@ -12,10 +12,8 @@ pub struct Move {
 
 impl Display for Move {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // 1. origin + destination squares
         write!(f, "{}{}", self.from, self.to)?;
 
-        // 2. optional promotion suffix (UCI uses lowercase piece letters)
         if let Some(p) = self.promotion {
             let symbol = match p {
                 Piece::Knight => 'n',
@@ -33,7 +31,6 @@ impl Display for Move {
 }
 
 impl Move {
-    /// Creates a new Move from the given origin and destination squares
     pub fn new(from: Square, to: Square, piece: Piece) -> Self {
         Move {
             from,
@@ -49,31 +46,26 @@ impl Move {
         }
     }
 
-    /// Sets the promotion piece for the move
     pub const fn with_promotion(mut self, piece: Piece) -> Self {
         self.promotion = Some(piece);
         self
     }
 
-    /// Sets the moving piece for the move
     pub const fn with_piece(mut self, piece: Piece) -> Self {
         self.piece = piece;
         self
     }
 
-    /// Sets the captured piece for the move
     pub const fn with_capture(mut self, piece: Piece) -> Self {
         self.capture = Some(piece);
         self
     }
 
-    /// Sets the move flags for the move
     pub const fn with_flags(mut self, flags: MoveFlags) -> Self {
         self.flags = flags;
         self
     }
 
-    /// Returns true if the move is a capture
     #[inline]
     pub const fn is_capture(&self) -> bool {
         self.capture.is_some()

@@ -1,14 +1,8 @@
-//! UCI (Universal Chess Interface) protocol implementation
-//!
-//! This module handles communication between the chess engine and GUI applications
-//! following the UCI protocol specification.
-
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::io::{self, BufRead, Write};
 use std::time::Duration;
 
-/// UCI engine information
 pub struct EngineInfo {
     pub name: String,
     pub author: String,
@@ -23,44 +17,29 @@ impl Default for EngineInfo {
     }
 }
 
-/// Search parameters from UCI "go" command
 #[derive(Debug, Clone, Default)]
 pub struct SearchParams {
-    /// Search specific moves only
     pub searchmoves: Vec<String>,
-    /// Start searching in pondering mode
     pub ponder: bool,
-    /// White has x msec left on the clock
     pub wtime: Option<u64>,
-    /// Black has x msec left on the clock
     pub btime: Option<u64>,
-    /// White increment per move in msec
     pub winc: Option<u64>,
-    /// Black increment per move in msec
     pub binc: Option<u64>,
-    /// Moves to go until next time control
     pub movestogo: Option<u32>,
-    /// Search x plies only
     pub depth: Option<u8>,
-    /// Search x nodes only
     pub nodes: Option<u64>,
-    /// Search for mate in x moves
     pub mate: Option<u32>,
-    /// Search for exactly x msec
     pub movetime: Option<u64>,
-    /// Search until "stop" command
     pub infinite: bool,
 }
 
 impl SearchParams {
-    /// Calculate time to use for this move based on time controls
     pub fn calculate_move_time(&self, is_white: bool) -> Option<Duration> {
         if self.infinite {
             return None;
         }
 
         if let Some(movetime) = self.movetime {
-            // Fixed time per move - use almost all of it (leave 50ms buffer)
             return Some(Duration::from_millis(movetime.saturating_sub(50).max(10)));
         }
 
@@ -69,27 +48,15 @@ impl SearchParams {
 
         if let Some(time_left) = time {
             let increment = inc.unwrap_or(0);
-
-            // Estimate moves remaining
             let moves_to_go = self.movestogo.unwrap_or(30) as u64;
-
-            // Base time allocation
             let base_time = time_left / moves_to_go.max(1);
-
-            // Add portion of increment
             let inc_bonus = (increment * 7) / 10;
-
-            // Target time
             let target_time = base_time + inc_bonus;
 
-            // Safety limits:
-            // 1. Never use more than 10% of remaining time (for bullet)
-            // 2. Leave at least 100ms on clock (or 50ms for very short times)
             let max_fraction = time_left / 10;
             let min_remaining = if time_left > 1000 { 100 } else { 50 };
             let safety_buffer = time_left.saturating_sub(min_remaining);
-
-            let final_time = target_time.min(max_fraction).min(safety_buffer).max(5); // At least 5ms
+            let final_time = target_time.min(max_fraction).min(safety_buffer).max(5);
 
             Some(Duration::from_millis(final_time))
         } else {
@@ -97,7 +64,6 @@ impl SearchParams {
         }
     }
 
-    /// Get hard time limit (absolute maximum, never exceed)
     pub fn calculate_hard_limit(&self, is_white: bool) -> Option<Duration> {
         if self.infinite {
             return None;
@@ -110,8 +76,6 @@ impl SearchParams {
         let time = if is_white { self.wtime } else { self.btime };
 
         if let Some(time_left) = time {
-            // Hard limit: never use more than 25% of remaining time
-            // and always leave 30ms buffer
             let hard_limit = (time_left / 4).saturating_sub(30).max(5);
             Some(Duration::from_millis(hard_limit))
         } else {
@@ -120,43 +84,24 @@ impl SearchParams {
     }
 }
 
-/// UCI command parsed from input
 #[derive(Debug, Clone)]
 pub enum UciCommand {
-    /// uci - Tell engine to use UCI protocol
     Uci,
-    /// debug [on|off] - Switch debug mode
     Debug(bool),
-    /// isready - Synchronize with engine
     IsReady,
-    /// setoption name <id> [value <x>]
     SetOption { name: String, value: Option<String> },
-    /// register - Register the engine (not implemented)
     Register,
-    /// ucinewgame - New game is starting
     UciNewGame,
-    /// position [fen <fenstring> | startpos] [moves <move1> ... <movei>]
-    Position {
-        fen: Option<String>,
-        moves: Vec<String>,
-    },
-    /// go <search params>
+    Position { fen: Option<String>, moves: Vec<String> },
     Go(SearchParams),
-    /// stop - Stop calculating
     Stop,
-    /// ponderhit - User played expected move
     PonderHit,
-    /// quit - Quit the program
     Quit,
-    /// d - Debug: display current position (non-standard but useful)
     Display,
-    /// perft <depth> - Run perft test (non-standard)
     Perft(u8),
-    /// Unknown command
     Unknown(String),
 }
 
-/// Parse a UCI command from a string
 pub fn parse_command(input: &str) -> UciCommand {
     let input = input.trim();
     let mut parts = input.split_whitespace();
@@ -303,33 +248,19 @@ fn parse_go<'a>(parts: &mut impl Iterator<Item = &'a str>) -> UciCommand {
     UciCommand::Go(params)
 }
 
-/// UCI response to send to GUI
 #[derive(Debug, Clone)]
 pub enum UciResponse {
-    /// id name <x>
     IdName(String),
-    /// id author <x>
     IdAuthor(String),
-    /// uciok
     UciOk,
-    /// readyok
     ReadyOk,
-    /// bestmove <move1> [ponder <move2>]
-    BestMove {
-        best: String,
-        ponder: Option<String>,
-    },
-    /// copyprotection [checking|ok|error]
+    BestMove { best: String, ponder: Option<String> },
     CopyProtection(String),
-    /// registration [checking|ok|error]
     Registration(String),
-    /// info <info>
     Info(InfoResponse),
-    /// option name <id> type <t> [default <x>] [min <x>] [max <x>] [var <x>]*
     Option(OptionInfo),
 }
 
-/// Info response parameters
 #[derive(Debug, Clone, Default)]
 pub struct InfoResponse {
     pub depth: Option<u8>,
@@ -394,7 +325,6 @@ impl InfoResponse {
     }
 }
 
-/// Option information for UCI options
 #[derive(Debug, Clone)]
 pub struct OptionInfo {
     pub name: String,
@@ -512,20 +442,17 @@ impl Display for UciResponse {
     }
 }
 
-/// Sends a UCI response to stdout
 pub fn send_response(response: &UciResponse) {
     println!("{}", response);
     io::stdout().flush().ok();
 }
 
-/// Sends multiple UCI responses
 pub fn send_responses(responses: &[UciResponse]) {
     for response in responses {
         send_response(response);
     }
 }
 
-/// UCI input handler - reads commands from stdin
 pub struct UciInput {
     reader: io::BufReader<io::Stdin>,
 }
@@ -537,7 +464,6 @@ impl UciInput {
         }
     }
 
-    /// Read the next command (blocking)
     pub fn read_command(&mut self) -> Option<UciCommand> {
         let mut line = String::new();
         match self.reader.read_line(&mut line) {

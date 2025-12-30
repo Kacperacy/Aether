@@ -1,39 +1,25 @@
-//! Transposition Table for storing search results
-
 use aether_core::{Move, Score};
 
 const MATE_THRESHOLD: Score = 90000;
 
-/// Type of node stored in the transposition table
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
-    /// Exact score (PV node)
-    Exact,
-    /// Lower bound (fail-high, cut node)
-    LowerBound,
-    /// Upper bound (fail-low, all node)
-    UpperBound,
+    Exact,      // PV node
+    LowerBound, // fail-high
+    UpperBound, // fail-low
 }
 
-/// Entry in the transposition table
 #[derive(Debug, Clone, Copy)]
 pub struct TTEntry {
-    /// Zobrist hash key (used for verification)
     pub key: u64,
-    /// Best move found
     pub best_move: Option<Move>,
-    /// Score of the position
     pub score: Score,
-    /// Depth of search
     pub depth: u8,
-    /// Type of node
     pub node_type: NodeType,
-    /// Age/generation of the entry
     pub age: u8,
 }
 
 impl TTEntry {
-    /// Create a new TT entry
     pub fn new(
         key: u64,
         best_move: Option<Move>,
@@ -52,7 +38,7 @@ impl TTEntry {
         }
     }
 
-    /// Adjust mate scores based on ply (for correct mate distance)
+    /// Adjusts mate scores for storage (accounts for ply)
     #[inline]
     pub fn score_to_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
@@ -64,7 +50,7 @@ impl TTEntry {
         }
     }
 
-    /// Adjust mate scores when retrieving from TT
+    /// Adjusts mate scores for retrieval (accounts for ply)
     #[inline]
     pub fn score_from_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
@@ -77,20 +63,14 @@ impl TTEntry {
     }
 }
 
-/// Transposition Table
 pub struct TranspositionTable {
-    /// Table entries
     entries: Vec<Option<TTEntry>>,
-    /// Number of entries
     size: usize,
-    /// Current generation/age
     generation: u8,
-    /// Number of entries used
     used: usize,
 }
 
 impl TranspositionTable {
-    /// Create a new transposition table with the given size in MB
     pub fn new(size_mb: usize) -> Self {
         let entry_size = std::mem::size_of::<Option<TTEntry>>();
         let num_entries = (size_mb * 1024 * 1024) / entry_size;
@@ -106,28 +86,22 @@ impl TranspositionTable {
         }
     }
 
-    /// Get the index for a given hash key
     #[inline]
     fn index(&self, key: u64) -> usize {
         (key as usize) & (self.size - 1)
     }
 
-    /// Probe the transposition table
     #[inline]
     pub fn probe(&self, key: u64) -> Option<&TTEntry> {
         let idx = self.index(key);
         self.entries[idx].as_ref().filter(|e| e.key == key)
     }
 
-    /// Store an entry in the transposition table
     #[inline]
     pub fn store(&mut self, entry: TTEntry) {
         let idx = self.index(entry.key);
 
-        // Replacement strategy:
-        // 1. Always replace if empty
-        // 2. Always replace if same position
-        // 3. Replace if new entry has higher depth or is from newer generation
+        // Replace if: empty, same position, higher depth, or newer generation
         let should_replace = match &self.entries[idx] {
             None => {
                 self.used += 1;
@@ -145,39 +119,33 @@ impl TranspositionTable {
         }
     }
 
-    /// Clear the transposition table
     pub fn clear(&mut self) {
         self.entries.fill(None);
         self.used = 0;
         self.generation = 0;
     }
 
-    /// Increment the generation (called at the start of each search)
     pub fn new_search(&mut self) {
         self.generation = self.generation.wrapping_add(1);
     }
 
-    /// Get the current generation
     pub fn generation(&self) -> u8 {
         self.generation
     }
 
-    /// Get hash table usage in permille (0-1000)
+    /// Returns usage in permille (0-1000)
     pub fn hashfull(&self) -> u16 {
         ((self.used as u64 * 1000) / self.size as u64) as u16
     }
 
-    /// Get the number of entries in use
     pub fn len(&self) -> usize {
         self.used
     }
 
-    /// Check if the table is empty
     pub fn is_empty(&self) -> bool {
         self.used == 0
     }
 
-    /// Resize the table to a new size in MB
     pub fn resize(&mut self, size_mb: usize) {
         let entry_size = std::mem::size_of::<Option<TTEntry>>();
         let num_entries = (size_mb * 1024 * 1024) / entry_size;

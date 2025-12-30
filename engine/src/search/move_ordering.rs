@@ -1,5 +1,5 @@
-use crate::search::see::{see_ge, see_value};
 use crate::search::MAX_PLY;
+use crate::search::see::{see_ge, see_value};
 use aether_core::{BitBoard, Color, Move, Piece, Square};
 
 const REPETITION_PENALTY: i32 = -5000;

@@ -36,7 +36,6 @@ pub struct Board {
 }
 
 impl Board {
-    /// Creates a new, empty board (no pieces, white to move)
     pub fn empty() -> Self {
         Self {
             pieces: [[BitBoard::EMPTY; 6]; 2],
@@ -49,87 +48,72 @@ impl Board {
         }
     }
 
-    /// Creates a board set up in the standard starting position
     pub fn starting_position() -> Result<Self> {
         BoardBuilder::starting_position().build()
     }
 
-    /// Returns a builder for constructing a custom board position
     pub fn builder() -> BoardBuilder {
         BoardBuilder::new()
     }
 
-    /// Returns the piece bitboards for both colors and all piece types
     #[inline]
     pub fn pieces(&self) -> &[[BitBoard; 6]; 2] {
         &self.pieces
     }
 
-    /// Returns the current game state
     #[inline]
     pub fn game_state(&self) -> &GameState {
         &self.game_state
     }
 
-    /// Returns the Zobrist hash of the current position, if non-zero
     #[inline]
     pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
         NonZeroU64::new(self.zobrist_hash)
     }
 
-    /// Returns the raw zobrist hash value
     #[inline]
     pub fn zobrist_hash_raw(&self) -> u64 {
         self.zobrist_hash
     }
 
-    /// Returns reference to move history
     #[inline]
     pub fn move_history(&self) -> &[MoveState] {
         &self.move_history
     }
 
-    /// Returns the piece and color at the given square without bounds checking
     pub fn piece_at_fast(&self, square: Square) -> Option<(Piece, Color)> {
         self.mailbox[square.to_index() as usize]
     }
 
-    /// Returns reference to the cache
     #[inline]
     pub fn cache(&self) -> &BoardCache {
         &self.cache
     }
 
-    /// Refreshes the board cache from current piece positions
     #[inline]
     pub fn refresh_cache(&mut self) {
         self.cache.refresh(&self.pieces);
     }
 
-    /// Returns a BitBoard of all pieces of the given color attacking the specified square
     #[inline]
     pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
         attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
     }
 
-    /// Returns the occupied squares bitboard
     #[inline]
     pub fn occupied(&self) -> BitBoard {
         self.cache.occupied
     }
 
-    /// Returns the bitboard of all pieces of a given color
     #[inline]
     pub fn color_occupied(&self, color: Color) -> BitBoard {
         self.cache.color_combined[color as usize]
     }
 
-    /// Prints an ASCII diagram of the current board to stdout
     pub fn print(&self) {
         println!("{}", self.as_ascii());
     }
 
-    /// Generates an ASCII diagram of the current board position
     pub fn as_ascii(&self) -> String {
         use std::fmt::Write;
         let mut out = String::new();
@@ -154,7 +138,6 @@ impl Board {
         out
     }
 
-    /// Returns the number of half-moves played
     #[inline]
     pub fn ply(&self) -> usize {
         self.move_history.len()
@@ -180,7 +163,6 @@ impl Board {
         count
     }
 
-    /// Piece and color at square, if any. (Delegates to BoardQuery)
     #[inline]
     pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
         <Self as BoardQuery>::piece_at(self, square)
@@ -188,7 +170,6 @@ impl Board {
 }
 
 impl Default for Board {
-    /// Creates a board in the standard starting position
     fn default() -> Self {
         Self::starting_position().expect("Failed to create starting position")
     }

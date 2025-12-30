@@ -128,13 +128,11 @@ impl BitBoard {
         self.0.count_ones()
     }
 
-    /// Returns an iterator over all set squares (non-mutating)
     #[inline(always)]
     pub const fn iter(self) -> BitBoardIter {
         BitBoardIter { bits: self.0 }
     }
 
-    /// Counts the number of set bits (returns usize for convenience)
     #[inline(always)]
     pub const fn count(self) -> usize {
         self.0.count_ones() as usize

@@ -78,7 +78,6 @@ impl UciHandler {
         }
     }
 
-    /// Handle a single UCI command
     fn handle_command(&mut self, cmd: UciCommand) {
         match cmd {
             UciCommand::Uci => self.cmd_uci(),
@@ -104,7 +103,6 @@ impl UciHandler {
         }
     }
 
-    /// Handle "uci" command
     fn cmd_uci(&self) {
         send_responses(&[
             UciResponse::IdName(self.info.name.clone()),
@@ -133,17 +131,14 @@ impl UciHandler {
         send_response(&UciResponse::UciOk);
     }
 
-    /// Handle "debug" command
     fn cmd_debug(&mut self, on: bool) {
         self.options.debug = on;
     }
 
-    /// Handle "isready" command
     fn cmd_isready(&self) {
         send_response(&UciResponse::ReadyOk);
     }
 
-    /// Handle "setoption" command
     fn cmd_setoption(&mut self, name: &str, value: Option<String>) {
         match name.to_lowercase().as_str() {
             "hash" => {
@@ -165,13 +160,11 @@ impl UciHandler {
         }
     }
 
-    /// Handle "ucinewgame" command
     fn cmd_ucinewgame(&mut self) {
         self.board = Board::starting_position().expect("Failed to create starting position");
         self.engine.new_game();
     }
 
-    /// Handle "position" command
     fn cmd_position(&mut self, fen: Option<String>, moves: Vec<String>) {
         // Set up the position
         if let Some(fen_str) = fen {
@@ -214,7 +207,6 @@ impl UciHandler {
         }
     }
 
-    /// Parse a UCI move string (e.g., "e2e4", "e7e8q")
     fn parse_uci_move(&self, move_str: &str) -> Option<Move> {
         if move_str.len() < 4 {
             return None;
@@ -244,7 +236,6 @@ impl UciHandler {
             .find(|m| m.from == from && m.to == to && m.promotion == promotion)
     }
 
-    /// Handle "go" command
     fn cmd_go(&mut self, params: SearchParams) {
         let is_white = self.board.side_to_move() == Color::White;
         let time_limit = params.calculate_move_time(is_white);
@@ -286,7 +277,6 @@ impl UciHandler {
         });
     }
 
-    /// Convert a Move to UCI notation
     fn move_to_uci(mv: &Move) -> String {
         let mut s = format!("{}{}", mv.from, mv.to);
         if let Some(promo) = mv.promotion {
@@ -301,12 +291,10 @@ impl UciHandler {
         s
     }
 
-    /// Handle "stop" command
     fn cmd_stop(&mut self) {
         self.stop_flag.store(true, Ordering::SeqCst);
     }
 
-    /// Handle "d" (display) command - non-standard debug command
     fn cmd_display(&self) {
         println!("{}", self.board.as_ascii());
         println!("Fen: {}", self.board.to_fen());
@@ -316,7 +304,6 @@ impl UciHandler {
         println!("Legal moves: {}", legal_moves.len());
     }
 
-    /// Handle "perft" command - count nodes at given depth
     fn cmd_perft(&mut self, depth: u8) {
         use std::time::Instant;
 

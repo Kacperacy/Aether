@@ -67,29 +67,18 @@ impl Display for Square {
 }
 
 impl Square {
-    /// Number of squares on a chessboard
     pub const NUM: usize = 64;
 
-    /// Create a new Square from a File and Rank
     #[inline(always)]
     pub const fn new(file: File, rank: Rank) -> Self {
         let index = (rank as u8) * 8 + (file as u8);
         Self::from_index(index as i8)
     }
 
-    /// Create a Square from an index (0-63)
-    ///
-    /// # Safety invariant
-    /// This function uses unsafe transmute for performance in hot paths (called
-    /// millions of times per second in search). The safety is guaranteed by:
-    /// - Square is #[repr(u8)] with values 0-63 matching the index
-    /// - All callers within this crate use valid indices (e.g., from bitboard iteration)
-    /// - External callers should use `try_from_index()` for untrusted input
-    /// - debug_assert validates bounds in debug builds
+    /// Index must be 0-63. Use `try_from_index` for untrusted input.
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
-        // SAFETY: Square is repr(u8) with explicit values 0-63, callers ensure valid index
         unsafe { std::mem::transmute(index as u8) }
     }
 
@@ -101,31 +90,26 @@ impl Square {
         }
     }
 
-    /// Convert the Square to an index (0-63)
     #[inline(always)]
     pub const fn to_index(self) -> u8 {
         self as u8
     }
 
-    /// Get the File of the Square
     #[inline(always)]
     pub const fn file(self) -> File {
         File::from_index(((self as u8) % 8) as i8)
     }
 
-    /// Get the Rank of the Square
     #[inline(always)]
     pub const fn rank(self) -> Rank {
         Rank::from_index(((self as u8) / 8) as i8)
     }
 
-    /// Get the BitBoard representation of the Square
     #[inline(always)]
     pub const fn bitboard(self) -> BitBoard {
         BitBoard(1 << self as u8)
     }
 
-    /// Offset the Square by the given file and rank deltas
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
         let file = self.file() as i8 + file;
         let rank = self.rank() as i8 + rank;
@@ -136,17 +120,14 @@ impl Square {
         }
     }
 
-    /// Flip the Square horizontally (mirror across vertical axis)
     pub const fn flip_file(self) -> Self {
         Self::new(self.file().flip(), self.rank())
     }
 
-    /// Flip the Square vertically (mirror across horizontal axis)
     pub const fn flip_rank(self) -> Self {
         Self::new(self.file(), self.rank().flip())
     }
 
-    /// Get the Square relative to the given color's perspective
     pub const fn relative_to(self, color: Color) -> Self {
         match color {
             Color::White => self,
@@ -154,7 +135,6 @@ impl Square {
         }
     }
 
-    /// Move the Square up by one rank relative to the given color
     pub const fn up(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(0, 1),
@@ -162,7 +142,6 @@ impl Square {
         }
     }
 
-    /// Move the Square down by one rank relative to the given color
     pub const fn down(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(0, -1),
@@ -170,7 +149,6 @@ impl Square {
         }
     }
 
-    /// Move the Square left by one file relative to the given color
     pub const fn left(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(-1, 0),
@@ -178,7 +156,6 @@ impl Square {
         }
     }
 
-    /// Move the Square right by one file relative to the given color
     pub const fn right(self, color: Color) -> Option<Self> {
         match color {
             Color::White => self.offset(1, 0),

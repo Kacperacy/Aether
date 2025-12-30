@@ -4,8 +4,8 @@
 //! assuming both sides always recapture with their least valuable piece.
 
 use aether_core::{
-    bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks, BitBoard, Color,
-    Move, Piece, Score, Square, BISHOP_VALUE, KNIGHT_VALUE, PAWN_VALUE, QUEEN_VALUE, ROOK_VALUE,
+    BISHOP_VALUE, BitBoard, Color, KNIGHT_VALUE, Move, PAWN_VALUE, Piece, QUEEN_VALUE, ROOK_VALUE,
+    Score, Square, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
 };
 
 const SEE_PIECE_VALUES: [Score; 6] = [
@@ -138,12 +138,7 @@ pub fn see_ge(
 
 /// Returns the exact SEE value of a capture.
 #[inline]
-pub fn see_value(
-    mv: &Move,
-    side: Color,
-    occupied: BitBoard,
-    pieces: &[[BitBoard; 6]; 2],
-) -> Score {
+pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard; 6]; 2]) -> Score {
     let to = mv.to;
     let from = mv.from;
 
@@ -331,7 +326,13 @@ mod tests {
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert!(see_ge(&mv, Color::White, PAWN_VALUE, occupied, &pieces));
-        assert!(!see_ge(&mv, Color::White, PAWN_VALUE + 1, occupied, &pieces));
+        assert!(!see_ge(
+            &mv,
+            Color::White,
+            PAWN_VALUE + 1,
+            occupied,
+            &pieces
+        ));
         assert_eq!(see_value(&mv, Color::White, occupied, &pieces), PAWN_VALUE);
     }
 
@@ -361,7 +362,13 @@ mod tests {
         let occupied = get_occupied(&pieces);
 
         assert!(!see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(&mv, Color::White, PAWN_VALUE - QUEEN_VALUE, occupied, &pieces));
+        assert!(see_ge(
+            &mv,
+            Color::White,
+            PAWN_VALUE - QUEEN_VALUE,
+            occupied,
+            &pieces
+        ));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
             PAWN_VALUE - QUEEN_VALUE
@@ -411,7 +418,10 @@ mod tests {
         let occupied = get_occupied(&pieces);
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), BISHOP_VALUE);
+        assert_eq!(
+            see_value(&mv, Color::White, occupied, &pieces),
+            BISHOP_VALUE
+        );
     }
 
     #[test]
@@ -460,7 +470,10 @@ mod tests {
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert!(see_ge(&mv, Color::White, KNIGHT_VALUE, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), KNIGHT_VALUE);
+        assert_eq!(
+            see_value(&mv, Color::White, occupied, &pieces),
+            KNIGHT_VALUE
+        );
     }
 
     #[test]

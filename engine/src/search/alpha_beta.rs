@@ -10,46 +10,16 @@ use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-// --- Search Constants ---
 
-/// Number of nodes between time/stop checks
-/// Balances search responsiveness with checking overhead
 const NODE_CHECK_INTERVAL: u64 = 4096;
-
-/// Safety margin for delta pruning in quiescence search (centipawns)
-/// Accounts for positional factors beyond pure material count
 const DELTA_PRUNING_MARGIN: Score = 200;
-
-/// Depth reduction for null move pruning (R value)
-/// Standard value balancing pruning aggressiveness with tactical safety
 const NULL_MOVE_REDUCTION: u8 = 3;
-
-/// Minimum depth required to apply null move pruning
-/// Below this depth, null move overhead exceeds potential savings
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
-
-/// Number of moves searched at full depth before applying LMR
-/// First moves are likely best (due to move ordering) and deserve full analysis
 const LMR_FULL_DEPTH_MOVES: usize = 4;
-
-/// Minimum depth required to apply late move reductions
-/// At shallow depths, LMR provides minimal time savings
 const LMR_MIN_DEPTH: u8 = 3;
-
-/// Minimum depth for aspiration window search
-/// At shallow depths, aspiration windows cause more re-searches than savings
 const ASPIRATION_DEPTH: u8 = 5;
-
-/// Initial aspiration window size (centipawns)
-/// Narrow window = more cutoffs but risk of re-searches
-/// 25 cp is a good balance for most positions
 const ASPIRATION_WINDOW: Score = 25;
-
-/// Maximum aspiration delta before falling back to full window search
-/// Beyond this value, re-searches waste more time than full-width search
 const ASPIRATION_MAX_DELTA: Score = 400;
-
-/// Average number of legal moves in a chess position (~35)
 const AVG_LEGAL_MOVES: usize = 40;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
@@ -65,7 +35,6 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
-    /// Creates a new AlphaBetaSearcher with the given evaluator
     pub fn new(evaluator: E, tt_size_mb: usize) -> Self {
         Self {
             evaluator,
@@ -272,9 +241,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         pv: &mut Vec<Move>,
         is_pv_node: bool,
     ) -> Score {
-        // =========================================================================
-        // Step 1. Initialize node
-        // =========================================================================
+        // ===== Node initialization =====
         self.info.nodes += 1;
         pv.clear();
 
@@ -282,16 +249,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return 0;
         }
 
-        // =========================================================================
-        // Step 2. Check for quiescence
-        // =========================================================================
+        // ===== Quiescence =====
         if depth == 0 {
             return self.quiescence(board, ply, 0, alpha, beta);
         }
 
-        // =========================================================================
-        // Step 3. Check terminal conditions (max ply, repetition, 50-move, insufficient material)
-        // =========================================================================
+        // ===== Terminal conditions =====
         if ply >= MAX_PLY {
             return self.evaluator.evaluate(board);
         }
@@ -312,9 +275,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return 0;
         }
 
-        // =========================================================================
-        // Step 4. Transposition table lookup
-        // =========================================================================
+        // ===== Transposition table probe =====
         let zobrist_key = board.zobrist_hash_raw();
         let mut tt_move: Option<Move> = None;
 
@@ -336,9 +297,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         let in_check = board.is_in_check(board.side_to_move());
 
-        // =========================================================================
-        // Step 5. Null move pruning
-        // =========================================================================
+        // ===== Null move pruning =====
         if !is_pv_node
             && !in_check
             && depth >= NULL_MOVE_MIN_DEPTH
@@ -364,9 +323,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        // =========================================================================
-        // Step 6. Generate and order moves
-        // =========================================================================
+        // ===== Generate and order moves =====
         let mut moves = Vec::with_capacity(AVG_LEGAL_MOVES);
         self.generator.legal(board, &mut moves);
 
@@ -385,15 +342,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.move_orderer
             .order_moves_with_see(&mut moves, tt_move, ply, side, occupied, pieces);
 
-        // =========================================================================
-        // Step 7. Main move loop
-        // =========================================================================
+        // ===== Main move loop =====
         let mut best_score = NEG_MATE_SCORE;
         let mut best_move: Option<Move> = None;
         let mut node_type = NodeType::UpperBound;
 
         for (move_index, mv) in moves.iter().enumerate() {
-            // --- Step 7a. Make move ---
             if board.make_move(mv).is_err() {
                 continue;
             }
@@ -411,7 +365,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let score;
 
             if move_index == 0 {
-                // --- Step 7b. First move: full window search ---
+                // First move: full window search
                 score = -self.alpha_beta(
                     board,
                     depth - 1 + extension,
@@ -422,7 +376,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     is_pv_node,
                 );
             } else {
-                // --- Step 7c. Late Move Reductions (LMR) ---
+                // Late Move Reductions (LMR)
                 let can_reduce = move_index >= LMR_FULL_DEPTH_MOVES
                     && depth >= LMR_MIN_DEPTH
                     && mv.capture.is_none()
@@ -457,7 +411,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     );
                 }
 
-                // --- Step 7d. Re-search with full window if needed ---
+                // Re-search with full window if needed
                 if lmr_score > alpha && lmr_score < beta {
                     lmr_score = -self.alpha_beta(
                         board,
@@ -473,10 +427,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 score = lmr_score;
             }
 
-            // --- Step 7e. Unmake move ---
             let _ = board.unmake_move(mv);
 
-            // --- Step 7f. Update best score ---
             if score > best_score {
                 best_score = score;
                 best_move = Some(*mv);
@@ -487,7 +439,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 pv.extend_from_slice(&child_pv);
             }
 
-            // --- Step 7g. Beta cutoff ---
+            // Beta cutoff
             if score >= beta {
                 // Update move ordering heuristics for quiet moves
                 if mv.capture.is_none() && mv.promotion.is_none() {
@@ -510,16 +462,13 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 return beta;
             }
 
-            // --- Step 7h. Update alpha ---
             if score > alpha {
                 alpha = score;
                 node_type = NodeType::Exact;
             }
         }
 
-        // =========================================================================
-        // Step 8. Store result in transposition table
-        // =========================================================================
+        // ===== Store in transposition table =====
         let tt_score = TTEntry::score_to_tt(best_score, ply);
         let entry = TTEntry::new(
             zobrist_key,

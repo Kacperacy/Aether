@@ -15,7 +15,6 @@ impl Generator {
         Self
     }
 
-    /// Builds occupancy bitboards for move generation
     #[inline]
     fn occupancies<T: BoardQuery>(&self, board: &T, side: Color) -> (BitBoard, BitBoard, BitBoard) {
         let own = board.occupied_by(side);
@@ -24,7 +23,6 @@ impl Generator {
         (all, own, opponent)
     }
 
-    /// Appends a move to the move list
     #[inline(always)]
     fn push_move(
         moves: &mut Vec<Move>,
@@ -48,8 +46,6 @@ impl Generator {
         moves.push(chess_move);
     }
 
-    /// Generates standard piece moves from an attack bitboard
-    /// Handles captures automatically by checking occupancy
     #[inline]
     fn generate_piece_moves<T: BoardQuery>(
         &self,
@@ -72,7 +68,6 @@ impl Generator {
         }
     }
 
-    /// Generates all pawn moves including pushes, captures, promotions, and en passant
     fn generate_pawn_moves<T: BoardQuery>(
         &self,
         board: &T,
@@ -151,7 +146,6 @@ impl Generator {
         }
     }
 
-    /// Generates knight moves
     fn generate_knight_moves<T: BoardQuery>(
         &self,
         board: &T,
@@ -164,7 +158,6 @@ impl Generator {
         self.generate_piece_moves(board, from, Piece::Knight, targets, occupied, moves);
     }
 
-    /// Generates sliding piece moves (bishop, rook, queen)
     fn generate_slider_moves<T: BoardQuery>(
         &self,
         board: &T,
@@ -184,7 +177,6 @@ impl Generator {
         self.generate_piece_moves(board, from, piece, targets, occupied, moves);
     }
 
-    /// Generates king moves including normal moves (castling handled separately)
     fn generate_king_moves<T: BoardQuery>(
         &self,
         board: &T,
@@ -201,7 +193,6 @@ impl Generator {
         }
     }
 
-    /// Generates castling moves if legal
     fn generate_castling_moves<T: BoardQuery>(
         &self,
         board: &T,
