@@ -270,8 +270,8 @@ mod tests {
         assert!(board.is_twofold_repetition());
 
         // Now make a pawn move which resets halfmove clock
-        let pawn_move = Move::new(Square::E2, Square::E4, Piece::Pawn)
-            .with_flags(aether_core::MoveFlags {
+        let pawn_move =
+            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
                 is_double_pawn_push: true,
                 is_castle: false,
                 is_en_passant: false,
