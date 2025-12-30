@@ -107,3 +107,16 @@ impl Default for MoveState {
         }
     }
 }
+
+impl Default for Move {
+    fn default() -> Self {
+        Move {
+            from: Square::A1,
+            to: Square::A1,
+            piece: Piece::Pawn,
+            capture: None,
+            promotion: None,
+            flags: MoveFlags::default(),
+        }
+    }
+}

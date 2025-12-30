@@ -1,5 +1,5 @@
 use crate::search::MAX_PLY;
-use crate::search::see::{see_ge, see_value};
+use crate::search::see::see_value;
 use aether_core::{BitBoard, Color, Move, Piece, Square};
 
 const REPETITION_PENALTY: i32 = -5000;
@@ -110,10 +110,8 @@ impl MoveOrderer {
         occupied: BitBoard,
         pieces: &[[BitBoard; 6]; 2],
     ) {
-        moves.sort_unstable_by(|a, b| {
-            let a_score = self.move_score_with_see(a, tt_move, ply, side, occupied, pieces);
-            let b_score = self.move_score_with_see(b, tt_move, ply, side, occupied, pieces);
-            b_score.cmp(&a_score)
+        moves.sort_by_cached_key(|mv| {
+            std::cmp::Reverse(self.move_score_with_see(mv, tt_move, ply, side, occupied, pieces))
         });
     }
 
@@ -132,11 +130,11 @@ impl MoveOrderer {
         }
 
         if mv.capture.is_some() {
-            if see_ge(mv, side, 0, occupied, pieces) {
+            let see = see_value(mv, side, occupied, pieces);
+            if see >= 0 {
                 let captured = mv.capture.unwrap();
                 return GOOD_CAPTURE_SCORE + 10 * captured.value() as i32 - mv.piece.value() as i32;
             } else {
-                let see = see_value(mv, side, occupied, pieces);
                 return BAD_CAPTURE_SCORE + see;
             }
         }
