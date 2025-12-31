@@ -54,13 +54,6 @@ strip = true
 [profile.release-native]
 inherits = "release"
 # Use with: RUSTFLAGS="-C target-cpu=native" cargo build --profile release-native
-# This enables all CPU-specific optimizations including PEXT (BMI2) on supported CPUs
-
-[profile.release-haswell]
-inherits = "release"
-# For Intel Haswell+ and AMD Excavator+ CPUs with BMI2/PEXT support
-# Use with: RUSTFLAGS="-C target-cpu=haswell" cargo build --profile release-haswell
-# PEXT provides ~2x faster sliding piece attack generation
 
 [profile.bench]
 inherits = "release"

@@ -13,19 +13,6 @@ pub struct MagicEntry {
 }
 
 impl MagicEntry {
-    /// Computes the index into the attack table based on the occupied squares.
-    /// Uses PEXT instruction when BMI2 is available (Intel Haswell+, AMD Excavator+),
-    /// falls back to magic multiplication otherwise.
-    #[cfg(all(target_arch = "x86_64", target_feature = "bmi2"))]
-    #[inline(always)]
-    fn index(&self, occupied: u64) -> u64 {
-        // PEXT directly extracts the relevant bits into a compact index
-        // This is ~2x faster than magic multiplication (~3 cycles vs ~6 cycles)
-        unsafe { std::arch::x86_64::_pext_u64(occupied, self.mask) }
-    }
-
-    /// Fallback implementation using magic bitboard multiplication
-    #[cfg(not(all(target_arch = "x86_64", target_feature = "bmi2")))]
     #[inline(always)]
     const fn index(&self, occupied: u64) -> u64 {
         let relevant = occupied & self.mask;
@@ -34,7 +21,6 @@ impl MagicEntry {
     }
 }
 
-/// Computes rook attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -46,7 +32,6 @@ pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
-/// Computes bishop attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -58,13 +43,11 @@ pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
-/// Computes queen attacks for a given square and occupied bitboard using magic bitboards
 #[inline(always)]
 pub fn queen_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     rook_attacks(square, occupied) | bishop_attacks(square, occupied)
 }
 
-/// Batch computes rook attacks for multiple squares given an occupied bitboard
 pub fn rook_attacks_batch(
     squares: &[Square],
     occupied: BitBoard,
@@ -72,7 +55,6 @@ pub fn rook_attacks_batch(
     squares.iter().map(move |&sq| rook_attacks(sq, occupied))
 }
 
-/// Batch computes bishop attacks for multiple squares given an occupied bitboard
 pub fn bishop_attacks_batch(
     squares: &[Square],
     occupied: BitBoard,
