@@ -13,7 +13,19 @@ pub struct MagicEntry {
 }
 
 impl MagicEntry {
-    /// Computes the index into the attack table based on the occupied squares
+    /// Computes the index into the attack table based on the occupied squares.
+    /// Uses PEXT instruction when BMI2 is available (Intel Haswell+, AMD Excavator+),
+    /// falls back to magic multiplication otherwise.
+    #[cfg(all(target_arch = "x86_64", target_feature = "bmi2"))]
+    #[inline(always)]
+    fn index(&self, occupied: u64) -> u64 {
+        // PEXT directly extracts the relevant bits into a compact index
+        // This is ~2x faster than magic multiplication (~3 cycles vs ~6 cycles)
+        unsafe { std::arch::x86_64::_pext_u64(occupied, self.mask) }
+    }
+
+    /// Fallback implementation using magic bitboard multiplication
+    #[cfg(not(all(target_arch = "x86_64", target_feature = "bmi2")))]
     #[inline(always)]
     const fn index(&self, occupied: u64) -> u64 {
         let relevant = occupied & self.mask;
