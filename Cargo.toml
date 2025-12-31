@@ -46,7 +46,15 @@ nursery = "allow"
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[profile.release-native]
+inherits = "release"
+# Use with: RUSTFLAGS="-C target-cpu=native" cargo build --profile release-native
+
+[profile.bench]
+inherits = "release"
+debug = true
