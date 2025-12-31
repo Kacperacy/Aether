@@ -427,8 +427,8 @@ impl Display for UciResponse {
                 if let Some(time) = info.time {
                     write!(f, " time {}", time)?;
                 }
-                if !info.pv.is_empty() {
-                    write!(f, " pv {}", info.pv.join(" "))?;
+                if let Some(hf) = info.hashfull {
+                    write!(f, " hashfull {}", hf)?;
                 }
                 if let Some(cm) = &info.currmove {
                     write!(f, " currmove {}", cm)?;
@@ -436,8 +436,8 @@ impl Display for UciResponse {
                 if let Some(cmn) = info.currmovenumber {
                     write!(f, " currmovenumber {}", cmn)?;
                 }
-                if let Some(hf) = info.hashfull {
-                    write!(f, " hashfull {}", hf)?;
+                if !info.pv.is_empty() {
+                    write!(f, " pv {}", info.pv.join(" "))?;
                 }
                 if let Some(s) = &info.string {
                     write!(f, " string {}", s)?;
