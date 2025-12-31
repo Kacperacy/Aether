@@ -480,7 +480,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 best_move = Some(*mv);
 
                 // Update triangular PV table only for shallow plies
-                if ply < MAX_PV_LENGTH - 1 && ply < PV_COLLECTION_LIMIT {
+                if ply < PV_COLLECTION_LIMIT {
                     self.pv_table[ply][0] = *mv;
                     let child_len = self.pv_length[ply + 1].min(MAX_PV_LENGTH - ply - 2);
                     for i in 0..child_len {

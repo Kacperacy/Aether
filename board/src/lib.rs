@@ -36,9 +36,12 @@ pub struct Board {
     game_state: GameState,
     cache: BoardCache,
     zobrist_hash: u64,
-    /// Stack to store move states for unmake operations
+    /// Circular buffer for move states (for make/unmake during search)
     move_history: [MoveState; MAX_SEARCH_DEPTH],
-    history_count: usize,
+    /// Current index in the circular buffer
+    history_index: usize,
+    /// History of zobrist hashes for repetition detection (grows with game length)
+    zobrist_history: Vec<u64>,
     /// Mailbox representation for easy piece lookup
     mailbox: [Option<(Piece, Color)>; 64],
     /// Cached game phase (0 = endgame, 256 = opening)
@@ -57,7 +60,8 @@ impl Board {
             cache: BoardCache::new(),
             zobrist_hash: 0,
             move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
-            history_count: 0,
+            history_index: 0,
+            zobrist_history: Vec::with_capacity(512),
             mailbox: [None; 64],
             game_phase: 0,
             pst_mg: 0,
@@ -179,19 +183,29 @@ impl Board {
 
     #[inline]
     pub fn ply(&self) -> usize {
-        self.move_history.len()
+        self.zobrist_history.len()
     }
 
     pub fn repetition_count(&self) -> usize {
         let current_hash = self.zobrist_hash;
+        let history_len = self.zobrist_history.len();
+
+        if history_len == 0 {
+            return 0;
+        }
+
         let mut count = 0;
+        let look_back = (self.game_state.halfmove_clock as usize).min(history_len);
+        let min_idx = history_len - look_back;
 
-        let start_idx = self
-            .history_count
-            .saturating_sub(self.game_state.halfmove_clock as usize);
+        // Only compare positions with the same side to move
+        // history[i] corresponds to position after i moves
+        // If history_len is even, current position has WHITE to move, check even indices
+        // If history_len is odd, current position has BLACK to move, check odd indices
+        let same_side_parity = history_len % 2;
 
-        for i in (start_idx..self.history_count).step_by(2) {
-            if self.move_history[i].old_zobrist_hash == current_hash {
+        for i in min_idx..history_len {
+            if i % 2 == same_side_parity && self.zobrist_history[i] == current_hash {
                 count += 1;
             }
         }
@@ -438,5 +452,67 @@ mod tests {
         // Different colors - not insufficient
 
         assert!(!board.is_insufficient_material());
+    }
+
+    #[test]
+    fn test_ply_tracking() {
+        let mut board = Board::starting_position().unwrap();
+        assert_eq!(board.ply(), 0);
+
+        let moves = [
+            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
+                is_double_pawn_push: true,
+                ..Default::default()
+            }),
+            Move::new(Square::E7, Square::E5, Piece::Pawn).with_flags(aether_core::MoveFlags {
+                is_double_pawn_push: true,
+                ..Default::default()
+            }),
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+        ];
+
+        for (i, mv) in moves.iter().enumerate() {
+            board.make_move(mv).unwrap();
+            assert_eq!(board.ply(), i + 1);
+        }
+
+        // Unmake and verify ply decreases
+        for (i, mv) in moves.iter().rev().enumerate() {
+            board.unmake_move(mv).unwrap();
+            assert_eq!(board.ply(), moves.len() - i - 1);
+        }
+
+        assert_eq!(board.ply(), 0);
+    }
+
+    #[test]
+    fn test_circular_buffer_make_unmake_deep() {
+        let mut board = Board::starting_position().unwrap();
+
+        // Make many moves to test circular buffer doesn't overflow
+        let move_sequence = [
+            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::G8, Square::F6, Piece::Knight),
+            Move::new(Square::F3, Square::G1, Piece::Knight),
+            Move::new(Square::F6, Square::G8, Piece::Knight),
+        ];
+
+        // Make 200 moves (50 cycles) - more than MAX_SEARCH_DEPTH
+        for _ in 0..50 {
+            for mv in &move_sequence {
+                board.make_move(mv).unwrap();
+            }
+        }
+
+        assert_eq!(board.ply(), 200);
+
+        // Unmake 100 moves - should work correctly with circular buffer
+        for _ in 0..25 {
+            for mv in move_sequence.iter().rev() {
+                board.unmake_move(mv).unwrap();
+            }
+        }
+
+        assert_eq!(board.ply(), 100);
     }
 }

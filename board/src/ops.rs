@@ -26,12 +26,10 @@ impl BoardOps for Board {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();
 
-        debug_assert!(
-            self.history_count < MAX_SEARCH_DEPTH,
-            "Exceeded maximum search depth"
-        );
+        self.zobrist_history.push(self.zobrist_hash);
 
-        self.move_history[self.history_count] = MoveState {
+        let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
+        self.move_history[buffer_idx] = MoveState {
             captured_piece: mv.capture.map(|p| (p, opponent)),
             mv_from: mv.from,
             mv_to: mv.to,
@@ -45,7 +43,7 @@ impl BoardOps for Board {
             old_pst_eg: self.pst_eg,
         };
 
-        self.history_count += 1;
+        self.history_index += 1;
 
         if let Some(captured) = mv.capture {
             let phase_delta =
@@ -134,12 +132,15 @@ impl BoardOps for Board {
 
     #[inline(always)]
     fn unmake_move(&mut self, mv: &Move) -> Result<()> {
-        if self.history_count == 0 {
+        if self.history_index == 0 {
             return Err(BoardError::ChessMoveError(MoveError::NoMoveToUnmake));
         }
 
-        self.history_count -= 1;
-        let state = self.move_history[self.history_count];
+        self.history_index -= 1;
+        let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
+        let state = self.move_history[buffer_idx];
+
+        self.zobrist_history.pop();
 
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         let side = self.game_state.side_to_move;
@@ -176,7 +177,10 @@ impl BoardOps for Board {
     }
 
     fn make_null_move(&mut self) {
-        let state = MoveState {
+        self.zobrist_history.push(self.zobrist_hash);
+
+        let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
+        self.move_history[buffer_idx] = MoveState {
             captured_piece: None,
             mv_from: Square::A1, // Dummy values
             mv_to: Square::A1,   // Dummy values
@@ -189,8 +193,7 @@ impl BoardOps for Board {
             old_pst_mg: self.pst_mg,
             old_pst_eg: self.pst_eg,
         };
-        self.move_history[self.history_count] = state;
-        self.history_count += 1;
+        self.history_index += 1;
 
         if let Some(ep_sq) = self.game_state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
@@ -202,12 +205,15 @@ impl BoardOps for Board {
     }
 
     fn unmake_null_move(&mut self) {
-        if self.history_count == 0 {
+        if self.history_index == 0 {
             return;
         }
-        self.history_count -= 1;
+        self.history_index -= 1;
 
-        let state = self.move_history[self.history_count];
+        let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
+        let state = self.move_history[buffer_idx];
+
+        self.zobrist_history.pop();
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         self.game_state.en_passant_square = state.old_en_passant;
         self.zobrist_hash = state.old_zobrist_hash;
