@@ -1,4 +1,4 @@
-use crate::TypeError::{InvalidRank, InvalidRankIndex};
+use crate::TypeError::InvalidRank;
 use crate::{BitBoard, Color, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -16,7 +16,6 @@ pub enum Rank {
     Eight = 7,
 }
 
-/// All ranks on a chessboard
 pub const ALL_RANKS: [Rank; 8] = [
     Rank::One,
     Rank::Two,
@@ -55,35 +54,17 @@ impl Display for Rank {
 }
 
 impl Rank {
-    /// Number of ranks on a chessboard
     pub const NUM: usize = 8;
 
-    /// Safe conversion from index (0-7) to Rank
-    pub fn try_from_index(rank: u8) -> Result<Self> {
-        match rank {
-            0 => Ok(Self::One),
-            1 => Ok(Self::Two),
-            2 => Ok(Self::Three),
-            3 => Ok(Self::Four),
-            4 => Ok(Self::Five),
-            5 => Ok(Self::Six),
-            6 => Ok(Self::Seven),
-            7 => Ok(Self::Eight),
-            _ => Err(InvalidRankIndex { rank_index: rank }),
-        }
-    }
-
-    /// Fast conversion from index (0-7) to Rank
-    ///
-    /// # Safety invariant
-    /// Uses unsafe transmute for performance. Safety guaranteed by:
-    /// - Rank is #[repr(u8)] with values 0-7 matching the index
-    /// - External callers should use `try_from_index()` for untrusted input
     #[inline(always)]
     pub const fn from_index(rank: i8) -> Self {
         debug_assert!(rank >= 0 && rank < 8, "Rank index out of bounds");
-        // SAFETY: Rank is repr(u8) with explicit values 0-7
         unsafe { std::mem::transmute(rank as u8) }
+    }
+
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self as u8
     }
 
     pub const fn as_char(self) -> char {
@@ -139,10 +120,5 @@ impl Rank {
             Color::White => self,
             Color::Black => self.flip(),
         }
-    }
-
-    #[inline(always)]
-    pub const fn to_index(self) -> u8 {
-        self as u8
     }
 }

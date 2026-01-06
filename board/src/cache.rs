@@ -29,22 +29,22 @@ impl BoardCache {
 
     #[inline]
     pub fn add_piece(&mut self, square: Square, color: Color) {
-        let bb = BitBoard::from_square(square);
+        let bb = square.bitboard();
         self.color_combined[color as usize] |= bb;
         self.occupied |= bb;
     }
 
     #[inline]
     pub fn remove_piece(&mut self, square: Square, color: Color) {
-        let bb = BitBoard::from_square(square);
+        let bb = square.bitboard();
         self.color_combined[color as usize] &= !bb;
         self.occupied &= !bb;
     }
 
     #[inline]
     pub fn move_piece(&mut self, from: Square, to: Square, color: Color) {
-        let from_bb = BitBoard::from_square(from);
-        let to_bb = BitBoard::from_square(to);
+        let from_bb = from.bitboard();
+        let to_bb = to.bitboard();
         let combined = from_bb | to_bb;
 
         self.color_combined[color as usize] ^= combined;

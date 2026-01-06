@@ -213,10 +213,7 @@ impl<'a> FenParser<'a> {
         match Square::from_str(en_passant_str) {
             Ok(square) => {
                 // Validate en passant square is on correct rank
-                let expected_rank = match side_to_move {
-                    Color::White => Rank::Six,
-                    Color::Black => Rank::Three,
-                };
+                let expected_rank = side_to_move.en_passant_rank();
 
                 if square.rank() != expected_rank {
                     return Err(FenParsingError(FenError::InvalidEnPassantRank {

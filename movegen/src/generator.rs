@@ -1,8 +1,8 @@
 use crate::MoveGen;
 use aether_core::{
-    ALL_PIECES, BitBoard, Color, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
-    is_promotion_rank, is_square_attacked, king_attacks, knight_attacks, pawn_attacks, pawn_moves,
-    queen_attacks, rook_attacks,
+    ALL_PIECES, BitBoard, Color, File, Move, MoveFlags, PROMOTION_PIECES, Piece, Square,
+    bishop_attacks, is_promotion_rank, is_square_attacked, king_attacks, knight_attacks,
+    pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
 };
 use board::BoardQuery;
 
@@ -208,10 +208,10 @@ impl Generator {
 
         // Kingside castling
         if board.can_castle_short(side) {
-            let (king_start, f_square, g_square) = match side {
-                Color::White => (Square::E1, Square::F1, Square::G1),
-                Color::Black => (Square::E8, Square::F8, Square::G8),
-            };
+            let back = side.back_rank();
+            let king_start = Square::new(File::E, back);
+            let f_square = Square::new(File::F, back);
+            let g_square = Square::new(File::G, back);
 
             let path_clear =
                 !board.is_square_occupied(f_square) && !board.is_square_occupied(g_square);
@@ -234,10 +234,11 @@ impl Generator {
 
         // Queenside castling
         if board.can_castle_long(side) {
-            let (king_start, d_square, c_square, b_square) = match side {
-                Color::White => (Square::E1, Square::D1, Square::C1, Square::B1),
-                Color::Black => (Square::E8, Square::D8, Square::C8, Square::B8),
-            };
+            let back = side.back_rank();
+            let king_start = Square::new(File::E, back);
+            let d_square = Square::new(File::D, back);
+            let c_square = Square::new(File::C, back);
+            let b_square = Square::new(File::B, back);
 
             let path_clear = !board.is_square_occupied(d_square)
                 && !board.is_square_occupied(c_square)
@@ -411,8 +412,8 @@ impl PieceMap {
     fn simulate_move(mut self, side: Color, mv: &Move) -> Self {
         let us = side as usize;
         let them = side.opponent() as usize;
-        let from_bb = BitBoard::from_square(mv.from);
-        let to_bb = BitBoard::from_square(mv.to);
+        let from_bb = mv.from.bitboard();
+        let to_bb = mv.to.bitboard();
 
         // Remove piece from origin
         self.pieces[us][mv.piece as usize] &= !from_bb;
@@ -422,7 +423,7 @@ impl PieceMap {
         // Handle captures
         if mv.flags.is_en_passant {
             if let Some(captured_sq) = mv.to.down(side) {
-                let cap_bb = BitBoard::from_square(captured_sq);
+                let cap_bb = captured_sq.bitboard();
                 self.pieces[them][Piece::Pawn as usize] &= !cap_bb;
                 self.color_occ[them] &= !cap_bb;
                 self.all_occ &= !cap_bb;
@@ -448,8 +449,8 @@ impl PieceMap {
                 _ => (mv.to, mv.to),
             };
 
-            let rf = BitBoard::from_square(rook_from);
-            let rt = BitBoard::from_square(rook_to);
+            let rf = rook_from.bitboard();
+            let rt = rook_to.bitboard();
             self.pieces[us][Piece::Rook as usize] &= !rf;
             self.pieces[us][Piece::Rook as usize] |= rt;
             self.color_occ[us] = (self.color_occ[us] & !rf) | rt;

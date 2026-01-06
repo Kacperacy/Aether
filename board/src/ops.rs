@@ -2,7 +2,7 @@ use crate::error::MoveError;
 use crate::pst;
 use crate::query::BoardQuery;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{BitBoard, CastlingRights, Color, File, Move, MoveState, Piece, Square};
+use aether_core::{CastlingRights, Color, File, Move, MoveState, Piece, Square};
 
 /// Trait for board operations
 pub trait BoardOps: BoardQuery + Clone {
@@ -237,7 +237,7 @@ impl Board {
     /// Internal method to place a piece on the board without updating game state
     #[inline(always)]
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
-        let bb = BitBoard::from_square(square);
+        let bb = square.bitboard();
         self.pieces[color as usize][piece as usize] |= bb;
         self.cache.add_piece(square, color);
         self.mailbox[square.to_index() as usize] = Some((piece, color));
@@ -246,7 +246,7 @@ impl Board {
     /// Fast remove when piece type and color are known
     #[inline(always)]
     pub(crate) fn remove_piece_known(&mut self, square: Square, piece: Piece, color: Color) {
-        let bb = BitBoard::from_square(square);
+        let bb = square.bitboard();
         self.pieces[color as usize][piece as usize] &= !bb;
         self.cache.remove_piece(square, color);
         self.mailbox[square.to_index() as usize] = None;

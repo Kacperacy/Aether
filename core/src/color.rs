@@ -8,7 +8,6 @@ pub enum Color {
     Black = 1,
 }
 
-/// All colors in chess
 pub const ALL_COLORS: [Color; Color::NUM] = [Color::White, Color::Black];
 
 impl Display for Color {
@@ -27,7 +26,6 @@ impl Not for Color {
 }
 
 impl Color {
-    /// Number of colors in chess
     pub const NUM: usize = 2;
 
     pub const fn as_char(self) -> char {
@@ -78,6 +76,13 @@ impl Color {
         match self {
             Self::White => crate::Rank::One,
             Self::Black => crate::Rank::Eight,
+        }
+    }
+
+    pub const fn en_passant_rank(self) -> crate::Rank {
+        match self {
+            Self::White => crate::Rank::Six,
+            Self::Black => crate::Rank::Three,
         }
     }
 }

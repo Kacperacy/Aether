@@ -91,37 +91,12 @@ impl SubAssign for BitBoard {
 impl BitBoard {
     pub const EMPTY: Self = Self(0);
 
-    pub const FULL: Self = Self(!0);
-
-    pub const EDGES: Self = Self(0xff818181818181ff);
-
-    pub const CORNERS: Self = Self(0x8100000000000081);
-
-    pub const WHITE_SQUARES: Self = Self(0x55aa55aa55aa55aa);
-
-    pub const BLACK_SQUARES: Self = Self(!0x55aa55aa55aa55aa);
-
     pub const fn new() -> Self {
         Self(0)
     }
 
     pub const fn value(self) -> u64 {
         self.0
-    }
-
-    pub const fn flip_rank(self) -> Self {
-        Self(self.0.swap_bytes())
-    }
-
-    pub const fn flip_file(self) -> Self {
-        const K1: u64 = 0x5555555555555555;
-        const K2: u64 = 0x3333333333333333;
-        const K4: u64 = 0x0f0f0f0f0f0f0f0f;
-        let mut x = self.0;
-        x = ((x >> 1) & K1) | ((x & K1) << 1);
-        x = ((x >> 2) & K2) | ((x & K2) << 2);
-        x = ((x >> 4) & K4) | ((x & K4) << 4);
-        Self(x)
     }
 
     pub const fn len(self) -> u32 {
@@ -142,32 +117,12 @@ impl BitBoard {
         self.0 == Self::EMPTY.0
     }
 
-    pub const fn is_subset(self, other: BitBoard) -> bool {
-        self.0 & !other.0 == 0
-    }
-
-    pub const fn is_superset(self, other: BitBoard) -> bool {
-        other.is_subset(self)
-    }
-
     pub const fn is_set_index(self, index: u8) -> bool {
         self.0 & (1 << index) != 0
     }
 
-    pub const fn contains(self, other: BitBoard) -> bool {
-        self.0 & other.0 != Self::EMPTY.0
-    }
-
     pub const fn has(self, square: Square) -> bool {
-        self.contains(square.bitboard())
-    }
-
-    pub const fn reverse(self) -> Self {
-        Self(self.0.reverse_bits())
-    }
-
-    pub const fn from_square(square: Square) -> Self {
-        square.bitboard()
+        self.is_set_index(square.to_index())
     }
 
     pub const fn to_square(self) -> Option<Square> {
@@ -179,17 +134,13 @@ impl BitBoard {
         Some(square)
     }
 
-    pub const fn next_square(self) -> Option<Square> {
-        if self.is_empty() {
-            return None;
-        }
-
-        let square = Square::from_index(self.0.trailing_zeros() as i8);
-        Some(square)
+    #[inline(always)]
+    pub const fn lsb(self) -> Square {
+        debug_assert!(!self.is_empty(), "lsb() called on empty BitBoard");
+        Square::from_index(self.0.trailing_zeros() as i8)
     }
 }
 
-/// Iterator over set bits in a BitBoard (non-mutating)
 #[derive(Debug, Clone, Copy)]
 pub struct BitBoardIter {
     bits: u64,
@@ -207,18 +158,5 @@ impl Iterator for BitBoardIter {
         let idx = self.bits.trailing_zeros();
         self.bits &= self.bits - 1; // Clear lowest set bit (efficient bit trick)
         Some(Square::from_index(idx as i8))
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.bits.count_ones() as usize;
-        (count, Some(count))
-    }
-}
-
-impl ExactSizeIterator for BitBoardIter {
-    #[inline]
-    fn len(&self) -> usize {
-        self.bits.count_ones() as usize
     }
 }

@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, Rank, Square};
+use crate::{BitBoard, Color, Square};
 
 /// Pre-computed pawn attacks for all squares and colors
 static PAWN_ATTACKS: [[BitBoard; 64]; 2] = [
@@ -21,28 +21,15 @@ pub fn pawn_attacks(square: Square, color: Color) -> BitBoard {
 /// Get squares from which a pawn of `color` can attack `square`
 #[inline(always)]
 pub fn pawn_attacks_from(square: Square, color: Color) -> BitBoard {
-    match color {
-        Color::White => {
-            let mut attacks = BitBoard::EMPTY;
-            if let Some(sq) = square.offset(-1, -1) {
-                attacks |= BitBoard::from_square(sq);
-            }
-            if let Some(sq) = square.offset(1, -1) {
-                attacks |= BitBoard::from_square(sq);
-            }
-            attacks
-        }
-        Color::Black => {
-            let mut attacks = BitBoard::EMPTY;
-            if let Some(sq) = square.offset(-1, 1) {
-                attacks |= BitBoard::from_square(sq);
-            }
-            if let Some(sq) = square.offset(1, 1) {
-                attacks |= BitBoard::from_square(sq);
-            }
-            attacks
-        }
+    let rank_offset = -color.forward_direction();
+    let mut attacks = BitBoard::EMPTY;
+    if let Some(sq) = square.offset(-1, rank_offset) {
+        attacks |= sq.bitboard();
     }
+    if let Some(sq) = square.offset(1, rank_offset) {
+        attacks |= sq.bitboard();
+    }
+    attacks
 }
 
 /// Get pawn move targets (non-capturing) for a pawn of `color` on `square`, given `occupied` squares
@@ -50,25 +37,19 @@ pub fn pawn_attacks_from(square: Square, color: Color) -> BitBoard {
 pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard {
     let mut moves = BitBoard::EMPTY;
 
-    let push_dir = match color {
-        Color::White => 1,
-        Color::Black => -1,
-    };
+    let push_dir = color.forward_direction();
 
     if let Some(single) = square.offset(0, push_dir) {
         if !occupied.has(single) {
-            moves |= BitBoard::from_square(single);
+            moves |= single.bitboard();
 
             // Double push from starting rank
-            let starting_rank = match color {
-                Color::White => Rank::Two,
-                Color::Black => Rank::Seven,
-            };
+            let starting_rank = color.pawn_start_rank();
 
             if square.rank() == starting_rank {
                 if let Some(double) = square.offset(0, 2 * push_dir) {
                     if !occupied.has(double) {
-                        moves |= BitBoard::from_square(double);
+                        moves |= double.bitboard();
                     }
                 }
             }
@@ -93,10 +74,7 @@ pub fn king_attacks(square: Square) -> BitBoard {
 /// Check if a square is a promotion rank for the given color
 #[inline(always)]
 pub const fn is_promotion_rank(square: Square, color: Color) -> bool {
-    match color {
-        Color::White => square.rank() as u8 == Rank::Eight as u8,
-        Color::Black => square.rank() as u8 == Rank::One as u8,
-    }
+    square.rank() as u8 == color.pawn_promotion_rank() as u8
 }
 
 /// Initialize pawn attacks table for a given color
@@ -115,25 +93,14 @@ const fn init_pawn_attacks(color: Color) -> [BitBoard; 64] {
 
 /// Compute pawn attacks for a given square and color
 const fn compute_pawn_attacks(square: Square, color: Color) -> BitBoard {
+    let rank_offset = color.forward_direction();
     let mut result = BitBoard::EMPTY;
 
-    match color {
-        Color::White => {
-            if let Some(target) = square.offset(-1, 1) {
-                result = BitBoard(result.0 | BitBoard::from_square(target).0);
-            }
-            if let Some(target) = square.offset(1, 1) {
-                result = BitBoard(result.0 | BitBoard::from_square(target).0);
-            }
-        }
-        Color::Black => {
-            if let Some(target) = square.offset(-1, -1) {
-                result = BitBoard(result.0 | BitBoard::from_square(target).0);
-            }
-            if let Some(target) = square.offset(1, -1) {
-                result = BitBoard(result.0 | BitBoard::from_square(target).0);
-            }
-        }
+    if let Some(target) = square.offset(-1, rank_offset) {
+        result = BitBoard(result.0 | target.bitboard().0);
+    }
+    if let Some(target) = square.offset(1, rank_offset) {
+        result = BitBoard(result.0 | target.bitboard().0);
     }
 
     result
@@ -197,7 +164,7 @@ const fn compute_offsets<const N: usize>(square: Square, offsets: &[(i8, i8); N]
     while i < N {
         let (file_off, rank_off) = offsets[i];
         if let Some(target) = square.offset(file_off, rank_off) {
-            result = BitBoard(result.0 | BitBoard::from_square(target).0);
+            result = BitBoard(result.0 | target.bitboard().0);
         }
         i += 1;
     }
@@ -262,7 +229,7 @@ mod tests {
     #[test]
     fn test_pawn_moves_blocked() {
         let mut occupied = BitBoard::EMPTY;
-        occupied |= BitBoard::from_square(Square::E3);
+        occupied |= Square::E3.bitboard();
 
         let moves = pawn_moves(Square::E2, Color::White, occupied);
         // Blocked by piece on e3
@@ -272,7 +239,7 @@ mod tests {
     #[test]
     fn test_pawn_moves_double_blocked() {
         let mut occupied = BitBoard::EMPTY;
-        occupied |= BitBoard::from_square(Square::E4);
+        occupied |= Square::E4.bitboard();
 
         let moves = pawn_moves(Square::E2, Color::White, occupied);
         // Can push once but not twice

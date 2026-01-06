@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, File, Rank, Result, TypeError};
+use crate::{BitBoard, File, Rank, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -75,19 +75,10 @@ impl Square {
         Self::from_index(index as i8)
     }
 
-    /// Index must be 0-63. Use `try_from_index` for untrusted input.
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
         unsafe { std::mem::transmute(index as u8) }
-    }
-
-    pub const fn try_from_index(index: i8) -> Option<Self> {
-        if index < 0 || index >= 64 {
-            None
-        } else {
-            Some(Self::from_index(index))
-        }
     }
 
     #[inline(always)]
@@ -128,38 +119,11 @@ impl Square {
         Self::new(self.file(), self.rank().flip())
     }
 
-    pub const fn relative_to(self, color: Color) -> Self {
-        match color {
-            Color::White => self,
-            Color::Black => self.flip_rank(),
-        }
+    pub fn up(self, color: crate::Color) -> Option<Self> {
+        self.offset(0, color.forward_direction())
     }
 
-    pub const fn up(self, color: Color) -> Option<Self> {
-        match color {
-            Color::White => self.offset(0, 1),
-            Color::Black => self.offset(0, -1),
-        }
-    }
-
-    pub const fn down(self, color: Color) -> Option<Self> {
-        match color {
-            Color::White => self.offset(0, -1),
-            Color::Black => self.offset(0, 1),
-        }
-    }
-
-    pub const fn left(self, color: Color) -> Option<Self> {
-        match color {
-            Color::White => self.offset(-1, 0),
-            Color::Black => self.offset(1, 0),
-        }
-    }
-
-    pub const fn right(self, color: Color) -> Option<Self> {
-        match color {
-            Color::White => self.offset(1, 0),
-            Color::Black => self.offset(-1, 0),
-        }
+    pub fn down(self, color: crate::Color) -> Option<Self> {
+        self.offset(0, -color.forward_direction())
     }
 }

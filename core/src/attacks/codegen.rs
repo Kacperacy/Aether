@@ -25,19 +25,19 @@ fn rook_mask(sq: Square) -> BitBoard {
     let file = sq.file() as i8;
 
     for r in (rank + 1)..7 {
-        mask |= BitBoard::from_square(Square::new(File::from_index(file), Rank::from_index(r)));
+        mask |= Square::new(File::from_index(file), Rank::from_index(r)).bitboard();
     }
 
     for r in (1..rank).rev() {
-        mask |= BitBoard::from_square(Square::new(File::from_index(file), Rank::from_index(r)));
+        mask |= Square::new(File::from_index(file), Rank::from_index(r)).bitboard();
     }
 
     for f in (file + 1)..7 {
-        mask |= BitBoard::from_square(Square::new(File::from_index(f), Rank::from_index(rank)));
+        mask |= Square::new(File::from_index(f), Rank::from_index(rank)).bitboard();
     }
 
     for f in (1..file).rev() {
-        mask |= BitBoard::from_square(Square::new(File::from_index(f), Rank::from_index(rank)));
+        mask |= Square::new(File::from_index(f), Rank::from_index(rank)).bitboard();
     }
 
     mask
@@ -51,31 +51,19 @@ fn bishop_mask(sq: Square) -> BitBoard {
 
     for i in 1..7 {
         if rank + i < 7 && file + i < 7 {
-            mask |= BitBoard::from_square(Square::new(
-                File::from_index(file + i),
-                Rank::from_index(rank + i),
-            ));
+            mask |= Square::new(File::from_index(file + i), Rank::from_index(rank + i)).bitboard();
         }
 
         if rank + i < 7 && file - i > 0 {
-            mask |= BitBoard::from_square(Square::new(
-                File::from_index(file - i),
-                Rank::from_index(rank + i),
-            ));
+            mask |= Square::new(File::from_index(file - i), Rank::from_index(rank + i)).bitboard();
         }
 
         if rank - i > 0 && file + i < 7 {
-            mask |= BitBoard::from_square(Square::new(
-                File::from_index(file + i),
-                Rank::from_index(rank - i),
-            ));
+            mask |= Square::new(File::from_index(file + i), Rank::from_index(rank - i)).bitboard();
         }
 
         if rank - i > 0 && file - i > 0 {
-            mask |= BitBoard::from_square(Square::new(
-                File::from_index(file - i),
-                Rank::from_index(rank - i),
-            ));
+            mask |= Square::new(File::from_index(file - i), Rank::from_index(rank - i)).bitboard();
         }
     }
 
@@ -84,7 +72,7 @@ fn bishop_mask(sq: Square) -> BitBoard {
 
 /// Generates all possible blocker configurations for a given mask
 fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
-    let bits: Vec<Square> = mask.into_iter().collect();
+    let bits: Vec<Square> = mask.iter().collect();
     let count = 1 << bits.len();
     let mut blockers = Vec::with_capacity(count);
 
@@ -92,7 +80,7 @@ fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
         let mut bb = BitBoard::EMPTY;
         for (j, &sq) in bits.iter().enumerate() {
             if (i & (1 << j)) != 0 {
-                bb |= BitBoard::from_square(sq);
+                bb |= sq.bitboard();
             }
         }
         blockers.push(bb);
@@ -109,7 +97,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     for r in (rank + 1)..=7 {
         let target = Square::new(File::from_index(file), Rank::from_index(r));
-        attacks |= BitBoard::from_square(target);
+        attacks |= target.bitboard();
         if blockers.has(target) {
             break;
         }
@@ -117,7 +105,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     for r in (0..rank).rev() {
         let target = Square::new(File::from_index(file), Rank::from_index(r));
-        attacks |= BitBoard::from_square(target);
+        attacks |= target.bitboard();
         if blockers.has(target) {
             break;
         }
@@ -125,7 +113,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     for f in (file + 1)..=7 {
         let target = Square::new(File::from_index(f), Rank::from_index(rank));
-        attacks |= BitBoard::from_square(target);
+        attacks |= target.bitboard();
         if blockers.has(target) {
             break;
         }
@@ -133,7 +121,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     for f in (0..file).rev() {
         let target = Square::new(File::from_index(f), Rank::from_index(rank));
-        attacks |= BitBoard::from_square(target);
+        attacks |= target.bitboard();
         if blockers.has(target) {
             break;
         }
@@ -152,7 +140,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     for i in 1..=7 {
         if rank + i <= 7 && file + i <= 7 {
             let target = Square::new(File::from_index(file + i), Rank::from_index(rank + i));
-            attacks |= BitBoard::from_square(target);
+            attacks |= target.bitboard();
             if blockers.has(target) {
                 break;
             }
@@ -165,7 +153,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     for i in 1..=7 {
         if rank + i <= 7 && file - i >= 0 {
             let target = Square::new(File::from_index(file - i), Rank::from_index(rank + i));
-            attacks |= BitBoard::from_square(target);
+            attacks |= target.bitboard();
             if blockers.has(target) {
                 break;
             }
@@ -178,7 +166,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     for i in 1..=7 {
         if rank - i >= 0 && file + i <= 7 {
             let target = Square::new(File::from_index(file + i), Rank::from_index(rank - i));
-            attacks |= BitBoard::from_square(target);
+            attacks |= target.bitboard();
             if blockers.has(target) {
                 break;
             }
@@ -191,7 +179,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     for i in 1..=7 {
         if rank - i >= 0 && file - i >= 0 {
             let target = Square::new(File::from_index(file - i), Rank::from_index(rank - i));
-            attacks |= BitBoard::from_square(target);
+            attacks |= target.bitboard();
             if blockers.has(target) {
                 break;
             }
@@ -418,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_generate_blockers() {
-        let mask = BitBoard::from_square(Square::E4) | BitBoard::from_square(Square::E5);
+        let mask = Square::E4.bitboard() | Square::E5.bitboard();
         let blockers = generate_blockers(mask);
 
         // 2 bits → 4 combinations
@@ -426,12 +414,9 @@ mod tests {
 
         // Should include all combinations
         assert!(blockers.contains(&BitBoard::EMPTY));
-        assert!(blockers.contains(&BitBoard::from_square(Square::E4)));
-        assert!(blockers.contains(&BitBoard::from_square(Square::E5)));
-        assert!(
-            blockers
-                .contains(&(BitBoard::from_square(Square::E4) | BitBoard::from_square(Square::E5)))
-        );
+        assert!(blockers.contains(&Square::E4.bitboard()));
+        assert!(blockers.contains(&Square::E5.bitboard()));
+        assert!(blockers.contains(&(Square::E4.bitboard() | Square::E5.bitboard())));
     }
 
     #[test]

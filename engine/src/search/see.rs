@@ -37,7 +37,7 @@ pub fn see_ge(
         return true;
     }
 
-    let mut occ = occupied ^ BitBoard::from_square(from) ^ BitBoard::from_square(to);
+    let mut occ = occupied ^ from.bitboard() ^ to.bitboard();
     let mut attackers = all_attackers_to_square(to, occ, pieces);
     attackers &= occ;
 
@@ -60,7 +60,7 @@ pub fn see_ge(
             if swap < result as Score {
                 break;
             }
-            occ ^= BitBoard::from_square(lsb_square(pawn_attackers));
+            occ ^= pawn_attackers.lsb().bitboard();
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
             attackers &= occ;
             stm = stm.opponent();
@@ -74,7 +74,7 @@ pub fn see_ge(
             if swap < result as Score {
                 break;
             }
-            occ ^= BitBoard::from_square(lsb_square(knight_attackers));
+            occ ^= knight_attackers.lsb().bitboard();
             attackers &= occ;
             stm = stm.opponent();
             continue;
@@ -87,7 +87,7 @@ pub fn see_ge(
             if swap < result as Score {
                 break;
             }
-            occ ^= BitBoard::from_square(lsb_square(bishop_attackers));
+            occ ^= bishop_attackers.lsb().bitboard();
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
             attackers &= occ;
             stm = stm.opponent();
@@ -101,7 +101,7 @@ pub fn see_ge(
             if swap < result as Score {
                 break;
             }
-            occ ^= BitBoard::from_square(lsb_square(rook_attackers));
+            occ ^= rook_attackers.lsb().bitboard();
             attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
             attackers &= occ;
             stm = stm.opponent();
@@ -112,7 +112,7 @@ pub fn see_ge(
         let queen_attackers = stm_attackers & pieces[stm as usize][Piece::Queen as usize];
         if !queen_attackers.is_empty() {
             swap = QUEEN_VALUE - swap;
-            occ ^= BitBoard::from_square(lsb_square(queen_attackers));
+            occ ^= queen_attackers.lsb().bitboard();
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
             attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
             attackers &= occ;
@@ -145,7 +145,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     gain[0] = target_value;
 
     // Remove both attacker and victim from occupied
-    let mut occ = occupied ^ BitBoard::from_square(from) ^ BitBoard::from_square(to);
+    let mut occ = occupied ^ from.bitboard() ^ to.bitboard();
 
     let mut attackers = all_attackers_to_square(to, occ, pieces);
 
@@ -172,7 +172,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
             break;
         }
 
-        occ ^= BitBoard::from_square(attacker_sq);
+        occ ^= attacker_sq.bitboard();
 
         if matches!(attacker_piece, Piece::Pawn | Piece::Bishop | Piece::Queen) {
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
@@ -246,12 +246,6 @@ fn get_color_pieces(color: Color, pieces: &[[BitBoard; 6]; 2]) -> BitBoard {
 }
 
 #[inline]
-fn lsb_square(bb: BitBoard) -> Square {
-    debug_assert!(!bb.is_empty());
-    Square::from_index(bb.0.trailing_zeros() as i8)
-}
-
-#[inline]
 fn get_least_valuable_attacker(
     attackers: BitBoard,
     pieces: &[[BitBoard; 6]; 2],
@@ -270,7 +264,7 @@ fn get_least_valuable_attacker(
     for &piece in &PIECE_ORDER {
         let piece_attackers = attackers & color_pieces[piece as usize];
         if !piece_attackers.is_empty() {
-            return Some((lsb_square(piece_attackers), piece));
+            return Some((piece_attackers.lsb(), piece));
         }
     }
 
@@ -310,8 +304,8 @@ mod tests {
     #[test]
     fn test_see_simple_pawn_takes_pawn() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Pawn as usize] = BitBoard::from_square(Square::E4);
-        pieces[Color::Black as usize][Piece::Pawn as usize] = BitBoard::from_square(Square::D5);
+        pieces[Color::White as usize][Piece::Pawn as usize] = Square::E4.bitboard();
+        pieces[Color::Black as usize][Piece::Pawn as usize] = Square::D5.bitboard();
 
         let mv = make_capture(Square::E4, Square::D5, Piece::Pawn, Piece::Pawn);
         let occupied = get_occupied(&pieces);
@@ -331,9 +325,9 @@ mod tests {
     #[test]
     fn test_see_pawn_takes_defended_pawn() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Pawn as usize] = BitBoard::from_square(Square::E4);
+        pieces[Color::White as usize][Piece::Pawn as usize] = Square::E4.bitboard();
         pieces[Color::Black as usize][Piece::Pawn as usize] =
-            BitBoard::from_square(Square::D5) | BitBoard::from_square(Square::C6);
+            Square::D5.bitboard() | Square::C6.bitboard();
 
         let mv = make_capture(Square::E4, Square::D5, Piece::Pawn, Piece::Pawn);
         let occupied = get_occupied(&pieces);
@@ -346,9 +340,9 @@ mod tests {
     #[test]
     fn test_see_queen_takes_defended_pawn() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Queen as usize] = BitBoard::from_square(Square::D1);
+        pieces[Color::White as usize][Piece::Queen as usize] = Square::D1.bitboard();
         pieces[Color::Black as usize][Piece::Pawn as usize] =
-            BitBoard::from_square(Square::D5) | BitBoard::from_square(Square::E6);
+            Square::D5.bitboard() | Square::E6.bitboard();
 
         let mv = make_capture(Square::D1, Square::D5, Piece::Queen, Piece::Pawn);
         let occupied = get_occupied(&pieces);
@@ -370,9 +364,9 @@ mod tests {
     #[test]
     fn test_see_knight_takes_defended_rook() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = BitBoard::from_square(Square::F3);
-        pieces[Color::Black as usize][Piece::Rook as usize] = BitBoard::from_square(Square::E5);
-        pieces[Color::Black as usize][Piece::Pawn as usize] = BitBoard::from_square(Square::F6);
+        pieces[Color::White as usize][Piece::Knight as usize] = Square::F3.bitboard();
+        pieces[Color::Black as usize][Piece::Rook as usize] = Square::E5.bitboard();
+        pieces[Color::Black as usize][Piece::Pawn as usize] = Square::F6.bitboard();
 
         let mv = make_capture(Square::F3, Square::E5, Piece::Knight, Piece::Rook);
         let occupied = get_occupied(&pieces);
@@ -388,8 +382,8 @@ mod tests {
     fn test_see_xray_rook_attack() {
         let mut pieces = empty_pieces();
         pieces[Color::White as usize][Piece::Rook as usize] =
-            BitBoard::from_square(Square::D4) | BitBoard::from_square(Square::D1);
-        pieces[Color::Black as usize][Piece::Queen as usize] = BitBoard::from_square(Square::D8);
+            Square::D4.bitboard() | Square::D1.bitboard();
+        pieces[Color::Black as usize][Piece::Queen as usize] = Square::D8.bitboard();
 
         let mv = make_capture(Square::D4, Square::D8, Piece::Rook, Piece::Queen);
         let occupied = get_occupied(&pieces);
@@ -403,8 +397,8 @@ mod tests {
     fn test_see_xray_with_defender() {
         let mut pieces = empty_pieces();
         pieces[Color::White as usize][Piece::Rook as usize] =
-            BitBoard::from_square(Square::D4) | BitBoard::from_square(Square::A4);
-        pieces[Color::Black as usize][Piece::Bishop as usize] = BitBoard::from_square(Square::E4);
+            Square::D4.bitboard() | Square::A4.bitboard();
+        pieces[Color::Black as usize][Piece::Bishop as usize] = Square::E4.bitboard();
 
         let mv = make_capture(Square::D4, Square::E4, Piece::Rook, Piece::Bishop);
         let occupied = get_occupied(&pieces);
@@ -419,9 +413,9 @@ mod tests {
     #[test]
     fn test_see_losing_exchange() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Queen as usize] = BitBoard::from_square(Square::D1);
+        pieces[Color::White as usize][Piece::Queen as usize] = Square::D1.bitboard();
         pieces[Color::Black as usize][Piece::Pawn as usize] =
-            BitBoard::from_square(Square::D5) | BitBoard::from_square(Square::E6);
+            Square::D5.bitboard() | Square::E6.bitboard();
 
         let mv = make_capture(Square::D1, Square::D5, Piece::Queen, Piece::Pawn);
         let occupied = get_occupied(&pieces);
@@ -436,9 +430,9 @@ mod tests {
     #[test]
     fn test_see_knight_takes_bishop_defended_by_queen() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = BitBoard::from_square(Square::C3);
-        pieces[Color::Black as usize][Piece::Bishop as usize] = BitBoard::from_square(Square::E4);
-        pieces[Color::Black as usize][Piece::Queen as usize] = BitBoard::from_square(Square::E7);
+        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
+        pieces[Color::Black as usize][Piece::Bishop as usize] = Square::E4.bitboard();
+        pieces[Color::Black as usize][Piece::Queen as usize] = Square::E7.bitboard();
 
         let mv = make_capture(Square::C3, Square::E4, Piece::Knight, Piece::Bishop);
         let occupied = get_occupied(&pieces);
@@ -454,8 +448,8 @@ mod tests {
     #[test]
     fn test_see_equal_exchange() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = BitBoard::from_square(Square::C3);
-        pieces[Color::Black as usize][Piece::Knight as usize] = BitBoard::from_square(Square::E4);
+        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
+        pieces[Color::Black as usize][Piece::Knight as usize] = Square::E4.bitboard();
 
         let mv = make_capture(Square::C3, Square::E4, Piece::Knight, Piece::Knight);
         let occupied = get_occupied(&pieces);
@@ -471,9 +465,9 @@ mod tests {
     #[test]
     fn test_see_defended_equal_exchange() {
         let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = BitBoard::from_square(Square::C3);
+        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
         pieces[Color::Black as usize][Piece::Knight as usize] =
-            BitBoard::from_square(Square::E4) | BitBoard::from_square(Square::G5);
+            Square::E4.bitboard() | Square::G5.bitboard();
 
         let mv = make_capture(Square::C3, Square::E4, Piece::Knight, Piece::Knight);
         let occupied = get_occupied(&pieces);

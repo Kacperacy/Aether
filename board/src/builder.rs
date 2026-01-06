@@ -6,7 +6,7 @@ use crate::{
     cache::BoardCache, game_state::GameState, pst,
 };
 use aether_core::{
-    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, MoveState, Piece, Rank, Square,
+    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, MoveState, Piece, Square,
 };
 
 pub struct BoardBuilder {
@@ -51,10 +51,7 @@ impl BoardBuilder {
     pub fn set_en_passant(&mut self, square: Option<Square>) -> Result<&mut Self> {
         if let Some(sq) = square {
             // Validate en passant square
-            let expected_rank = match self.game_state.side_to_move {
-                Color::White => Rank::Six,
-                Color::Black => Rank::Three,
-            };
+            let expected_rank = self.game_state.side_to_move.en_passant_rank();
             if sq.rank() != expected_rank {
                 return Err(InvalidEnPassantSquare { square: sq });
             }

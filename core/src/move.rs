@@ -20,13 +20,25 @@ impl Display for Move {
                 Piece::Bishop => 'b',
                 Piece::Rook => 'r',
                 Piece::Queen => 'q',
-                // King and Pawn can never appear here – unreachable by rule
                 _ => unreachable!("illegal promotion piece"),
             };
             write!(f, "{symbol}")?;
         }
 
         Ok(())
+    }
+}
+
+impl Default for Move {
+    fn default() -> Self {
+        Move {
+            from: Square::A1,
+            to: Square::A1,
+            piece: Piece::Pawn,
+            capture: None,
+            promotion: None,
+            flags: MoveFlags::default(),
+        }
     }
 }
 
@@ -89,7 +101,7 @@ pub struct MoveState {
     /* game-state members */
     pub old_zobrist_hash: u64,
     pub old_en_passant: Option<Square>,
-    pub old_castling_rights: [CastlingRights; 2], // [color][side]
+    pub old_castling_rights: [CastlingRights; 2],
     pub old_halfmove_clock: u16,
     pub old_game_phase: i16,
     pub old_pst_mg: i32,
@@ -110,19 +122,6 @@ impl Default for MoveState {
             old_game_phase: 0,
             old_pst_mg: 0,
             old_pst_eg: 0,
-        }
-    }
-}
-
-impl Default for Move {
-    fn default() -> Self {
-        Move {
-            from: Square::A1,
-            to: Square::A1,
-            piece: Piece::Pawn,
-            capture: None,
-            promotion: None,
-            flags: MoveFlags::default(),
         }
     }
 }

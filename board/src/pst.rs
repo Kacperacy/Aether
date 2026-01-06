@@ -179,8 +179,10 @@ const PST_EG: [[i32; 64]; 6] = [
 /// Get PST index for a square from a specific color's perspective
 #[inline(always)]
 fn pst_index(square: Square, color: Color) -> usize {
-    let idx = square.to_index() as usize;
-    if color == Color::White { idx ^ 56 } else { idx }
+    match color {
+        Color::White => square.flip_rank().to_index() as usize,
+        Color::Black => square.to_index() as usize,
+    }
 }
 
 /// Get the PST + material value for a piece on a square
@@ -203,7 +205,7 @@ pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
 /// Compute full PST score for a board position
 /// Returns (middlegame_score, endgame_score) from white's perspective
 pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32) {
-    use aether_core::ALL_PIECES;
+    use aether_core::{ALL_COLORS, ALL_PIECES};
 
     let mut mg = 0i32;
     let mut eg = 0i32;
@@ -211,18 +213,12 @@ pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32)
     for &piece in &ALL_PIECES {
         let piece_idx = piece as usize;
 
-        // White pieces
-        for square in pieces[Color::White as usize][piece_idx].iter() {
-            let (pmg, peg) = piece_value(piece, square, Color::White);
-            mg += pmg;
-            eg += peg;
-        }
-
-        // Black pieces
-        for square in pieces[Color::Black as usize][piece_idx].iter() {
-            let (pmg, peg) = piece_value(piece, square, Color::Black);
-            mg += pmg;
-            eg += peg;
+        for color in ALL_COLORS {
+            for square in pieces[color as usize][piece_idx].iter() {
+                let (pmg, peg) = piece_value(piece, square, color);
+                mg += pmg;
+                eg += peg;
+            }
         }
     }
 

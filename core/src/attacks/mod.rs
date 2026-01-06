@@ -89,7 +89,7 @@ mod tests {
     fn test_attackers_to_square() {
         let mut pieces = [BitBoard::EMPTY; 6];
         // Place white rook on e1
-        pieces[Piece::Rook as usize] = BitBoard::from_square(Square::E1);
+        pieces[Piece::Rook as usize] = Square::E1.bitboard();
 
         let attackers = attackers_to_square(Square::E4, Color::White, BitBoard::EMPTY, &pieces);
 
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_blocked_rook() {
         let mut occupied = BitBoard::EMPTY;
-        occupied |= BitBoard::from_square(Square::E6); // blocker
+        occupied |= Square::E6.bitboard(); // blocker
 
         let attacks = rook_attacks(Square::E4, occupied);
 

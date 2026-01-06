@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn test_blocker_stops_attacks() {
         let mut occupied = BitBoard::EMPTY;
-        occupied |= BitBoard::from_square(Square::E6);
+        occupied |= Square::E6.bitboard();
 
         let attacks = rook_attacks(Square::E1, occupied);
 
@@ -138,9 +138,9 @@ mod tests {
     #[test]
     fn test_multiple_blockers() {
         let mut occupied = BitBoard::EMPTY;
-        occupied |= BitBoard::from_square(Square::E6);
-        occupied |= BitBoard::from_square(Square::C4);
-        occupied |= BitBoard::from_square(Square::G4);
+        occupied |= Square::E6.bitboard();
+        occupied |= Square::C4.bitboard();
+        occupied |= Square::G4.bitboard();
 
         let attacks = rook_attacks(Square::E4, occupied);
 

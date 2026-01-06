@@ -13,7 +13,6 @@ pub enum Piece {
     King = 5,
 }
 
-/// All piece types in chess
 pub const ALL_PIECES: [Piece; Piece::NUM] = [
     Piece::Pawn,
     Piece::Knight,
@@ -23,7 +22,6 @@ pub const ALL_PIECES: [Piece; Piece::NUM] = [
     Piece::King,
 ];
 
-/// Pieces that a pawn can promote to
 pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen];
 pub const PAWN_VALUE: Score = 100;
 pub const KNIGHT_VALUE: Score = 320;
@@ -60,7 +58,6 @@ impl FromStr for Piece {
 }
 
 impl Piece {
-    /// Number of piece types in chess
     pub const NUM: usize = 6;
 
     pub const fn as_char(self) -> char {
@@ -86,7 +83,6 @@ impl Piece {
         }
     }
 
-    /// Material value in centipawns
     pub const fn value(self) -> Score {
         match self {
             Self::Pawn => PAWN_VALUE,

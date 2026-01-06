@@ -17,7 +17,7 @@ pub fn main() {
     // Build occupied for the position
     let mut occupied = BitBoard::EMPTY;
     // Only g2 is relevant in mask (e2 is in mask and empty, g2 is in mask and occupied)
-    occupied |= BitBoard::from_square(Square::G2);
+    occupied |= Square::G2.bitboard();
     // a6 and h3 are NOT in mask so they don't matter
 
     println!("Testing bishop attacks for f1");

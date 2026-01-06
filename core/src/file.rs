@@ -1,4 +1,4 @@
-use crate::TypeError::{InvalidFile, InvalidFileIndex};
+use crate::TypeError::InvalidFile;
 use crate::{BitBoard, Result, TypeError};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -16,7 +16,6 @@ pub enum File {
     H = 7,
 }
 
-/// All files on a chessboard
 pub const ALL_FILES: [File; 8] = [
     File::A,
     File::B,
@@ -55,34 +54,11 @@ impl Display for File {
 }
 
 impl File {
-    /// Number of files on a chessboard
     pub const NUM: usize = 8;
 
-    /// Safe conversion from index (0-7) to File
-    pub fn try_from_index(file: u8) -> Result<Self> {
-        match file {
-            0 => Ok(Self::A),
-            1 => Ok(Self::B),
-            2 => Ok(Self::C),
-            3 => Ok(Self::D),
-            4 => Ok(Self::E),
-            5 => Ok(Self::F),
-            6 => Ok(Self::G),
-            7 => Ok(Self::H),
-            _ => Err(InvalidFileIndex { file_index: file }),
-        }
-    }
-
-    /// Fast conversion from index (0-7) to File
-    ///
-    /// # Safety invariant
-    /// Uses unsafe transmute for performance. Safety guaranteed by:
-    /// - File is #[repr(u8)] with values 0-7 matching the index
-    /// - External callers should use `try_from_index()` for untrusted input
     #[inline(always)]
     pub const fn from_index(file: i8) -> Self {
         debug_assert!(file >= 0 && file < 8, "File index out of bounds");
-        // SAFETY: File is repr(u8) with explicit values 0-7
         unsafe { std::mem::transmute(file as u8) }
     }
 

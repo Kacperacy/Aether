@@ -6,7 +6,6 @@ fn main() -> std::io::Result<()> {
     println!("  Magic Bitboard Generator");
     println!("====================================\n");
 
-    // Determine output path
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
 
     let output_path = PathBuf::from(&manifest_dir)
@@ -16,9 +15,8 @@ fn main() -> std::io::Result<()> {
 
     println!("Output: {}\n", output_path.display());
 
-    // Check if file exists
     if output_path.exists() {
-        println!("⚠️  File already exists!");
+        println!("File already exists!");
         print!("Do you want to regenerate? [y/N] ");
 
         use std::io::{self, Write};
@@ -34,7 +32,6 @@ fn main() -> std::io::Result<()> {
         println!();
     }
 
-    // Generate
     use aether_core::attacks::codegen;
 
     println!("Generating magic bitboards...");
@@ -43,7 +40,7 @@ fn main() -> std::io::Result<()> {
     codegen::generate_magic_constants(&output_path)?;
 
     println!("\n====================================");
-    println!("  ✅ Generation Complete!");
+    println!("Generation Complete!");
     println!("====================================\n");
 
     Ok(())
