@@ -1,6 +1,9 @@
-use crate::{CastlingRights, Color, Piece, Square};
+use crate::{CastlingRights, Color, CoreError, Piece, Square};
 use std::fmt::{self, Display, Formatter};
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use std::hash::Hash;
+use std::str::FromStr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Move {
     pub from: Square,
     pub to: Square,
@@ -42,6 +45,35 @@ impl Default for Move {
     }
 }
 
+impl FromStr for Move {
+    type Err = CoreError;
+
+    /// Parses a move in UCI format "e2e4" "e7e8q"
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() < 4 {
+            return Err(CoreError::InvalidMove { mv: s.to_string() });
+        }
+
+        let from = Square::from_str(&s[0..2])?;
+        let to = Square::from_str(&s[2..4])?;
+
+        let promotion = if s.len() > 4 {
+            Piece::from_char(s.chars().nth(4).unwrap())
+        } else {
+            None
+        };
+
+        Ok(Move {
+            from,
+            to,
+            piece: Piece::Pawn,
+            capture: None,
+            promotion,
+            flags: MoveFlags::default(),
+        })
+    }
+}
+
 impl Move {
     pub fn new(from: Square, to: Square, piece: Piece) -> Self {
         Move {
@@ -80,14 +112,14 @@ impl Move {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MoveFlags {
     pub is_castle: bool,
     pub is_en_passant: bool,
     pub is_double_pawn_push: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MoveState {
     pub captured_piece: Option<(Piece, Color)>,
     pub mv_from: Square,

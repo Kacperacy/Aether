@@ -4,7 +4,7 @@ use crate::uci::{
     EngineInfo, InfoResponse, OptionInfo, OptionType, SearchParams, UciCommand, UciInput,
     UciResponse, send_response, send_responses,
 };
-use aether_core::{Color, Move, Piece, Square};
+use aether_core::{Color, Move, Piece};
 use board::{Board, BoardOps, BoardQuery, FenOps};
 use engine::Engine;
 use std::str::FromStr;
@@ -208,32 +208,14 @@ impl UciHandler {
     }
 
     fn parse_uci_move(&self, move_str: &str) -> Option<Move> {
-        if move_str.len() < 4 {
-            return None;
-        }
-
-        let from = Square::from_str(&move_str[0..2]).ok()?;
-        let to = Square::from_str(&move_str[2..4]).ok()?;
-
-        // Check for promotion
-        let promotion = if move_str.len() > 4 {
-            match move_str.chars().nth(4)? {
-                'q' => Some(Piece::Queen),
-                'r' => Some(Piece::Rook),
-                'b' => Some(Piece::Bishop),
-                'n' => Some(Piece::Knight),
-                _ => None,
-            }
-        } else {
-            None
-        };
+        let parsed = Move::from_str(move_str).ok()?;
 
         // Generate legal moves and find matching one
         let legal_moves = self.engine.legal_moves(&self.board);
 
         legal_moves
             .into_iter()
-            .find(|m| m.from == from && m.to == to && m.promotion == promotion)
+            .find(|m| m.from == parsed.from && m.to == parsed.to && m.promotion == parsed.promotion)
     }
 
     fn cmd_go(&mut self, params: SearchParams) {
@@ -341,6 +323,7 @@ impl Default for UciHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aether_core::Square;
     use board::STARTING_POSITION_FEN;
 
     #[test]

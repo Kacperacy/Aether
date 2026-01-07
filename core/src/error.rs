@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum TypeError {
+pub enum CoreError {
     #[error("Invalid file: {file:?} (expected a-h)")]
     InvalidFile { file: String },
 
@@ -22,4 +22,7 @@ pub enum TypeError {
 
     #[error("Invalid square index: {square_index:?} (expected 0-63)")]
     InvalidSquareIndex { square_index: u8 },
+
+    #[error("Invalid move: {mv:?} (expected UCI format like 'e2e4' or 'e7e8q')")]
+    InvalidMove { mv: String },
 }

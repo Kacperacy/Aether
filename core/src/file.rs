@@ -1,5 +1,5 @@
-use crate::TypeError::InvalidFile;
-use crate::{BitBoard, Result, TypeError};
+use crate::CoreError::InvalidFile;
+use crate::{BitBoard, CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -28,7 +28,7 @@ pub const ALL_FILES: [File; 8] = [
 ];
 
 impl FromStr for File {
-    type Err = TypeError;
+    type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {

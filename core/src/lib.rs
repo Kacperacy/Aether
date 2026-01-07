@@ -24,4 +24,4 @@ pub use score::*;
 pub use square::*;
 pub use zobrist_keys::*;
 
-type Result<T> = std::result::Result<T, TypeError>;
+type Result<T> = std::result::Result<T, CoreError>;

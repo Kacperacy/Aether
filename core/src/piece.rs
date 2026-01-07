@@ -1,5 +1,5 @@
-use crate::TypeError::InvalidPiece;
-use crate::{Result, Score, TypeError};
+use crate::CoreError::InvalidPiece;
+use crate::{CoreError, Result, Score};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -47,7 +47,7 @@ impl Display for Piece {
 }
 
 impl FromStr for Piece {
-    type Err = TypeError;
+    type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
@@ -80,12 +80,12 @@ impl Piece {
 
     pub const fn from_char(c: char) -> Option<Self> {
         match c {
-            'p' => Some(Self::Pawn),
-            'n' => Some(Self::Knight),
-            'b' => Some(Self::Bishop),
-            'r' => Some(Self::Rook),
-            'q' => Some(Self::Queen),
-            'k' => Some(Self::King),
+            'p' | 'P' => Some(Self::Pawn),
+            'n' | 'N' => Some(Self::Knight),
+            'b' | 'B' => Some(Self::Bishop),
+            'r' | 'R' => Some(Self::Rook),
+            'q' | 'Q' => Some(Self::Queen),
+            'k' | 'K' => Some(Self::King),
             _ => None,
         }
     }

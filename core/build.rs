@@ -49,7 +49,7 @@ fn main() {
         if !constants_path.exists() {
             panic!(
                 "Magic constants file not found at: {}\n\
-                 Please run: cargo run -p core --features codegen --bin gen_magics",
+                 Please run: cargo run -p aether-core --features codegen --bin gen_magics",
                 constants_path.display()
             );
         }

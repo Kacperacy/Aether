@@ -143,20 +143,11 @@ impl<'a> FenParser<'a> {
     }
 
     fn parse_piece_char(&self, ch: char) -> Result<(Piece, Color)> {
-        let (piece, color) = match ch {
-            'P' => (Piece::Pawn, Color::White),
-            'N' => (Piece::Knight, Color::White),
-            'B' => (Piece::Bishop, Color::White),
-            'R' => (Piece::Rook, Color::White),
-            'Q' => (Piece::Queen, Color::White),
-            'K' => (Piece::King, Color::White),
-            'p' => (Piece::Pawn, Color::Black),
-            'n' => (Piece::Knight, Color::Black),
-            'b' => (Piece::Bishop, Color::Black),
-            'r' => (Piece::Rook, Color::Black),
-            'q' => (Piece::Queen, Color::Black),
-            'k' => (Piece::King, Color::Black),
-            _ => return Err(FenParsingError(InvalidPieceCharacter { ch })),
+        let piece = Piece::from_char(ch).ok_or(FenParsingError(InvalidPieceCharacter { ch }))?;
+        let color = if ch.is_ascii_uppercase() {
+            Color::White
+        } else {
+            Color::Black
         };
         Ok((piece, color))
     }

@@ -1,4 +1,4 @@
-use crate::{BitBoard, File, Rank, Result, TypeError};
+use crate::{BitBoard, CoreError, File, Rank, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -29,11 +29,11 @@ pub const ALL_SQUARES: [Square; Square::NUM] = [
 ];
 
 impl FromStr for Square {
-    type Err = TypeError;
+    type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
         if s.len() != 2 {
-            return Err(TypeError::InvalidSquare {
+            return Err(CoreError::InvalidSquare {
                 square: s.to_string(),
             });
         }
@@ -41,7 +41,7 @@ impl FromStr for Square {
         let file = match File::from_str(&s[0..1]) {
             Ok(file) => file,
             Err(_) => {
-                return Err(TypeError::InvalidSquare {
+                return Err(CoreError::InvalidSquare {
                     square: s.to_string(),
                 });
             }
@@ -50,7 +50,7 @@ impl FromStr for Square {
         let rank = match Rank::from_str(&s[1..2]) {
             Ok(rank) => rank,
             Err(_) => {
-                return Err(TypeError::InvalidSquare {
+                return Err(CoreError::InvalidSquare {
                     square: s.to_string(),
                 });
             }

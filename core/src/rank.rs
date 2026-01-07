@@ -1,5 +1,5 @@
-use crate::TypeError::InvalidRank;
-use crate::{BitBoard, Color, Result, TypeError};
+use crate::CoreError::InvalidRank;
+use crate::{BitBoard, Color, CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -28,7 +28,7 @@ pub const ALL_RANKS: [Rank; 8] = [
 ];
 
 impl FromStr for Rank {
-    type Err = TypeError;
+    type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
