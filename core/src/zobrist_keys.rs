@@ -23,7 +23,6 @@ impl ZobristKeys {
             en_passant: [0; 8],
         };
 
-        // Generate piece-square keys
         for square in 0..64 {
             for piece in 0..6 {
                 for color in 0..2 {
@@ -32,14 +31,12 @@ impl ZobristKeys {
             }
         }
 
-        // Generate castling keys
         for color in 0..2 {
             for side in 0..2 {
                 keys.castling[color][side] = rng.random();
             }
         }
 
-        // Generate en passant keys
         for file in 0..8 {
             keys.en_passant[file] = rng.random();
         }

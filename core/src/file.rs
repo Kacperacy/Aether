@@ -59,6 +59,7 @@ impl File {
     #[inline(always)]
     pub const fn from_index(file: i8) -> Self {
         debug_assert!(file >= 0 && file < 8, "File index out of bounds");
+        // SAFETY: File is #[repr(u8)] with variants 0..=7, and we assert file is in 0..8.
         unsafe { std::mem::transmute(file as u8) }
     }
 

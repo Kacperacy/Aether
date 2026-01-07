@@ -59,6 +59,7 @@ impl Rank {
     #[inline(always)]
     pub const fn from_index(rank: i8) -> Self {
         debug_assert!(rank >= 0 && rank < 8, "Rank index out of bounds");
+        // SAFETY: Rank is #[repr(u8)] with variants 0..=7, and we assert rank is in 0..8.
         unsafe { std::mem::transmute(rank as u8) }
     }
 

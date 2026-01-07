@@ -1,38 +1,32 @@
 use crate::{BitBoard, Color, Square};
 
-/// Pre-computed pawn attacks for all squares and colors
 static PAWN_ATTACKS: [[BitBoard; 64]; 2] = [
     init_pawn_attacks(Color::White),
     init_pawn_attacks(Color::Black),
 ];
 
-/// Pre-computed knight attacks for all squares
+static PAWN_ATTACKS_FROM: [[BitBoard; 64]; 2] = [
+    init_pawn_attacks_from(Color::White),
+    init_pawn_attacks_from(Color::Black),
+];
+
 static KNIGHT_ATTACKS: [BitBoard; 64] = init_knight_attacks();
 
-/// Pre-computed king attacks for all squares
 static KING_ATTACKS: [BitBoard; 64] = init_king_attacks();
 
-/// Get squares attacked by a pawn of `color` on `square`
+#[must_use]
 #[inline(always)]
 pub fn pawn_attacks(square: Square, color: Color) -> BitBoard {
     PAWN_ATTACKS[color as usize][square.to_index() as usize]
 }
 
-/// Get squares from which a pawn of `color` can attack `square`
+#[must_use]
 #[inline(always)]
 pub fn pawn_attacks_from(square: Square, color: Color) -> BitBoard {
-    let rank_offset = -color.forward_direction();
-    let mut attacks = BitBoard::EMPTY;
-    if let Some(sq) = square.offset(-1, rank_offset) {
-        attacks |= sq.bitboard();
-    }
-    if let Some(sq) = square.offset(1, rank_offset) {
-        attacks |= sq.bitboard();
-    }
-    attacks
+    PAWN_ATTACKS_FROM[color as usize][square.to_index() as usize]
 }
 
-/// Get pawn move targets (non-capturing) for a pawn of `color` on `square`, given `occupied` squares
+#[must_use]
 #[inline(always)]
 pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard {
     let mut moves = BitBoard::EMPTY;
@@ -43,7 +37,6 @@ pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard 
         if !occupied.has(single) {
             moves |= single.bitboard();
 
-            // Double push from starting rank
             let starting_rank = color.pawn_start_rank();
 
             if square.rank() == starting_rank {
@@ -59,25 +52,23 @@ pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard 
     moves
 }
 
-/// Get squares attacked by a knight on `square`
+#[must_use]
 #[inline(always)]
 pub fn knight_attacks(square: Square) -> BitBoard {
     KNIGHT_ATTACKS[square.to_index() as usize]
 }
 
-/// Get squares attacked by a king on `square`
+#[must_use]
 #[inline(always)]
 pub fn king_attacks(square: Square) -> BitBoard {
     KING_ATTACKS[square.to_index() as usize]
 }
 
-/// Check if a square is a promotion rank for the given color
 #[inline(always)]
 pub const fn is_promotion_rank(square: Square, color: Color) -> bool {
     square.rank() as u8 == color.pawn_promotion_rank() as u8
 }
 
-/// Initialize pawn attacks table for a given color
 const fn init_pawn_attacks(color: Color) -> [BitBoard; 64] {
     let mut attacks = [BitBoard::EMPTY; 64];
     let mut i: usize = 0;
@@ -91,7 +82,6 @@ const fn init_pawn_attacks(color: Color) -> [BitBoard; 64] {
     attacks
 }
 
-/// Compute pawn attacks for a given square and color
 const fn compute_pawn_attacks(square: Square, color: Color) -> BitBoard {
     let rank_offset = color.forward_direction();
     let mut result = BitBoard::EMPTY;
@@ -106,7 +96,33 @@ const fn compute_pawn_attacks(square: Square, color: Color) -> BitBoard {
     result
 }
 
-/// Initialize king attacks table
+const fn init_pawn_attacks_from(color: Color) -> [BitBoard; 64] {
+    let mut attacks = [BitBoard::EMPTY; 64];
+    let mut i: usize = 0;
+
+    while i < 64 {
+        let square = Square::from_index(i as i8);
+        attacks[i] = compute_pawn_attacks_from(square, color);
+        i += 1;
+    }
+
+    attacks
+}
+
+const fn compute_pawn_attacks_from(square: Square, color: Color) -> BitBoard {
+    let rank_offset = -color.forward_direction();
+    let mut result = BitBoard::EMPTY;
+
+    if let Some(target) = square.offset(-1, rank_offset) {
+        result = BitBoard(result.0 | target.bitboard().0);
+    }
+    if let Some(target) = square.offset(1, rank_offset) {
+        result = BitBoard(result.0 | target.bitboard().0);
+    }
+
+    result
+}
+
 const fn init_knight_attacks() -> [BitBoard; 64] {
     const KNIGHT_OFFSETS: [(i8, i8); 8] = [
         (1, 2),
@@ -131,7 +147,6 @@ const fn init_knight_attacks() -> [BitBoard; 64] {
     attacks
 }
 
-/// Initialize king attacks table
 const fn init_king_attacks() -> [BitBoard; 64] {
     const KING_OFFSETS: [(i8, i8); 8] = [
         (1, 1),
@@ -156,7 +171,6 @@ const fn init_king_attacks() -> [BitBoard; 64] {
     attacks
 }
 
-/// Helper: compute attacks based on given offsets
 const fn compute_offsets<const N: usize>(square: Square, offsets: &[(i8, i8); N]) -> BitBoard {
     let mut result = BitBoard::EMPTY;
     let mut i: usize = 0;

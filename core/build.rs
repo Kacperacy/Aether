@@ -28,10 +28,6 @@ fn main() {
             println!("cargo:warning=Generating magic bitboard constants...");
             println!("cargo:warning=This may take 10-30 seconds...");
 
-            // Note: This would require the codegen module to be available at build time
-            // In practice, you might want to use a separate binary or keep it manual
-            // For now, this is a template showing how it COULD work
-
             println!("cargo:warning=To generate manually, run:");
             println!(
                 "cargo:warning=  cargo run -p aether-core --features codegen --bin gen_magics"
@@ -44,7 +40,6 @@ fn main() {
 
     #[cfg(not(feature = "codegen"))]
     {
-        // When codegen feature is not enabled, just verify the file exists
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let constants_path = PathBuf::from(&manifest_dir)
             .join("src")

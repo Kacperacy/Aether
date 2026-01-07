@@ -1,5 +1,6 @@
 use crate::TypeError::InvalidPiece;
 use crate::{Result, Score, TypeError};
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -38,6 +39,12 @@ pub const PIECE_VALUES: [Score; Piece::NUM] = [
     QUEEN_VALUE,
     KING_VALUE,
 ];
+
+impl Display for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
+}
 
 impl FromStr for Piece {
     type Err = TypeError;

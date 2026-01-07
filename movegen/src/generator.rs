@@ -507,10 +507,10 @@ mod tests {
         let map = PieceMap::from_board(&board);
 
         // White should have 16 pieces
-        assert_eq!(map.color_occ[Color::White as usize].len(), 16);
+        assert_eq!(map.color_occ[Color::White as usize].count(), 16);
         // Black should have 16 pieces
-        assert_eq!(map.color_occ[Color::Black as usize].len(), 16);
+        assert_eq!(map.color_occ[Color::Black as usize].count(), 16);
         // Total 32 pieces
-        assert_eq!(map.all_occ.len(), 32);
+        assert_eq!(map.all_occ.count(), 32);
     }
 }

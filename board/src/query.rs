@@ -5,7 +5,7 @@ pub trait BoardQuery {
     fn piece_at(&self, square: Square) -> Option<(Piece, Color)>;
     fn is_square_occupied(&self, square: Square) -> bool;
     fn is_square_attacked(&self, square: Square, by_color: Color) -> bool;
-    fn piece_count(&self, piece: Piece, color: Color) -> u32;
+    fn piece_count(&self, piece: Piece, color: Color) -> usize;
     fn get_king_square(&self, color: Color) -> Option<Square>;
     fn occupied_by(&self, color: Color) -> BitBoard;
     fn occupied(&self) -> BitBoard;
@@ -42,8 +42,8 @@ impl BoardQuery for Board {
     }
 
     #[inline(always)]
-    fn piece_count(&self, piece: Piece, color: Color) -> u32 {
-        self.pieces[color as usize][piece as usize].len()
+    fn piece_count(&self, piece: Piece, color: Color) -> usize {
+        self.pieces[color as usize][piece as usize].count()
     }
 
     #[inline(always)]

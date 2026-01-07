@@ -1,24 +1,18 @@
 use crate::{ALL_SQUARES, BitBoard, File, Rank, Square};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::io::Write;
 use std::path::Path;
 use std::{fs, io};
 
 #[derive(Debug, Clone)]
 struct MagicEntry {
-    /// The attack mask for the piece on the given square
     mask: BitBoard,
-
-    /// The magic number used for indexing
     magic: u64,
-
-    /// Number of bits used for indexing
     index_bits: u8,
-
-    /// Precomputed attack moves for all blocker configurations
     attacks: Vec<BitBoard>,
 }
 
-/// Generates the rook attack mask for a given square
 fn rook_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
     let rank = sq.rank() as i8;
@@ -43,7 +37,6 @@ fn rook_mask(sq: Square) -> BitBoard {
     mask
 }
 
-/// Generates the bishop attack mask for a given square
 fn bishop_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
     let rank = sq.rank() as i8;
@@ -70,7 +63,6 @@ fn bishop_mask(sq: Square) -> BitBoard {
     mask
 }
 
-/// Generates all possible blocker configurations for a given mask
 fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
     let bits: Vec<Square> = mask.iter().collect();
     let count = 1 << bits.len();
@@ -89,7 +81,6 @@ fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
     blockers
 }
 
-/// Computes rook attacks from a square given blockers
 fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
     let rank = sq.rank() as i8;
@@ -130,7 +121,6 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     attacks
 }
 
-/// Computes bishop attacks from a square given blockers
 fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
     let rank = sq.rank() as i8;
@@ -191,11 +181,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     attacks
 }
 
-/// Finds a suitable magic entry for the given square and piece type
 fn find_magic(sq: Square, is_rook: bool) -> MagicEntry {
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
-
     let mask = if is_rook {
         rook_mask(sq)
     } else {
@@ -203,7 +189,6 @@ fn find_magic(sq: Square, is_rook: bool) -> MagicEntry {
     };
 
     let blockers = generate_blockers(mask);
-
     let attacks: Vec<BitBoard> = blockers
         .iter()
         .map(|&b| {
@@ -236,11 +221,9 @@ fn find_magic(sq: Square, is_rook: bool) -> MagicEntry {
             match table[index] {
                 None => table[index] = Some(attacks[i]),
                 Some(existing) if existing == attacks[i] => {
-                    // Collision is OK if attacks are the same
                     continue;
                 }
                 Some(_) => {
-                    // Collision with different attacks → magic doesn't work
                     continue 'search;
                 }
             }
@@ -260,7 +243,6 @@ fn find_magic(sq: Square, is_rook: bool) -> MagicEntry {
     }
 }
 
-/// Computes the magic index for given parameters
 #[inline]
 fn magic_index(mask: BitBoard, magic: u64, bits: u8, blockers: BitBoard) -> usize {
     let relevant = blockers.value() & mask.value();
@@ -268,8 +250,7 @@ fn magic_index(mask: BitBoard, magic: u64, bits: u8, blockers: BitBoard) -> usiz
     (hash >> (64 - bits)) as usize
 }
 
-/// Generates all rook and bishop magic entries for all squares
-pub fn generate_all_magics() -> (Vec<MagicEntry>, Vec<MagicEntry>) {
+fn generate_all_magics() -> (Vec<MagicEntry>, Vec<MagicEntry>) {
     println!("Generating all magics...");
 
     let mut rook_magics = Vec::with_capacity(64);
@@ -287,7 +268,6 @@ pub fn generate_all_magics() -> (Vec<MagicEntry>, Vec<MagicEntry>) {
     (rook_magics, bishop_magics)
 }
 
-/// Generates Rust code for the given magic entries
 fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> String {
     let mut code = String::with_capacity(1024 * 1024);
 
@@ -297,7 +277,6 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
 
     code.push_str("use super::magic::MagicEntry;\n\n");
 
-    // Rook magics
     code.push_str("#[rustfmt::skip]\n");
     code.push_str("pub const ROOK_MAGICS: &[MagicEntry; 64] = &[\n");
     for entry in rook_magics {
@@ -310,7 +289,6 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
     }
     code.push_str("];\n\n");
 
-    // Bishop magics
     code.push_str("#[rustfmt::skip]\n");
     code.push_str("pub const BISHOP_MAGICS: &[MagicEntry; 64] = &[\n");
     for entry in bishop_magics {
@@ -323,7 +301,6 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
     }
     code.push_str("];\n\n");
 
-    // Rook attack tables
     code.push_str("#[rustfmt::skip]\n");
     code.push_str("pub const ROOK_MOVES: &[&[u64]; 64] = &[\n");
     for entry in rook_magics {
@@ -338,7 +315,6 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
     }
     code.push_str("];\n\n");
 
-    // Bishop attack tables
     code.push_str("#[rustfmt::skip]\n");
     code.push_str("pub const BISHOP_MOVES: &[&[u64]; 64] = &[\n");
     for entry in bishop_magics {
@@ -356,7 +332,6 @@ fn generate_code(rook_magics: &[MagicEntry], bishop_magics: &[MagicEntry]) -> St
     code
 }
 
-/// Generates magic constants and writes them to the specified output file
 pub fn generate_magic_constants<P: AsRef<Path>>(output_path: P) -> io::Result<()> {
     let path = output_path.as_ref();
 

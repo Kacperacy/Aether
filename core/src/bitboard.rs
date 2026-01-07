@@ -99,10 +99,6 @@ impl BitBoard {
         self.0
     }
 
-    pub const fn len(self) -> u32 {
-        self.0.count_ones()
-    }
-
     #[inline(always)]
     pub const fn iter(self) -> BitBoardIter {
         BitBoardIter { bits: self.0 }

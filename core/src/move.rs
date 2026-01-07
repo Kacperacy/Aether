@@ -50,11 +50,7 @@ impl Move {
             piece,
             capture: None,
             promotion: None,
-            flags: MoveFlags {
-                is_castle: false,
-                is_en_passant: false,
-                is_double_pawn_push: false,
-            },
+            flags: MoveFlags::default(),
         }
     }
 

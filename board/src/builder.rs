@@ -95,14 +95,14 @@ impl BoardBuilder {
     }
 
     fn compute_game_phase(&self) -> i16 {
-        let knights = (self.pieces[0][Piece::Knight as usize].len()
-            + self.pieces[1][Piece::Knight as usize].len()) as i32;
-        let bishops = (self.pieces[0][Piece::Bishop as usize].len()
-            + self.pieces[1][Piece::Bishop as usize].len()) as i32;
-        let rooks = (self.pieces[0][Piece::Rook as usize].len()
-            + self.pieces[1][Piece::Rook as usize].len()) as i32;
-        let queens = (self.pieces[0][Piece::Queen as usize].len()
-            + self.pieces[1][Piece::Queen as usize].len()) as i32;
+        let knights = (self.pieces[0][Piece::Knight as usize].count()
+            + self.pieces[1][Piece::Knight as usize].count()) as i32;
+        let bishops = (self.pieces[0][Piece::Bishop as usize].count()
+            + self.pieces[1][Piece::Bishop as usize].count()) as i32;
+        let rooks = (self.pieces[0][Piece::Rook as usize].count()
+            + self.pieces[1][Piece::Rook as usize].count()) as i32;
+        let queens = (self.pieces[0][Piece::Queen as usize].count()
+            + self.pieces[1][Piece::Queen as usize].count()) as i32;
 
         let material = knights * PHASE_KNIGHT as i32
             + bishops * PHASE_BISHOP as i32
@@ -115,7 +115,7 @@ impl BoardBuilder {
     fn validate(&self) -> Result<()> {
         // Check for exactly one king per side
         for color in ALL_COLORS {
-            let king_count = self.pieces[color as usize][Piece::King as usize].len();
+            let king_count = self.pieces[color as usize][Piece::King as usize].count();
             match king_count {
                 0 => return Err(KingNotFound { color }),
                 1 => {}

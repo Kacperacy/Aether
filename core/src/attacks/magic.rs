@@ -2,13 +2,8 @@ use crate::{BISHOP_MAGICS, BISHOP_MOVES, BitBoard, ROOK_MAGICS, ROOK_MOVES, Squa
 
 #[derive(Debug, Clone, Copy)]
 pub struct MagicEntry {
-    /// Mask of relevant occupancy bits for the piece on the square
     pub mask: u64,
-
-    /// Magic multiplier for hashing blocker configurations
     pub magic: u64,
-
-    /// Number of bits used for indexing into the attack table
     pub index_bits: u8,
 }
 
@@ -21,6 +16,7 @@ impl MagicEntry {
     }
 }
 
+#[must_use]
 #[inline(always)]
 pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -32,6 +28,7 @@ pub fn rook_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
+#[must_use]
 #[inline(always)]
 pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     let sq_idx = square.to_index() as usize;
@@ -43,6 +40,7 @@ pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     BitBoard(moves[index])
 }
 
+#[must_use]
 #[inline(always)]
 pub fn queen_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     rook_attacks(square, occupied) | bishop_attacks(square, occupied)

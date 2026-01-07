@@ -78,6 +78,7 @@ impl Square {
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
+        // SAFETY: Square is #[repr(u8)] with variants 0..=63, and we assert index is in 0..64.
         unsafe { std::mem::transmute(index as u8) }
     }
 
