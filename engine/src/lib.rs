@@ -5,7 +5,7 @@ use crate::eval::SimpleEvaluator;
 use crate::search::alpha_beta::AlphaBetaSearcher;
 use crate::search::{SearchInfo, SearchLimits, SearchResult};
 use aether_core::{Move, Score};
-use board::{Board, BoardOps};
+use board::Board;
 use movegen::{Generator, MoveGen};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -144,7 +144,6 @@ impl Default for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use board::Board;
     use std::sync::atomic::Ordering;
 
     #[test]

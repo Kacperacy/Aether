@@ -5,7 +5,7 @@ use crate::search::{
     TranspositionTable,
 };
 use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, QUEEN_VALUE, Score, mated_in};
-use board::{BoardOps, BoardQuery};
+use board::Board;
 use movegen::{Generator, MoveGen};
 use std::mem;
 use std::sync::Arc;
@@ -94,9 +94,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.tt.hashfull()
     }
 
-    pub fn search<T: BoardOps + BoardQuery>(
+    pub fn search(
         &mut self,
-        board: &mut T,
+        board: &mut Board,
         limits: &SearchLimits,
         mut on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
@@ -250,9 +250,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     }
 
     /// Main alpha-beta search function
-    fn alpha_beta<T: BoardOps + BoardQuery>(
+    fn alpha_beta(
         &mut self,
-        board: &mut T,
+        board: &mut Board,
         depth: u8,
         ply: usize,
         mut alpha: Score,
@@ -535,9 +535,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
     /// Quiescence search - search captures until a quiet position is reached
     /// depth: quiescence depth (0 = first call, -1, -2, ... for deeper levels)
-    fn quiescence<T: BoardOps + BoardQuery>(
+    fn quiescence(
         &mut self,
-        board: &mut T,
+        board: &mut Board,
         ply: usize,
         depth: i32,
         mut alpha: Score,
@@ -641,7 +641,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     }
 
     #[inline]
-    fn has_non_pawn_material<T: BoardQuery>(&self, board: &T) -> bool {
+    fn has_non_pawn_material(&self, board: &Board) -> bool {
         let side = board.side_to_move();
         board.piece_count(Piece::Knight, side) > 0
             || board.piece_count(Piece::Bishop, side) > 0
@@ -663,7 +663,7 @@ where
 mod tests {
     use super::*;
     use crate::eval::SimpleEvaluator;
-    use board::{Board, FenOps};
+    use board::FenOps;
 
     #[test]
     fn test_search_basic() {
@@ -735,7 +735,7 @@ mod tests {
 
         // Opponent moves (simulate)
         let mut opponent_moves = Vec::new();
-        searcher.generator.legal(&mut board, &mut opponent_moves);
+        searcher.generator.legal(&board, &mut opponent_moves);
         board.make_move(&opponent_moves[0]).unwrap();
 
         // Second move - should NOT repeat position

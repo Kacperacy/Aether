@@ -1,5 +1,5 @@
 use aether_core::{File, Move, Rank, Square};
-use board::{Board, BoardOps, FenOps};
+use board::{Board, FenOps};
 use movegen::{Generator, MoveGen};
 
 #[test]

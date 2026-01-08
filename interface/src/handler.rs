@@ -5,7 +5,7 @@ use crate::uci::{
     UciResponse, send_response, send_responses,
 };
 use aether_core::{Color, Move, Piece};
-use board::{Board, BoardOps, BoardQuery, FenOps};
+use board::{Board, FenOps};
 use engine::Engine;
 use std::str::FromStr;
 use std::sync::Arc;

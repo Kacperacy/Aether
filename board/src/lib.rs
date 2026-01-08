@@ -11,8 +11,6 @@ mod zobrist;
 pub use builder::BoardBuilder;
 pub use error::{BoardError, FenError, MoveError};
 pub use fen::{FenOps, STARTING_POSITION_FEN};
-pub use ops::BoardOps;
-pub use query::BoardQuery;
 
 use aether_core::{BitBoard, Color, File, MoveState, Piece, Rank, Square, attackers_to_square};
 use cache::BoardCache;
@@ -75,11 +73,6 @@ impl Board {
         self.pst_eg = eg;
     }
 
-    #[inline(always)]
-    pub fn pst_scores(&self) -> (i32, i32) {
-        (self.pst_mg, self.pst_eg)
-    }
-
     #[inline]
     pub(crate) const fn phase_weight(piece: Piece) -> i16 {
         match piece {
@@ -100,11 +93,6 @@ impl Board {
     }
 
     #[inline]
-    pub fn pieces(&self) -> &[[BitBoard; 6]; 2] {
-        &self.pieces
-    }
-
-    #[inline]
     pub fn game_state(&self) -> &GameState {
         &self.game_state
     }
@@ -115,17 +103,8 @@ impl Board {
     }
 
     #[inline]
-    pub fn zobrist_hash_raw(&self) -> u64 {
-        self.zobrist_hash
-    }
-
-    #[inline]
     pub fn move_history(&self) -> &[MoveState] {
         &self.move_history
-    }
-
-    pub fn piece_at_fast(&self, square: Square) -> Option<(Piece, Color)> {
-        self.mailbox[square.to_index() as usize]
     }
 
     #[inline]
@@ -141,16 +120,6 @@ impl Board {
     #[inline]
     pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
         attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
-    }
-
-    #[inline]
-    pub fn occupied(&self) -> BitBoard {
-        self.cache.occupied
-    }
-
-    #[inline]
-    pub fn color_occupied(&self, color: Color) -> BitBoard {
-        self.cache.color_combined[color as usize]
     }
 
     pub fn print(&self) {
@@ -211,11 +180,6 @@ impl Board {
         }
 
         count
-    }
-
-    #[inline]
-    pub fn piece_at(&self, square: Square) -> Option<(Piece, Color)> {
-        <Self as BoardQuery>::piece_at(self, square)
     }
 }
 

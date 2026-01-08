@@ -385,7 +385,6 @@ impl FenOps for Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BoardQuery;
 
     #[test]
     fn test_parse_starting_position() {

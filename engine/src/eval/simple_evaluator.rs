@@ -1,6 +1,6 @@
 use crate::eval::Evaluator;
 use aether_core::{Color, Piece};
-use board::BoardQuery;
+use board::Board;
 
 /// Bishop pair bonus in middlegame (centipawns)
 const BISHOP_PAIR_MG: i32 = 30;
@@ -106,7 +106,7 @@ impl SimpleEvaluator {
         Self
     }
 
-    fn bishop_pair_bonus<T: BoardQuery>(board: &T) -> (i32, i32) {
+    fn bishop_pair_bonus(board: &Board) -> (i32, i32) {
         let white_pair = board.piece_count(Piece::Bishop, Color::White) >= 2;
         let black_pair = board.piece_count(Piece::Bishop, Color::Black) >= 2;
 
@@ -119,7 +119,7 @@ impl SimpleEvaluator {
     }
 
     #[inline]
-    fn evaluate_passed_pawns<T: BoardQuery>(board: &T) -> (i32, i32) {
+    fn evaluate_passed_pawns(board: &Board) -> (i32, i32) {
         let mut mg_score = 0;
         let mut eg_score = 0;
 
@@ -163,7 +163,7 @@ impl SimpleEvaluator {
     }
 
     #[inline(always)]
-    fn evaluate_position<T: BoardQuery>(&self, board: &T) -> i32 {
+    fn evaluate_position(&self, board: &Board) -> i32 {
         // Use incrementally updated PST scores - O(1) instead of O(pieces)
         let (mut mg_score, mut eg_score) = board.pst_scores();
 
@@ -182,7 +182,7 @@ impl SimpleEvaluator {
 
 impl Evaluator for SimpleEvaluator {
     #[inline(always)]
-    fn evaluate<T: BoardQuery>(&self, board: &T) -> i32 {
+    fn evaluate(&self, board: &Board) -> i32 {
         let score = self.evaluate_position(board);
 
         if board.side_to_move() == Color::White {

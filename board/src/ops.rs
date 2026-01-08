@@ -1,28 +1,11 @@
 use crate::error::MoveError;
 use crate::pst;
-use crate::query::BoardQuery;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
 use aether_core::{CastlingRights, Color, File, Move, MoveState, Piece, Square};
 
-/// Trait for board operations
-pub trait BoardOps: BoardQuery + Clone {
-    /// Make a move on the board, updating the position accordingly
-    fn make_move(&mut self, mv: &Move) -> Result<()>;
-
-    /// Unmake a move on the board, restoring the previous position
-    fn unmake_move(&mut self, mv: &Move) -> Result<()>;
-    ///  Make a null move (pass the turn without moving any piece)
-    fn make_null_move(&mut self);
-    /// Unmake a null move
-    fn unmake_null_move(&mut self);
-
-    /// Is the position in check for the given color
-    fn is_in_check(&self, color: Color) -> bool;
-}
-
-impl BoardOps for Board {
+impl Board {
     #[inline(always)]
-    fn make_move(&mut self, mv: &Move) -> Result<()> {
+    pub fn make_move(&mut self, mv: &Move) -> Result<()> {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();
 
@@ -131,7 +114,7 @@ impl BoardOps for Board {
     }
 
     #[inline(always)]
-    fn unmake_move(&mut self, mv: &Move) -> Result<()> {
+    pub fn unmake_move(&mut self, mv: &Move) -> Result<()> {
         if self.history_index == 0 {
             return Err(BoardError::ChessMoveError(MoveError::NoMoveToUnmake));
         }
@@ -176,14 +159,14 @@ impl BoardOps for Board {
         Ok(())
     }
 
-    fn make_null_move(&mut self) {
+    pub fn make_null_move(&mut self) {
         self.zobrist_history.push(self.zobrist_hash);
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
         self.move_history[buffer_idx] = MoveState {
             captured_piece: None,
-            mv_from: Square::A1, // Dummy values
-            mv_to: Square::A1,   // Dummy values
+            mv_from: Square::A1,
+            mv_to: Square::A1,
             promotion: None,
             old_zobrist_hash: self.zobrist_hash,
             old_en_passant: self.game_state.en_passant_square,
@@ -204,7 +187,7 @@ impl BoardOps for Board {
         self.zobrist_toggle_side();
     }
 
-    fn unmake_null_move(&mut self) {
+    pub fn unmake_null_move(&mut self) {
         if self.history_index == 0 {
             return;
         }
@@ -217,13 +200,12 @@ impl BoardOps for Board {
         self.game_state.side_to_move = self.game_state.side_to_move.opponent();
         self.game_state.en_passant_square = state.old_en_passant;
         self.zobrist_hash = state.old_zobrist_hash;
-        // PST doesn't change during null move, but restore for consistency
         self.pst_mg = state.old_pst_mg;
         self.pst_eg = state.old_pst_eg;
     }
 
     #[inline(always)]
-    fn is_in_check(&self, color: Color) -> bool {
+    pub fn is_in_check(&self, color: Color) -> bool {
         let king_sq = match self.get_king_square(color) {
             Some(sq) => sq,
             None => return false,
@@ -231,10 +213,7 @@ impl BoardOps for Board {
 
         self.is_square_attacked(king_sq, color.opponent())
     }
-}
 
-impl Board {
-    /// Internal method to place a piece on the board without updating game state
     #[inline(always)]
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = square.bitboard();
@@ -243,7 +222,6 @@ impl Board {
         self.mailbox[square.to_index() as usize] = Some((piece, color));
     }
 
-    /// Fast remove when piece type and color are known
     #[inline(always)]
     pub(crate) fn remove_piece_known(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = square.bitboard();
@@ -266,17 +244,14 @@ impl Board {
         }
     }
 
-    /// Update castling rights after a move
     fn update_castling_rights_after_move(&mut self, mv: &Move) {
         let side = self.game_state.side_to_move;
         let opponent = side.opponent();
 
-        // King move removes all castling rights for that side
         if mv.piece == Piece::King {
             self.game_state.castling_rights[side as usize] = CastlingRights::EMPTY;
         }
 
-        // Rook move removes castling right for that side
         if mv.piece == Piece::Rook {
             let back_rank = side.back_rank();
             if mv.from == Square::new(File::H, back_rank) {
@@ -286,7 +261,6 @@ impl Board {
             }
         }
 
-        // Capturing opponent's rook removes their castling right
         if mv.capture == Some(Piece::Rook) {
             let opp_back_rank = opponent.back_rank();
             if mv.to == Square::new(File::H, opp_back_rank) {

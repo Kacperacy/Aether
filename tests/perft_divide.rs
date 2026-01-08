@@ -1,4 +1,4 @@
-use board::{Board, BoardOps};
+use board::Board;
 use movegen::{Generator, MoveGen};
 
 fn perft(board: &mut Board, generator: &Generator, depth: u32) -> u64 {

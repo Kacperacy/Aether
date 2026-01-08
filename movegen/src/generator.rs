@@ -4,7 +4,7 @@ use aether_core::{
     bishop_attacks, is_promotion_rank, is_square_attacked, king_attacks, knight_attacks,
     pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
 };
-use board::BoardQuery;
+use board::Board;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Generator;
@@ -16,7 +16,7 @@ impl Generator {
     }
 
     #[inline]
-    fn occupancies<T: BoardQuery>(&self, board: &T, side: Color) -> (BitBoard, BitBoard, BitBoard) {
+    fn occupancies(&self, board: &Board, side: Color) -> (BitBoard, BitBoard, BitBoard) {
         let own = board.occupied_by(side);
         let opponent = board.occupied_by(side.opponent());
         let all = own | opponent;
@@ -47,9 +47,9 @@ impl Generator {
     }
 
     #[inline]
-    fn generate_piece_moves<T: BoardQuery>(
+    fn generate_piece_moves(
         &self,
-        board: &T,
+        board: &Board,
         from: Square,
         piece: Piece,
         targets: BitBoard,
@@ -68,9 +68,9 @@ impl Generator {
         }
     }
 
-    fn generate_pawn_moves<T: BoardQuery>(
+    fn generate_pawn_moves(
         &self,
-        board: &T,
+        board: &Board,
         from: Square,
         side: Color,
         occupied: BitBoard,
@@ -146,9 +146,9 @@ impl Generator {
         }
     }
 
-    fn generate_knight_moves<T: BoardQuery>(
+    fn generate_knight_moves(
         &self,
-        board: &T,
+        board: &Board,
         from: Square,
         occupied: BitBoard,
         own_pieces: BitBoard,
@@ -158,9 +158,9 @@ impl Generator {
         self.generate_piece_moves(board, from, Piece::Knight, targets, occupied, moves);
     }
 
-    fn generate_slider_moves<T: BoardQuery>(
+    fn generate_slider_moves(
         &self,
-        board: &T,
+        board: &Board,
         from: Square,
         piece: Piece,
         occupied: BitBoard,
@@ -177,9 +177,9 @@ impl Generator {
         self.generate_piece_moves(board, from, piece, targets, occupied, moves);
     }
 
-    fn generate_king_moves<T: BoardQuery>(
+    fn generate_king_moves(
         &self,
-        board: &T,
+        board: &Board,
         from: Square,
         occupied: BitBoard,
         own_pieces: BitBoard,
@@ -193,9 +193,9 @@ impl Generator {
         }
     }
 
-    fn generate_castling_moves<T: BoardQuery>(
+    fn generate_castling_moves(
         &self,
-        board: &T,
+        board: &Board,
         king_square: Square,
         side: Color,
         moves: &mut Vec<Move>,
@@ -262,8 +262,8 @@ impl Generator {
     }
 }
 
-impl<T: BoardQuery> MoveGen<T> for Generator {
-    fn pseudo_legal(&self, board: &T, moves: &mut Vec<Move>) {
+impl MoveGen for Generator {
+    fn pseudo_legal(&self, board: &Board, moves: &mut Vec<Move>) {
         moves.clear();
         moves.reserve(256);
 
@@ -294,24 +294,24 @@ impl<T: BoardQuery> MoveGen<T> for Generator {
         }
     }
 
-    fn legal(&self, board: &T, moves: &mut Vec<Move>) {
+    fn legal(&self, board: &Board, moves: &mut Vec<Move>) {
         self.pseudo_legal(board, moves);
         let side = board.side_to_move();
         let map = PieceMap::from_board(board);
         moves.retain(|mv| is_move_legal(&map, side, mv));
     }
 
-    fn captures(&self, board: &T, moves: &mut Vec<Move>) {
+    fn captures(&self, board: &Board, moves: &mut Vec<Move>) {
         self.pseudo_legal(board, moves);
         moves.retain(|m| m.is_capture() || m.flags.is_en_passant);
     }
 
-    fn quiet_moves(&self, board: &T, moves: &mut Vec<Move>) {
+    fn quiet_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         self.pseudo_legal(board, moves);
         moves.retain(|m| !m.is_capture() && !m.flags.is_en_passant && !m.flags.is_castle);
     }
 
-    fn checks(&self, board: &T, moves: &mut Vec<Move>) {
+    fn checks(&self, board: &Board, moves: &mut Vec<Move>) {
         let side = board.side_to_move();
         let opponent = side.opponent();
         let king_sq = match board.get_king_square(opponent) {
@@ -378,7 +378,7 @@ struct PieceMap {
 }
 
 impl PieceMap {
-    fn from_board<T: BoardQuery>(board: &T) -> Self {
+    fn from_board(board: &Board) -> Self {
         // Copy bitboards directly - O(12) vs O(32) piece_at lookups
         let mut pieces = [[BitBoard::EMPTY; 6]; 2];
         for &piece in &ALL_PIECES {
@@ -470,7 +470,6 @@ fn is_move_legal(map: &PieceMap, side: Color, mv: &Move) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use board::Board;
 
     #[test]
     fn test_generator_creation() {
