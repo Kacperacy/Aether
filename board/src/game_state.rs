@@ -45,36 +45,6 @@ impl GameState {
             self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
     }
-
-    #[inline]
-    pub fn can_castle_short(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].short.is_some()
-    }
-
-    #[inline]
-    pub fn can_castle_long(&self, color: Color) -> bool {
-        self.castling_rights[color as usize].long.is_some()
-    }
-
-    #[inline]
-    pub fn can_castle(&self, color: Color) -> bool {
-        !self.castling_rights[color as usize].is_empty()
-    }
-
-    #[inline]
-    pub fn remove_castling_rights(&mut self, color: Color) {
-        self.castling_rights[color as usize] = CastlingRights::EMPTY;
-    }
-
-    #[inline]
-    pub fn remove_short_castling(&mut self, color: Color) {
-        self.castling_rights[color as usize].short = None;
-    }
-
-    #[inline]
-    pub fn remove_long_castling(&mut self, color: Color) {
-        self.castling_rights[color as usize].long = None;
-    }
 }
 
 impl Default for GameState {
@@ -94,18 +64,18 @@ mod tests {
         assert!(state.en_passant_square.is_none());
         assert_eq!(state.halfmove_clock, 0);
         assert_eq!(state.fullmove_number, 1);
-        assert!(!state.can_castle(Color::White));
-        assert!(!state.can_castle(Color::Black));
+        assert!(state.castling_rights[Color::White as usize].is_empty());
+        assert!(state.castling_rights[Color::Black as usize].is_empty());
     }
 
     #[test]
     fn test_starting_position() {
         let state = GameState::starting_position();
         assert_eq!(state.side_to_move, Color::White);
-        assert!(state.can_castle_short(Color::White));
-        assert!(state.can_castle_long(Color::White));
-        assert!(state.can_castle_short(Color::Black));
-        assert!(state.can_castle_long(Color::Black));
+        assert!(state.castling_rights[Color::White as usize].short.is_some());
+        assert!(state.castling_rights[Color::White as usize].long.is_some());
+        assert!(state.castling_rights[Color::Black as usize].short.is_some());
+        assert!(state.castling_rights[Color::Black as usize].long.is_some());
     }
 
     #[test]
@@ -119,17 +89,5 @@ mod tests {
         state.switch_side();
         assert_eq!(state.side_to_move, Color::White);
         assert_eq!(state.fullmove_number, 2);
-    }
-
-    #[test]
-    fn test_remove_castling_rights() {
-        let mut state = GameState::starting_position();
-
-        state.remove_short_castling(Color::White);
-        assert!(!state.can_castle_short(Color::White));
-        assert!(state.can_castle_long(Color::White));
-
-        state.remove_castling_rights(Color::Black);
-        assert!(!state.can_castle(Color::Black));
     }
 }

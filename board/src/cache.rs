@@ -42,34 +42,8 @@ impl BoardCache {
     }
 
     #[inline]
-    pub fn move_piece(&mut self, from: Square, to: Square, color: Color) {
-        let from_bb = from.bitboard();
-        let to_bb = to.bitboard();
-        let combined = from_bb | to_bb;
-
-        self.color_combined[color as usize] ^= combined;
-        self.occupied ^= combined;
-    }
-
-    #[inline]
     pub fn is_occupied(&self, square: Square) -> bool {
         self.occupied.has(square)
-    }
-
-    #[inline]
-    pub fn is_occupied_by(&self, square: Square, color: Color) -> bool {
-        self.color_combined[color as usize].has(square)
-    }
-
-    #[inline]
-    pub fn color_at(&self, square: Square) -> Option<Color> {
-        if self.color_combined[Color::White as usize].has(square) {
-            Some(Color::White)
-        } else if self.color_combined[Color::Black as usize].has(square) {
-            Some(Color::Black)
-        } else {
-            None
-        }
     }
 }
 
@@ -98,36 +72,10 @@ mod tests {
 
         cache.add_piece(sq, Color::White);
         assert!(cache.is_occupied(sq));
-        assert!(cache.is_occupied_by(sq, Color::White));
-        assert!(!cache.is_occupied_by(sq, Color::Black));
+        assert!(cache.color_combined[Color::White as usize].has(sq));
+        assert!(!cache.color_combined[Color::Black as usize].has(sq));
 
         cache.remove_piece(sq, Color::White);
         assert!(!cache.is_occupied(sq));
-    }
-
-    #[test]
-    fn test_cache_move_piece() {
-        let mut cache = BoardCache::new();
-        let from = Square::E2;
-        let to = Square::E4;
-
-        cache.add_piece(from, Color::White);
-        cache.move_piece(from, to, Color::White);
-
-        assert!(!cache.is_occupied(from));
-        assert!(cache.is_occupied(to));
-        assert!(cache.is_occupied_by(to, Color::White));
-    }
-
-    #[test]
-    fn test_cache_color_at() {
-        let mut cache = BoardCache::new();
-
-        cache.add_piece(Square::E2, Color::White);
-        cache.add_piece(Square::E7, Color::Black);
-
-        assert_eq!(cache.color_at(Square::E2), Some(Color::White));
-        assert_eq!(cache.color_at(Square::E7), Some(Color::Black));
-        assert_eq!(cache.color_at(Square::E4), None);
     }
 }

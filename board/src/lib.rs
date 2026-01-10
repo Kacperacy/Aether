@@ -34,19 +34,15 @@ pub struct Board {
     game_state: GameState,
     cache: BoardCache,
     zobrist_hash: u64,
-    /// Circular buffer for move states (for make/unmake during search)
+
     move_history: [MoveState; MAX_SEARCH_DEPTH],
-    /// Current index in the circular buffer
     history_index: usize,
-    /// History of zobrist hashes for repetition detection (grows with game length)
     zobrist_history: Vec<u64>,
-    /// Mailbox representation for easy piece lookup
+
     mailbox: [Option<(Piece, Color)>; 64],
-    /// Cached game phase (0 = endgame, 256 = opening)
+
     game_phase: i16,
-    /// Incrementally updated PST score (middlegame) from white's perspective
     pst_mg: i32,
-    /// Incrementally updated PST score (endgame) from white's perspective
     pst_eg: i32,
 }
 
@@ -80,16 +76,12 @@ impl Board {
             Piece::Bishop => PHASE_BISHOP,
             Piece::Rook => PHASE_ROOK,
             Piece::Queen => PHASE_QUEEN,
-            _ => 0,
+            Piece::Pawn | Piece::King => 0,
         }
     }
 
     pub fn starting_position() -> Result<Self> {
         BoardBuilder::starting_position().build()
-    }
-
-    pub fn builder() -> BoardBuilder {
-        BoardBuilder::new()
     }
 
     #[inline]
