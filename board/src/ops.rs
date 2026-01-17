@@ -26,7 +26,8 @@ impl Board {
         if let Some(promo) = mv.promotion {
             let phase_delta = (Self::phase_weight(promo) as i32 * crate::MAX_GAME_PHASE
                 / crate::PHASE_TOTAL as i32) as i16;
-            self.state.game_phase = (self.state.game_phase + phase_delta).min(crate::MAX_GAME_PHASE as i16);
+            self.state.game_phase =
+                (self.state.game_phase + phase_delta).min(crate::MAX_GAME_PHASE as i16);
         }
 
         if let Some(ep_sq) = self.state.en_passant_square {

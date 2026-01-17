@@ -37,7 +37,6 @@ impl StateInfo {
             pst_eg: 0,
         }
     }
-
 }
 
 impl Default for StateInfo {

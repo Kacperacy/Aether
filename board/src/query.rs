@@ -49,16 +49,12 @@ impl Board {
 
     #[inline]
     pub fn can_castle_short(&self, color: Color) -> bool {
-        self.state.castling_rights[color as usize]
-            .short
-            .is_some()
+        self.state.castling_rights[color as usize].short.is_some()
     }
 
     #[inline]
     pub fn can_castle_long(&self, color: Color) -> bool {
-        self.state.castling_rights[color as usize]
-            .long
-            .is_some()
+        self.state.castling_rights[color as usize].long.is_some()
     }
 
     #[inline(always)]

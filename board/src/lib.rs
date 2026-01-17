@@ -42,7 +42,7 @@ pub struct Board {
 
     state_history: [StateInfo; MAX_SEARCH_DEPTH],
     history_index: usize,
-    
+
     zobrist_history: Vec<u64>,
 }
 
