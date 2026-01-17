@@ -1,4 +1,4 @@
-use crate::{CastlingRights, Color, CoreError, Piece, Square};
+use crate::{CoreError, Piece, Square};
 use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
@@ -117,39 +117,4 @@ pub struct MoveFlags {
     pub is_castle: bool,
     pub is_en_passant: bool,
     pub is_double_pawn_push: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MoveState {
-    pub captured_piece: Option<(Piece, Color)>,
-    pub mv_from: Square,
-    pub mv_to: Square,
-    pub promotion: Option<Piece>,
-
-    /* game-state members */
-    pub old_zobrist_hash: u64,
-    pub old_en_passant: Option<Square>,
-    pub old_castling_rights: [CastlingRights; 2],
-    pub old_halfmove_clock: u16,
-    pub old_game_phase: i16,
-    pub old_pst_mg: i32,
-    pub old_pst_eg: i32,
-}
-
-impl Default for MoveState {
-    fn default() -> Self {
-        MoveState {
-            captured_piece: None,
-            mv_from: Square::A1,
-            mv_to: Square::A1,
-            promotion: None,
-            old_zobrist_hash: 0,
-            old_en_passant: None,
-            old_castling_rights: [CastlingRights::EMPTY; 2],
-            old_halfmove_clock: 0,
-            old_game_phase: 0,
-            old_pst_mg: 0,
-            old_pst_eg: 0,
-        }
-    }
 }

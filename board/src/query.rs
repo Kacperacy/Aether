@@ -49,31 +49,31 @@ impl Board {
 
     #[inline]
     pub fn can_castle_short(&self, color: Color) -> bool {
-        self.game_state.castling_rights[color as usize]
+        self.state.castling_rights[color as usize]
             .short
             .is_some()
     }
 
     #[inline]
     pub fn can_castle_long(&self, color: Color) -> bool {
-        self.game_state.castling_rights[color as usize]
+        self.state.castling_rights[color as usize]
             .long
             .is_some()
     }
 
     #[inline(always)]
     pub fn en_passant_square(&self) -> Option<Square> {
-        self.game_state.en_passant_square
+        self.state.en_passant_square
     }
 
     #[inline(always)]
     pub fn side_to_move(&self) -> Color {
-        self.game_state.side_to_move
+        self.side_to_move
     }
 
     #[inline(always)]
     pub fn zobrist_hash_raw(&self) -> u64 {
-        self.zobrist_hash
+        self.state.zobrist_hash
     }
 
     pub fn is_insufficient_material(&self) -> bool {
@@ -136,7 +136,7 @@ impl Board {
 
     #[inline]
     pub fn is_fifty_move_draw(&self) -> bool {
-        self.game_state.halfmove_clock >= 100
+        self.state.halfmove_clock >= crate::FIFTY_MOVE_THRESHOLD
     }
 
     #[inline]
@@ -148,12 +148,27 @@ impl Board {
 
     #[inline]
     pub fn game_phase(&self) -> i32 {
-        self.game_phase as i32
+        self.state.game_phase as i32
     }
 
     #[inline(always)]
     pub fn pst_scores(&self) -> (i32, i32) {
-        (self.pst_mg, self.pst_eg)
+        (self.state.pst_mg, self.state.pst_eg)
+    }
+
+    #[inline(always)]
+    pub fn fullmove_number(&self) -> u16 {
+        self.fullmove_number
+    }
+
+    #[inline(always)]
+    pub fn halfmove_clock(&self) -> u16 {
+        self.state.halfmove_clock
+    }
+
+    #[inline]
+    pub fn castling_rights(&self, color: Color) -> &aether_core::CastlingRights {
+        &self.state.castling_rights[color as usize]
     }
 
     fn are_bishops_on_same_color(&self) -> bool {

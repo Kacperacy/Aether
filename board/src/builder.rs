@@ -1,30 +1,46 @@
 use crate::error::BoardError::{
     InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
 };
+use crate::state_info::StateInfo;
 use crate::{
-    MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK, PHASE_TOTAL, Result,
-    cache::BoardCache, game_state::GameState, pst,
+    MAX_GAME_PHASE, MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK,
+    PHASE_TOTAL, Result, ZOBRIST_HISTORY_CAPACITY, cache::BoardCache, pst,
 };
-use aether_core::{
-    ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, MoveState, Piece, Square,
-};
+use aether_core::{ALL_COLORS, ALL_PIECES, BitBoard, CastlingRights, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
-    pieces: [[BitBoard; 6]; 2],
-    game_state: GameState,
+    pieces: [[BitBoard; Piece::NUM]; Color::NUM],
+    side_to_move: Color,
+    fullmove_number: u16,
+    castling_rights: [CastlingRights; 2],
+    en_passant_square: Option<Square>,
+    halfmove_clock: u16,
 }
 
 impl BoardBuilder {
     pub fn new() -> Self {
         Self {
-            pieces: [[BitBoard::EMPTY; 6]; 2],
-            game_state: GameState::new(),
+            pieces: [[BitBoard::EMPTY; Piece::NUM]; Color::NUM],
+            side_to_move: Color::White,
+            fullmove_number: 1,
+            castling_rights: [CastlingRights::EMPTY; 2],
+            en_passant_square: None,
+            halfmove_clock: 0,
         }
     }
 
     pub fn starting_position() -> Self {
         let mut builder = Self::new();
-        builder.game_state = GameState::starting_position();
+        builder.castling_rights = [
+            CastlingRights {
+                short: Some(File::H),
+                long: Some(File::A),
+            },
+            CastlingRights {
+                short: Some(File::H),
+                long: Some(File::A),
+            },
+        ];
         builder.setup_starting_pieces();
         builder
     }
@@ -39,25 +55,34 @@ impl BoardBuilder {
     }
 
     pub fn set_side_to_move(&mut self, color: Color) -> &mut Self {
-        self.game_state.side_to_move = color;
+        self.side_to_move = color;
         self
     }
 
     pub fn set_castling_rights(&mut self, color: Color, rights: CastlingRights) -> &mut Self {
-        self.game_state.castling_rights[color as usize] = rights;
+        self.castling_rights[color as usize] = rights;
         self
     }
 
     pub fn set_en_passant(&mut self, square: Option<Square>) -> Result<&mut Self> {
         if let Some(sq) = square {
-            // Validate en passant square
-            let expected_rank = self.game_state.side_to_move.en_passant_rank();
+            let expected_rank = self.side_to_move.en_passant_rank();
             if sq.rank() != expected_rank {
                 return Err(InvalidEnPassantSquare { square: sq });
             }
         }
-        self.game_state.en_passant_square = square;
+        self.en_passant_square = square;
         Ok(self)
+    }
+
+    pub fn set_halfmove_clock(&mut self, clock: u16) -> &mut Self {
+        self.halfmove_clock = clock;
+        self
+    }
+
+    pub fn set_fullmove_number(&mut self, number: u16) -> &mut Self {
+        self.fullmove_number = if number == 0 { 1 } else { number };
+        self
     }
 
     pub fn build(self) -> Result<super::Board> {
@@ -66,11 +91,10 @@ impl BoardBuilder {
         let mut cache = BoardCache::new();
         cache.refresh(&self.pieces);
 
-        let zobrist_hash = self.compute_zobrist_hash();
         let game_phase = self.compute_game_phase();
         let (pst_mg, pst_eg) = pst::compute_pst_score(&self.pieces);
 
-        let mut mailbox = [None; 64];
+        let mut mailbox = [None; Square::NUM];
         for color in ALL_COLORS {
             for &piece in &ALL_PIECES {
                 for square in self.pieces[color as usize][piece as usize].iter() {
@@ -79,37 +103,52 @@ impl BoardBuilder {
             }
         }
 
-        Ok(super::Board {
+        let mut board = super::Board {
             pieces: self.pieces,
-            game_state: self.game_state,
-            cache,
-            zobrist_hash,
-            move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
-            history_index: 0,
-            zobrist_history: Vec::with_capacity(512),
             mailbox,
-            game_phase,
-            pst_mg,
-            pst_eg,
-        })
+            cache,
+            side_to_move: self.side_to_move,
+            fullmove_number: self.fullmove_number,
+            state: StateInfo {
+                castling_rights: self.castling_rights,
+                en_passant_square: self.en_passant_square,
+                halfmove_clock: self.halfmove_clock,
+                captured_piece: None,
+                zobrist_hash: 0,
+                game_phase,
+                pst_mg,
+                pst_eg,
+            },
+            state_history: [StateInfo::default(); MAX_SEARCH_DEPTH],
+            history_index: 0,
+            zobrist_history: Vec::with_capacity(ZOBRIST_HISTORY_CAPACITY),
+        };
+
+        board.state.zobrist_hash = board.calculate_zobrist_hash();
+
+        Ok(board)
     }
 
     fn compute_game_phase(&self) -> i16 {
-        let knights = (self.pieces[0][Piece::Knight as usize].count()
-            + self.pieces[1][Piece::Knight as usize].count()) as i32;
-        let bishops = (self.pieces[0][Piece::Bishop as usize].count()
-            + self.pieces[1][Piece::Bishop as usize].count()) as i32;
-        let rooks = (self.pieces[0][Piece::Rook as usize].count()
-            + self.pieces[1][Piece::Rook as usize].count()) as i32;
-        let queens = (self.pieces[0][Piece::Queen as usize].count()
-            + self.pieces[1][Piece::Queen as usize].count()) as i32;
+        let knights = (self.pieces[Color::White as usize][Piece::Knight as usize].count()
+            + self.pieces[Color::Black as usize][Piece::Knight as usize].count())
+            as i32;
+        let bishops = (self.pieces[Color::White as usize][Piece::Bishop as usize].count()
+            + self.pieces[Color::Black as usize][Piece::Bishop as usize].count())
+            as i32;
+        let rooks = (self.pieces[Color::White as usize][Piece::Rook as usize].count()
+            + self.pieces[Color::Black as usize][Piece::Rook as usize].count())
+            as i32;
+        let queens = (self.pieces[Color::White as usize][Piece::Queen as usize].count()
+            + self.pieces[Color::Black as usize][Piece::Queen as usize].count())
+            as i32;
 
         let material = knights * PHASE_KNIGHT as i32
             + bishops * PHASE_BISHOP as i32
             + rooks * PHASE_ROOK as i32
             + queens * PHASE_QUEEN as i32;
 
-        ((material * 256) / PHASE_TOTAL as i32).min(256) as i16
+        ((material * MAX_GAME_PHASE) / PHASE_TOTAL as i32).min(MAX_GAME_PHASE) as i16
     }
 
     fn validate(&self) -> Result<()> {
@@ -131,7 +170,7 @@ impl BoardBuilder {
 
     fn validate_castling_rights(&self) -> Result<()> {
         for color in ALL_COLORS {
-            let rights = &self.game_state.castling_rights[color as usize];
+            let rights = &self.castling_rights[color as usize];
             if rights.is_empty() {
                 continue;
             }
@@ -164,65 +203,14 @@ impl BoardBuilder {
     }
 
     fn is_square_occupied(&self, square: Square) -> bool {
-        for color in 0..2 {
-            for piece in 0..6 {
-                if self.pieces[color][piece].has(square) {
+        for color in ALL_COLORS {
+            for &piece in &ALL_PIECES {
+                if self.pieces[color as usize][piece as usize].has(square) {
                     return true;
                 }
             }
         }
         false
-    }
-
-    fn compute_zobrist_hash(&self) -> u64 {
-        use aether_core::{ALL_SQUARES, Piece, zobrist_keys};
-
-        let keys = zobrist_keys();
-        let mut hash = 0u64;
-
-        // Hash pieces
-        for &sq in &ALL_SQUARES {
-            for color in ALL_COLORS {
-                for piece_idx in 0..6 {
-                    let piece = match piece_idx {
-                        0 => Piece::Pawn,
-                        1 => Piece::Knight,
-                        2 => Piece::Bishop,
-                        3 => Piece::Rook,
-                        4 => Piece::Queen,
-                        5 => Piece::King,
-                        _ => continue,
-                    };
-
-                    if self.pieces[color as usize][piece_idx].has(sq) {
-                        hash ^= keys.piece_key(sq, piece, color);
-                    }
-                }
-            }
-        }
-
-        // Hash side to move
-        if self.game_state.side_to_move == Color::Black {
-            hash ^= keys.side_to_move;
-        }
-
-        // Hash castling rights
-        for color in ALL_COLORS {
-            let rights = &self.game_state.castling_rights[color as usize];
-            if rights.short.is_some() {
-                hash ^= keys.castling_key(color, true);
-            }
-            if rights.long.is_some() {
-                hash ^= keys.castling_key(color, false);
-            }
-        }
-
-        // Hash en passant
-        if let Some(ep_sq) = self.game_state.en_passant_square {
-            hash ^= keys.en_passant_key(ep_sq.file());
-        }
-
-        hash
     }
 }
 

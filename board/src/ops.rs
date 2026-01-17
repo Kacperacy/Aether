@@ -1,52 +1,41 @@
 use crate::error::MoveError;
 use crate::pst;
+use crate::state_info::StateInfo;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{CastlingRights, Color, File, Move, MoveState, Piece, Square};
+use aether_core::{CastlingRights, Color, File, Move, Piece, Square};
 
 impl Board {
     #[inline(always)]
     pub fn make_move(&mut self, mv: &Move) -> Result<()> {
-        let side = self.game_state.side_to_move;
+        let side = self.side_to_move;
         let opponent = side.opponent();
 
-        self.zobrist_history.push(self.zobrist_hash);
+        self.zobrist_history.push(self.state.zobrist_hash);
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
-        self.move_history[buffer_idx] = MoveState {
-            captured_piece: mv.capture.map(|p| (p, opponent)),
-            mv_from: mv.from,
-            mv_to: mv.to,
-            promotion: mv.promotion,
-            old_zobrist_hash: self.zobrist_hash,
-            old_en_passant: self.game_state.en_passant_square,
-            old_castling_rights: self.game_state.castling_rights,
-            old_halfmove_clock: self.game_state.halfmove_clock,
-            old_game_phase: self.game_phase,
-            old_pst_mg: self.pst_mg,
-            old_pst_eg: self.pst_eg,
-        };
-
+        self.state_history[buffer_idx] = self.state;
+        self.state_history[buffer_idx].captured_piece = mv.capture.map(|p| (p, opponent));
         self.history_index += 1;
 
         if let Some(captured) = mv.capture {
-            let phase_delta =
-                (Self::phase_weight(captured) as i32 * 256 / crate::PHASE_TOTAL as i32) as i16;
-            self.game_phase = (self.game_phase - phase_delta).max(0);
+            let phase_delta = (Self::phase_weight(captured) as i32 * crate::MAX_GAME_PHASE
+                / crate::PHASE_TOTAL as i32) as i16;
+            self.state.game_phase = (self.state.game_phase - phase_delta).max(0);
         }
 
         if let Some(promo) = mv.promotion {
-            let phase_delta =
-                (Self::phase_weight(promo) as i32 * 256 / crate::PHASE_TOTAL as i32) as i16;
-            self.game_phase = (self.game_phase + phase_delta).min(256);
+            let phase_delta = (Self::phase_weight(promo) as i32 * crate::MAX_GAME_PHASE
+                / crate::PHASE_TOTAL as i32) as i16;
+            self.state.game_phase = (self.state.game_phase + phase_delta).min(crate::MAX_GAME_PHASE as i16);
         }
 
-        if let Some(ep_sq) = self.game_state.en_passant_square {
+        if let Some(ep_sq) = self.state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
         let (from_mg, from_eg) = pst::piece_value(mv.piece, mv.from, side);
-        self.pst_mg -= from_mg;
-        self.pst_eg -= from_eg;
+        self.state.pst_mg -= from_mg;
+        self.state.pst_eg -= from_eg;
         self.remove_piece_known(mv.from, mv.piece, side);
         self.zobrist_toggle_piece(mv.from, mv.piece, side);
 
@@ -54,14 +43,14 @@ impl Board {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
                 let (cap_mg, cap_eg) = pst::piece_value(Piece::Pawn, captured_sq, opponent);
-                self.pst_mg -= cap_mg;
-                self.pst_eg -= cap_eg;
+                self.state.pst_mg -= cap_mg;
+                self.state.pst_eg -= cap_eg;
                 self.remove_piece_known(captured_sq, Piece::Pawn, opponent);
                 self.zobrist_toggle_piece(captured_sq, Piece::Pawn, opponent);
             } else {
                 let (cap_mg, cap_eg) = pst::piece_value(captured, mv.to, opponent);
-                self.pst_mg -= cap_mg;
-                self.pst_eg -= cap_eg;
+                self.state.pst_mg -= cap_mg;
+                self.state.pst_eg -= cap_eg;
                 self.remove_piece_known(mv.to, captured, opponent);
                 self.zobrist_toggle_piece(mv.to, captured, opponent);
             }
@@ -69,8 +58,8 @@ impl Board {
 
         let final_piece = mv.promotion.unwrap_or(mv.piece);
         let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to, side);
-        self.pst_mg += to_mg;
-        self.pst_eg += to_eg;
+        self.state.pst_mg += to_mg;
+        self.state.pst_eg += to_eg;
         self.place_piece_internal(mv.to, final_piece, side);
         self.zobrist_toggle_piece(mv.to, final_piece, side);
 
@@ -78,36 +67,39 @@ impl Board {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
             let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, rook_from, side);
             let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, rook_to, side);
-            self.pst_mg += rt_mg - rf_mg;
-            self.pst_eg += rt_eg - rf_eg;
+            self.state.pst_mg += rt_mg - rf_mg;
+            self.state.pst_eg += rt_eg - rf_eg;
             self.remove_piece_known(rook_from, Piece::Rook, side);
             self.place_piece_internal(rook_to, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_from, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_to, Piece::Rook, side);
         }
 
-        let old_castling = self.game_state.castling_rights;
+        let old_castling = self.state.castling_rights;
         self.update_castling_rights_after_move(mv);
-        let new_castling = self.game_state.castling_rights;
+        let new_castling = self.state.castling_rights;
         self.zobrist_update_castling(&old_castling, &new_castling);
 
-        self.game_state.en_passant_square = if mv.flags.is_double_pawn_push {
+        self.state.en_passant_square = if mv.flags.is_double_pawn_push {
             mv.from.up(side)
         } else {
             None
         };
 
-        if let Some(ep_sq) = self.game_state.en_passant_square {
+        if let Some(ep_sq) = self.state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
         if mv.piece == Piece::Pawn || mv.capture.is_some() {
-            self.game_state.halfmove_clock = 0;
+            self.state.halfmove_clock = 0;
         } else {
-            self.game_state.halfmove_clock += 1;
+            self.state.halfmove_clock += 1;
         }
 
-        self.game_state.switch_side();
+        self.side_to_move = opponent;
+        if self.side_to_move == Color::White {
+            self.fullmove_number = self.fullmove_number.saturating_add(1);
+        }
         self.zobrist_toggle_side();
 
         Ok(())
@@ -121,19 +113,22 @@ impl Board {
 
         self.history_index -= 1;
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
-        let state = self.move_history[buffer_idx];
+        let saved_state = self.state_history[buffer_idx];
 
         self.zobrist_history.pop();
 
-        self.game_state.side_to_move = self.game_state.side_to_move.opponent();
-        let side = self.game_state.side_to_move;
+        self.side_to_move = self.side_to_move.opponent();
+        let side = self.side_to_move;
+
+        if side == Color::Black {
+            self.fullmove_number = self.fullmove_number.saturating_sub(1);
+        }
 
         let final_piece = mv.promotion.unwrap_or(mv.piece);
         self.remove_piece_known(mv.to, final_piece, side);
-
         self.place_piece_internal(mv.from, mv.piece, side);
 
-        if let Some((captured_piece, captured_color)) = state.captured_piece {
+        if let Some((captured_piece, captured_color)) = saved_state.captured_piece {
             if mv.flags.is_en_passant {
                 let captured_sq = mv.to.down(side).expect("Invalid en passant square");
                 self.place_piece_internal(captured_sq, captured_piece, captured_color);
@@ -148,42 +143,37 @@ impl Board {
             self.place_piece_internal(rook_from, Piece::Rook, side);
         }
 
-        self.game_state.en_passant_square = state.old_en_passant;
-        self.game_state.castling_rights = state.old_castling_rights;
-        self.game_state.halfmove_clock = state.old_halfmove_clock;
-        self.zobrist_hash = state.old_zobrist_hash;
-        self.game_phase = state.old_game_phase;
-        self.pst_mg = state.old_pst_mg;
-        self.pst_eg = state.old_pst_eg;
+        self.state = StateInfo {
+            castling_rights: saved_state.castling_rights,
+            en_passant_square: saved_state.en_passant_square,
+            halfmove_clock: saved_state.halfmove_clock,
+            captured_piece: None,
+            zobrist_hash: saved_state.zobrist_hash,
+            game_phase: saved_state.game_phase,
+            pst_mg: saved_state.pst_mg,
+            pst_eg: saved_state.pst_eg,
+        };
 
         Ok(())
     }
 
     pub fn make_null_move(&mut self) {
-        self.zobrist_history.push(self.zobrist_hash);
+        self.zobrist_history.push(self.state.zobrist_hash);
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
-        self.move_history[buffer_idx] = MoveState {
-            captured_piece: None,
-            mv_from: Square::A1,
-            mv_to: Square::A1,
-            promotion: None,
-            old_zobrist_hash: self.zobrist_hash,
-            old_en_passant: self.game_state.en_passant_square,
-            old_castling_rights: self.game_state.castling_rights,
-            old_halfmove_clock: self.game_state.halfmove_clock,
-            old_game_phase: self.game_phase,
-            old_pst_mg: self.pst_mg,
-            old_pst_eg: self.pst_eg,
-        };
+        self.state_history[buffer_idx] = self.state;
+        self.state_history[buffer_idx].captured_piece = None;
         self.history_index += 1;
 
-        if let Some(ep_sq) = self.game_state.en_passant_square {
+        if let Some(ep_sq) = self.state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
-            self.game_state.en_passant_square = None;
+            self.state.en_passant_square = None;
         }
 
-        self.game_state.switch_side();
+        self.side_to_move = self.side_to_move.opponent();
+        if self.side_to_move == Color::White {
+            self.fullmove_number = self.fullmove_number.saturating_add(1);
+        }
         self.zobrist_toggle_side();
     }
 
@@ -194,14 +184,20 @@ impl Board {
         self.history_index -= 1;
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
-        let state = self.move_history[buffer_idx];
+        let saved_state = self.state_history[buffer_idx];
 
         self.zobrist_history.pop();
-        self.game_state.side_to_move = self.game_state.side_to_move.opponent();
-        self.game_state.en_passant_square = state.old_en_passant;
-        self.zobrist_hash = state.old_zobrist_hash;
-        self.pst_mg = state.old_pst_mg;
-        self.pst_eg = state.old_pst_eg;
+
+        self.side_to_move = self.side_to_move.opponent();
+
+        if self.side_to_move == Color::Black {
+            self.fullmove_number = self.fullmove_number.saturating_sub(1);
+        }
+
+        self.state.en_passant_square = saved_state.en_passant_square;
+        self.state.zobrist_hash = saved_state.zobrist_hash;
+        self.state.pst_mg = saved_state.pst_mg;
+        self.state.pst_eg = saved_state.pst_eg;
     }
 
     #[inline(always)]
@@ -245,28 +241,28 @@ impl Board {
     }
 
     fn update_castling_rights_after_move(&mut self, mv: &Move) {
-        let side = self.game_state.side_to_move;
+        let side = self.side_to_move;
         let opponent = side.opponent();
 
         if mv.piece == Piece::King {
-            self.game_state.castling_rights[side as usize] = CastlingRights::EMPTY;
+            self.state.castling_rights[side as usize] = CastlingRights::EMPTY;
         }
 
         if mv.piece == Piece::Rook {
             let back_rank = side.back_rank();
             if mv.from == Square::new(File::H, back_rank) {
-                self.game_state.castling_rights[side as usize].short = None;
+                self.state.castling_rights[side as usize].short = None;
             } else if mv.from == Square::new(File::A, back_rank) {
-                self.game_state.castling_rights[side as usize].long = None;
+                self.state.castling_rights[side as usize].long = None;
             }
         }
 
         if mv.capture == Some(Piece::Rook) {
             let opp_back_rank = opponent.back_rank();
             if mv.to == Square::new(File::H, opp_back_rank) {
-                self.game_state.castling_rights[opponent as usize].short = None;
+                self.state.castling_rights[opponent as usize].short = None;
             } else if mv.to == Square::new(File::A, opp_back_rank) {
-                self.game_state.castling_rights[opponent as usize].long = None;
+                self.state.castling_rights[opponent as usize].long = None;
             }
         }
     }
@@ -466,7 +462,7 @@ mod tests {
 
         board.make_move(&mv).unwrap();
 
-        assert_eq!(board.game_state().halfmove_clock, 0);
+        assert_eq!(board.halfmove_clock(), 0);
     }
 
     #[test]
@@ -479,7 +475,7 @@ mod tests {
 
         board.make_move(&mv).unwrap();
 
-        assert_eq!(board.game_state().halfmove_clock, 0);
+        assert_eq!(board.halfmove_clock(), 0);
     }
 
     #[test]
@@ -491,7 +487,7 @@ mod tests {
 
         board.make_move(&mv).unwrap();
 
-        assert_eq!(board.game_state().halfmove_clock, 1);
+        assert_eq!(board.halfmove_clock(), 1);
     }
 
     #[test]

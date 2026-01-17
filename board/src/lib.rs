@@ -2,26 +2,28 @@ mod builder;
 mod cache;
 mod error;
 mod fen;
-mod game_state;
 mod ops;
 pub mod pst;
 mod query;
+mod state_info;
 mod zobrist;
 
 pub use builder::BoardBuilder;
 pub use error::{BoardError, FenError, MoveError};
 pub use fen::{FenOps, STARTING_POSITION_FEN};
 
-use aether_core::{BitBoard, Color, File, MoveState, Piece, Rank, Square, attackers_to_square};
+use aether_core::{BitBoard, Color, File, Piece, Rank, Square};
 use cache::BoardCache;
-use game_state::GameState;
+use state_info::StateInfo;
 use std::num::NonZeroU64;
 
 pub type Result<T> = std::result::Result<T, BoardError>;
 
 const MAX_SEARCH_DEPTH: usize = 256;
+const ZOBRIST_HISTORY_CAPACITY: usize = 512;
+const FIFTY_MOVE_THRESHOLD: u16 = 100;
 
-// Phase weights for tapered evaluation (middlegame/endgame interpolation)
+pub(crate) const MAX_GAME_PHASE: i32 = 256;
 pub(crate) const PHASE_KNIGHT: i16 = 1;
 pub(crate) const PHASE_BISHOP: i16 = 1;
 pub(crate) const PHASE_ROOK: i16 = 2;
@@ -30,43 +32,33 @@ pub(crate) const PHASE_TOTAL: i16 = 24; // 4*1 + 4*1 + 4*2 + 2*4
 
 #[derive(Debug, Clone)]
 pub struct Board {
-    pieces: [[BitBoard; 6]; 2],
-    game_state: GameState,
+    pieces: [[BitBoard; Piece::NUM]; Color::NUM],
+    mailbox: [Option<(Piece, Color)>; Square::NUM],
     cache: BoardCache,
-    zobrist_hash: u64,
 
-    move_history: [MoveState; MAX_SEARCH_DEPTH],
+    side_to_move: Color,
+    fullmove_number: u16,
+    state: StateInfo,
+
+    state_history: [StateInfo; MAX_SEARCH_DEPTH],
     history_index: usize,
+    
     zobrist_history: Vec<u64>,
-
-    mailbox: [Option<(Piece, Color)>; 64],
-
-    game_phase: i16,
-    pst_mg: i32,
-    pst_eg: i32,
 }
 
 impl Board {
     pub fn empty() -> Self {
         Self {
-            pieces: [[BitBoard::EMPTY; 6]; 2],
-            game_state: GameState::new(),
+            pieces: [[BitBoard::EMPTY; Piece::NUM]; Color::NUM],
+            mailbox: [None; Square::NUM],
             cache: BoardCache::new(),
-            zobrist_hash: 0,
-            move_history: [MoveState::default(); MAX_SEARCH_DEPTH],
+            side_to_move: Color::White,
+            fullmove_number: 1,
+            state: StateInfo::new(),
+            state_history: [StateInfo::default(); MAX_SEARCH_DEPTH],
             history_index: 0,
-            zobrist_history: Vec::with_capacity(512),
-            mailbox: [None; 64],
-            game_phase: 0,
-            pst_mg: 0,
-            pst_eg: 0,
+            zobrist_history: Vec::with_capacity(ZOBRIST_HISTORY_CAPACITY),
         }
-    }
-
-    pub fn recalculate_pst(&mut self) {
-        let (mg, eg) = pst::compute_pst_score(&self.pieces);
-        self.pst_mg = mg;
-        self.pst_eg = eg;
     }
 
     #[inline]
@@ -85,33 +77,45 @@ impl Board {
     }
 
     #[inline]
-    pub fn game_state(&self) -> &GameState {
-        &self.game_state
-    }
-
-    #[inline]
     pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
-        NonZeroU64::new(self.zobrist_hash)
+        NonZeroU64::new(self.state.zobrist_hash)
     }
 
     #[inline]
-    pub fn move_history(&self) -> &[MoveState] {
-        &self.move_history
-    }
-
-    #[inline]
-    pub fn cache(&self) -> &BoardCache {
-        &self.cache
-    }
-
-    #[inline]
-    pub fn refresh_cache(&mut self) {
-        self.cache.refresh(&self.pieces);
+    pub fn ply(&self) -> usize {
+        self.zobrist_history.len()
     }
 
     #[inline]
     pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
-        attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
+        aether_core::attackers_to_square(
+            sq,
+            color,
+            self.cache.occupied,
+            &self.pieces[color as usize],
+        )
+    }
+
+    pub fn repetition_count(&self) -> usize {
+        let history_len = self.zobrist_history.len();
+
+        if history_len == 0 {
+            return 0;
+        }
+
+        let mut count = 0;
+        let look_back = (self.state.halfmove_clock as usize).min(history_len);
+        let min_idx = history_len - look_back;
+
+        let same_side_parity = history_len % 2;
+
+        for i in min_idx..history_len {
+            if i % 2 == same_side_parity && self.zobrist_history[i] == self.state.zobrist_hash {
+                count += 1;
+            }
+        }
+
+        count
     }
 
     pub fn print(&self) {
@@ -122,9 +126,9 @@ impl Board {
         use std::fmt::Write;
         let mut out = String::new();
         writeln!(out).unwrap();
-        for rank in (0..8).rev() {
+        for rank in (0..Rank::NUM as i8).rev() {
             write!(out, "{}", rank + 1).unwrap();
-            for file in 0..8 {
+            for file in 0..File::NUM as i8 {
                 let sq = Square::new(File::from_index(file), Rank::from_index(rank));
                 let ch = self.piece_at(sq).map_or('.', |(p, c)| {
                     let ch = p.as_char();
@@ -140,38 +144,6 @@ impl Board {
         }
         writeln!(out, "  A B C D E F G H").unwrap();
         out
-    }
-
-    #[inline]
-    pub fn ply(&self) -> usize {
-        self.zobrist_history.len()
-    }
-
-    pub fn repetition_count(&self) -> usize {
-        let current_hash = self.zobrist_hash;
-        let history_len = self.zobrist_history.len();
-
-        if history_len == 0 {
-            return 0;
-        }
-
-        let mut count = 0;
-        let look_back = (self.game_state.halfmove_clock as usize).min(history_len);
-        let min_idx = history_len - look_back;
-
-        // Only compare positions with the same side to move
-        // history[i] corresponds to position after i moves
-        // If history_len is even, current position has WHITE to move, check even indices
-        // If history_len is odd, current position has BLACK to move, check odd indices
-        let same_side_parity = history_len % 2;
-
-        for i in min_idx..history_len {
-            if i % 2 == same_side_parity && self.zobrist_history[i] == current_hash {
-                count += 1;
-            }
-        }
-
-        count
     }
 }
 
@@ -327,7 +299,7 @@ mod tests {
         let mut board = Board::starting_position().unwrap();
 
         // Set halfmove clock to 100
-        board.game_state.halfmove_clock = 100;
+        board.state.halfmove_clock = 100;
 
         assert!(board.is_fifty_move_draw());
     }

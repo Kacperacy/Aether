@@ -129,7 +129,7 @@ fn test_halfmove_clock() {
 
     board.make_move(&mv).unwrap();
     assert_eq!(
-        board.game_state().halfmove_clock,
+        board.halfmove_clock(),
         0,
         "Pawn move should reset halfmove clock"
     );

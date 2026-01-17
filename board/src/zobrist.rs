@@ -1,14 +1,13 @@
 use crate::Board;
 use aether_core::zobrist_keys::zobrist_keys;
-use aether_core::{ALL_COLORS, CastlingRights, Color, File, Piece, Square};
+use aether_core::{ALL_COLORS, ALL_SQUARES, CastlingRights, Color, File, Piece, Square};
 
 impl Board {
     pub fn calculate_zobrist_hash(&self) -> u64 {
         let keys = zobrist_keys();
         let mut hash = 0u64;
 
-        for square_idx in 0..64 {
-            let square = Square::from_index(square_idx);
+        for &square in &ALL_SQUARES {
             if let Some((piece, color)) = self.piece_at(square) {
                 hash ^= keys.piece_key(square, piece, color);
             }
@@ -37,25 +36,25 @@ impl Board {
     #[inline(always)]
     pub(crate) fn zobrist_toggle_piece(&mut self, square: Square, piece: Piece, color: Color) {
         let keys = zobrist_keys();
-        self.zobrist_hash ^= keys.piece_key(square, piece, color);
+        self.state.zobrist_hash ^= keys.piece_key(square, piece, color);
     }
 
     #[inline(always)]
     pub(crate) fn zobrist_toggle_side(&mut self) {
         let keys = zobrist_keys();
-        self.zobrist_hash ^= keys.side_to_move;
+        self.state.zobrist_hash ^= keys.side_to_move;
     }
 
     #[inline(always)]
     pub(crate) fn zobrist_toggle_castling(&mut self, color: Color, kingside: bool) {
         let keys = zobrist_keys();
-        self.zobrist_hash ^= keys.castling_key(color, kingside);
+        self.state.zobrist_hash ^= keys.castling_key(color, kingside);
     }
 
     #[inline(always)]
     pub(crate) fn zobrist_toggle_en_passant(&mut self, file: File) {
         let keys = zobrist_keys();
-        self.zobrist_hash ^= keys.en_passant_key(file);
+        self.state.zobrist_hash ^= keys.en_passant_key(file);
     }
 
     pub(crate) fn zobrist_update_castling(

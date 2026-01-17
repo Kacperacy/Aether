@@ -30,11 +30,7 @@ impl<'a> FenParser<'a> {
         }
 
         let fields: Vec<&str> = trimmed.split_whitespace().collect();
-
-        // FEN must have at least the board field, others can be defaulted
-        if fields.is_empty() {
-            return Err(FenParsingError(FenError::EmptyFields));
-        }
+        // Note: fields cannot be empty here because trimmed is non-empty after trim()
 
         // Ensure we have exactly 6 fields, padding with defaults if necessary
         let mut complete_fields = fields;
@@ -82,30 +78,29 @@ impl<'a> FenParser<'a> {
         let halfmove_clock = self.parse_halfmove_clock()?;
         let fullmove_number = self.parse_fullmove_number()?;
 
-        // Build base board and update game state
-        let mut board = builder.build()?;
-        board.game_state.halfmove_clock = halfmove_clock;
-        board.game_state.fullmove_number = fullmove_number;
+        builder
+            .set_halfmove_clock(halfmove_clock)
+            .set_fullmove_number(fullmove_number);
 
-        Ok(board)
+        builder.build()
     }
 
     fn parse_piece_placement(&self, builder: &mut BoardBuilder) -> Result<()> {
         let placement = self.fields[0];
         let ranks: Vec<&str> = placement.split('/').collect();
 
-        if ranks.len() != 8 {
+        if ranks.len() != Rank::NUM {
             return Err(FenParsingError(FenError::WrongAmountOfRanks {
                 amount: ranks.len(),
             }));
         }
 
         for (rank_index, rank_str) in ranks.iter().enumerate() {
-            let rank = Rank::from_index(7 - rank_index as i8); // FEN starts from rank 8
+            let rank = Rank::from_index((Rank::NUM - 1 - rank_index) as i8); // FEN starts from rank 8
             let mut file_index = 0;
 
             for ch in rank_str.chars() {
-                if file_index >= 8 {
+                if file_index >= File::NUM as i8 {
                     return Err(FenParsingError(TooManySquaresInRank {
                         rank: Rank::from_index(rank_index as i8),
                     }));
@@ -114,7 +109,7 @@ impl<'a> FenParser<'a> {
                 if ch.is_ascii_digit() {
                     // Empty squares
                     let empty_count = ch.to_digit(10).unwrap() as i8;
-                    if !(1..=8).contains(&empty_count) {
+                    if !(1..=File::NUM as i8).contains(&empty_count) {
                         return Err(FenParsingError(InvalidEmptySquareCount {
                             count: empty_count as usize,
                         }));
@@ -131,7 +126,7 @@ impl<'a> FenParser<'a> {
                 }
             }
 
-            if file_index != 8 {
+            if file_index != File::NUM as i8 {
                 return Err(FenParsingError(InvalidRankSquares {
                     rank: Rank::from_index(rank_index as i8),
                     amount: file_index as usize,
@@ -264,12 +259,12 @@ impl<'a> FenGenerator<'a> {
     fn generate_piece_placement(&self) -> String {
         let mut placement = String::new();
 
-        for rank_index in 0..8 {
-            let rank = Rank::from_index(7 - rank_index); // Start from rank 8
+        for rank_index in 0..Rank::NUM {
+            let rank = Rank::from_index((Rank::NUM - 1 - rank_index) as i8); // Start from rank 8
             let mut empty_count = 0;
 
-            for file_index in 0..8 {
-                let file = File::from_index(file_index);
+            for file_index in 0..File::NUM {
+                let file = File::from_index(file_index as i8);
                 let square = Square::new(file, rank);
 
                 if let Some((piece, color)) = self.board.piece_at(square) {
@@ -280,19 +275,10 @@ impl<'a> FenGenerator<'a> {
                     }
 
                     // Add piece character
-                    let piece_char = match (piece, color) {
-                        (Piece::Pawn, Color::White) => 'P',
-                        (Piece::Knight, Color::White) => 'N',
-                        (Piece::Bishop, Color::White) => 'B',
-                        (Piece::Rook, Color::White) => 'R',
-                        (Piece::Queen, Color::White) => 'Q',
-                        (Piece::King, Color::White) => 'K',
-                        (Piece::Pawn, Color::Black) => 'p',
-                        (Piece::Knight, Color::Black) => 'n',
-                        (Piece::Bishop, Color::Black) => 'b',
-                        (Piece::Rook, Color::Black) => 'r',
-                        (Piece::Queen, Color::Black) => 'q',
-                        (Piece::King, Color::Black) => 'k',
+                    let piece_char = if color == Color::White {
+                        piece.as_char().to_ascii_uppercase()
+                    } else {
+                        piece.as_char()
                     };
                     placement.push(piece_char);
                 } else {
@@ -307,7 +293,7 @@ impl<'a> FenGenerator<'a> {
             }
 
             // Add rank separator (except for last rank)
-            if rank_index < 7 {
+            if rank_index < Rank::NUM - 1 {
                 placement.push('/');
             }
         }
@@ -315,16 +301,16 @@ impl<'a> FenGenerator<'a> {
         placement
     }
 
-    fn generate_side_to_move(&self) -> String {
-        match self.board.game_state().side_to_move {
-            Color::White => "w".to_string(),
-            Color::Black => "b".to_string(),
+    fn generate_side_to_move(&self) -> &'static str {
+        match self.board.side_to_move() {
+            Color::White => "w",
+            Color::Black => "b",
         }
     }
 
     fn generate_castling_rights(&self) -> String {
-        let white_rights = &self.board.game_state().castling_rights[Color::White as usize];
-        let black_rights = &self.board.game_state().castling_rights[Color::Black as usize];
+        let white_rights = self.board.castling_rights(Color::White);
+        let black_rights = self.board.castling_rights(Color::Black);
 
         let mut castling = String::new();
 
@@ -352,18 +338,18 @@ impl<'a> FenGenerator<'a> {
     }
 
     fn generate_en_passant(&self) -> String {
-        match self.board.game_state().en_passant_square {
+        match self.board.en_passant_square() {
             Some(square) => square.to_string(),
             None => "-".to_string(),
         }
     }
 
     fn generate_halfmove_clock(&self) -> String {
-        self.board.game_state().halfmove_clock.to_string()
+        self.board.halfmove_clock().to_string()
     }
 
     fn generate_fullmove_number(&self) -> String {
-        self.board.game_state().fullmove_number.to_string()
+        self.board.fullmove_number().to_string()
     }
 }
 
@@ -392,7 +378,7 @@ mod tests {
             Board::from_fen(STARTING_POSITION_FEN).expect("Failed to parse starting position");
 
         // Verify side to move
-        assert_eq!(board.game_state().side_to_move, Color::White);
+        assert_eq!(board.side_to_move(), Color::White);
 
         // Verify castling rights
         assert!(board.can_castle_short(Color::White));
@@ -404,8 +390,8 @@ mod tests {
         assert!(board.en_passant_square().is_none());
 
         // Verify move counters
-        assert_eq!(board.game_state().halfmove_clock, 0);
-        assert_eq!(board.game_state().fullmove_number, 1);
+        assert_eq!(board.halfmove_clock(), 0);
+        assert_eq!(board.fullmove_number(), 1);
     }
 
     #[test]
@@ -420,13 +406,38 @@ mod tests {
         for fen in &test_fens {
             let board = Board::from_fen(fen).expect(&format!("Failed to parse FEN: {}", fen));
             let generated_fen = board.to_fen();
+
+            // FEN should roundtrip exactly
+            assert_eq!(
+                *fen, generated_fen,
+                "FEN roundtrip mismatch:\n  input:  {}\n  output: {}",
+                fen, generated_fen
+            );
+
+            // And reparsing should work
             let reparsed_board =
                 Board::from_fen(&generated_fen).expect("Failed to parse generated FEN");
 
-            // The generated FEN should parse to an equivalent board
+            // Verify all game state fields match
             assert_eq!(
-                board.game_state().side_to_move,
-                reparsed_board.game_state().side_to_move
+                board.side_to_move(),
+                reparsed_board.side_to_move(),
+                "Side to move mismatch"
+            );
+            assert_eq!(
+                board.halfmove_clock(),
+                reparsed_board.halfmove_clock(),
+                "Halfmove clock mismatch"
+            );
+            assert_eq!(
+                board.fullmove_number(),
+                reparsed_board.fullmove_number(),
+                "Fullmove number mismatch"
+            );
+            assert_eq!(
+                board.en_passant_square(),
+                reparsed_board.en_passant_square(),
+                "En passant mismatch"
             );
         }
     }

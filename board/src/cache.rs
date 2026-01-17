@@ -40,11 +40,6 @@ impl BoardCache {
         self.color_combined[color as usize] &= !bb;
         self.occupied &= !bb;
     }
-
-    #[inline]
-    pub fn is_occupied(&self, square: Square) -> bool {
-        self.occupied.has(square)
-    }
 }
 
 impl Default for BoardCache {
@@ -71,11 +66,11 @@ mod tests {
         let sq = Square::E4;
 
         cache.add_piece(sq, Color::White);
-        assert!(cache.is_occupied(sq));
+        assert!(cache.occupied.has(sq));
         assert!(cache.color_combined[Color::White as usize].has(sq));
         assert!(!cache.color_combined[Color::Black as usize].has(sq));
 
         cache.remove_piece(sq, Color::White);
-        assert!(!cache.is_occupied(sq));
+        assert!(!cache.occupied.has(sq));
     }
 }
