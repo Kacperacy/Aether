@@ -1,4 +1,4 @@
-use aether_core::{CastlingRights, Color, Piece, Square};
+use aether_core::{BitBoard, CastlingRights, Color, Piece, Square};
 
 /// Stores all irreversible game state that must be preserved for unmake_move.
 /// This follows the Stockfish pattern where StateInfo contains both the current
@@ -22,6 +22,15 @@ pub struct StateInfo {
     pub pst_mg: i32,
     /// Piece-square table endgame score
     pub pst_eg: i32,
+
+    /// Cached king squares for both sides [White, Black]
+    pub king_square: [Square; 2],
+    /// Pieces giving check to the side to move (computed after each move)
+    pub checkers: BitBoard,
+    /// Pieces blocking slider attacks on our king [White, Black]
+    pub blockers_for_king: [BitBoard; 2],
+    /// Enemy pieces pinning our pieces to our king [White, Black]
+    pub pinners: [BitBoard; 2],
 }
 
 impl StateInfo {
@@ -35,6 +44,10 @@ impl StateInfo {
             game_phase: 0,
             pst_mg: 0,
             pst_eg: 0,
+            king_square: [Square::E1, Square::E8],
+            checkers: BitBoard::EMPTY,
+            blockers_for_king: [BitBoard::EMPTY; 2],
+            pinners: [BitBoard::EMPTY; 2],
         }
     }
 }

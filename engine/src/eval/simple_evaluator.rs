@@ -7,6 +7,14 @@ const BISHOP_PAIR_MG: i32 = 30;
 /// Bishop pair bonus in endgame (centipawns)
 const BISHOP_PAIR_EG: i32 = 50;
 
+/// Penalty for pinned pieces (centipawns per pinned piece)
+const PINNED_PIECE_PENALTY_MG: i32 = 15;
+const PINNED_PIECE_PENALTY_EG: i32 = 10;
+
+/// Bonus for pinning enemy pieces (centipawns per pinner)
+const PINNER_BONUS_MG: i32 = 10;
+const PINNER_BONUS_EG: i32 = 5;
+
 /// Passed pawn bonus by rank (from pawn's perspective, index 0 = rank 2, index 5 = rank 7)
 const PASSED_PAWN_BONUS_MG: [i32; 6] = [5, 12, 25, 50, 100, 180];
 const PASSED_PAWN_BONUS_EG: [i32; 6] = [15, 30, 55, 95, 160, 260];
@@ -162,6 +170,32 @@ impl SimpleEvaluator {
         (mg_score, eg_score)
     }
 
+    #[inline]
+    fn evaluate_pins(board: &Board) -> (i32, i32) {
+        let white_blockers = board.blockers_for_king(Color::White);
+        let black_blockers = board.blockers_for_king(Color::Black);
+
+        let white_pieces = board.occupied_by(Color::White);
+        let black_pieces = board.occupied_by(Color::Black);
+
+        // Count pinned pieces (our pieces blocking attacks on our king)
+        let white_pinned = (white_blockers & white_pieces).count() as i32;
+        let black_pinned = (black_blockers & black_pieces).count() as i32;
+
+        // Count pinners (our pieces pinning enemy pieces to enemy king)
+        // pinners[White] = black sliders pinning white pieces, so white_pinners counts black's pinning power
+        // pinners[Black] = white sliders pinning black pieces, so black_pinners counts white's pinning power
+        let white_pinning = board.pinners(Color::Black).count() as i32; // white sliders pinning black
+        let black_pinning = board.pinners(Color::White).count() as i32; // black sliders pinning white
+
+        let mg = (black_pinned - white_pinned) * PINNED_PIECE_PENALTY_MG
+            + (white_pinning - black_pinning) * PINNER_BONUS_MG;
+        let eg = (black_pinned - white_pinned) * PINNED_PIECE_PENALTY_EG
+            + (white_pinning - black_pinning) * PINNER_BONUS_EG;
+
+        (mg, eg)
+    }
+
     #[inline(always)]
     fn evaluate_position(&self, board: &Board) -> i32 {
         // Use incrementally updated PST scores - O(1) instead of O(pieces)
@@ -174,6 +208,10 @@ impl SimpleEvaluator {
         let (passed_mg, passed_eg) = Self::evaluate_passed_pawns(board);
         mg_score += passed_mg;
         eg_score += passed_eg;
+
+        let (pinned_mg, pinned_eg) = Self::evaluate_pins(board);
+        mg_score += pinned_mg;
+        eg_score += pinned_eg;
 
         let phase = board.game_phase();
         (mg_score * phase + eg_score * (256 - phase)) / 256

@@ -23,8 +23,8 @@ impl Board {
     }
 
     #[inline(always)]
-    pub fn get_king_square(&self, color: Color) -> Option<Square> {
-        self.pieces[color as usize][Piece::King as usize].to_square()
+    pub fn get_king_square(&self, color: Color) -> Square {
+        self.state.king_square[color as usize]
     }
 
     #[inline(always)]

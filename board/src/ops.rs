@@ -2,7 +2,10 @@ use crate::error::MoveError;
 use crate::pst;
 use crate::state_info::StateInfo;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{CastlingRights, Color, File, Move, Piece, Square};
+use aether_core::{
+    BitBoard, CastlingRights, Color, File, Move, Piece, Square, compute_slider_blockers,
+    is_square_attacked, line_through,
+};
 
 impl Board {
     #[inline(always)]
@@ -97,11 +100,20 @@ impl Board {
             self.state.halfmove_clock += 1;
         }
 
+        if mv.piece == Piece::King {
+            self.state.king_square[side as usize] = mv.to;
+        }
+
         self.side_to_move = opponent;
         if self.side_to_move == Color::White {
             self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.zobrist_toggle_side();
+
+        let new_king_sq = self.state.king_square[opponent as usize];
+        self.state.checkers = self.attackers_to_square(new_king_sq, side);
+
+        self.update_blockers();
 
         Ok(())
     }
@@ -153,12 +165,18 @@ impl Board {
             game_phase: saved_state.game_phase,
             pst_mg: saved_state.pst_mg,
             pst_eg: saved_state.pst_eg,
+            king_square: saved_state.king_square,
+            checkers: saved_state.checkers,
+            blockers_for_king: saved_state.blockers_for_king,
+            pinners: saved_state.pinners,
         };
 
         Ok(())
     }
 
     pub fn make_null_move(&mut self) {
+        let side = self.side_to_move;
+        let opponent = side.opponent();
         self.zobrist_history.push(self.state.zobrist_hash);
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
@@ -171,11 +189,14 @@ impl Board {
             self.state.en_passant_square = None;
         }
 
-        self.side_to_move = self.side_to_move.opponent();
+        self.side_to_move = opponent;
         if self.side_to_move == Color::White {
             self.fullmove_number = self.fullmove_number.saturating_add(1);
         }
         self.zobrist_toggle_side();
+
+        let new_king_sq = self.state.king_square[opponent as usize];
+        self.state.checkers = self.attackers_to_square(new_king_sq, side);
     }
 
     pub fn unmake_null_move(&mut self) {
@@ -199,16 +220,114 @@ impl Board {
         self.state.zobrist_hash = saved_state.zobrist_hash;
         self.state.pst_mg = saved_state.pst_mg;
         self.state.pst_eg = saved_state.pst_eg;
+        self.state.checkers = saved_state.checkers;
+        self.state.blockers_for_king = saved_state.blockers_for_king;
+        self.state.pinners = saved_state.pinners;
     }
 
     #[inline(always)]
     pub fn is_in_check(&self, color: Color) -> bool {
-        let king_sq = match self.get_king_square(color) {
-            Some(sq) => sq,
-            None => return false,
-        };
+        if color == self.side_to_move {
+            !self.state.checkers.is_empty()
+        } else {
+            let king_sq = self.get_king_square(color);
+            self.is_square_attacked(king_sq, color.opponent())
+        }
+    }
 
-        self.is_square_attacked(king_sq, color.opponent())
+    #[inline(always)]
+    pub fn checkers(&self) -> BitBoard {
+        self.state.checkers
+    }
+
+    #[inline]
+    pub fn would_leave_king_in_check(&self, mv: &Move) -> bool {
+        let side = self.side_to_move;
+        let us = side as usize;
+
+        if mv.piece == Piece::King {
+            return self.king_move_is_illegal(mv, side);
+        }
+
+        if mv.flags.is_en_passant {
+            return self.en_passant_is_illegal(mv, side);
+        }
+
+        if !self.state.checkers.is_empty() {
+            return self.king_still_attacked_after(mv, side);
+        }
+
+        let from_bb = mv.from.bitboard();
+        let blockers = self.state.blockers_for_king[us];
+
+        if (blockers & from_bb).is_empty() {
+            return false;
+        }
+
+        let king_sq = self.state.king_square[us];
+        let pin_line = line_through(king_sq, mv.from);
+        (pin_line & mv.to.bitboard()).is_empty()
+    }
+
+    #[inline]
+    fn king_still_attacked_after(&self, mv: &Move, side: Color) -> bool {
+        let opponent = side.opponent();
+        let them = opponent as usize;
+
+        let king_sq = self.state.king_square[side as usize];
+
+        let mut occupied = self.cache.occupied;
+        occupied &= !mv.from.bitboard();
+        occupied |= mv.to.bitboard();
+
+        let mut their_pieces = self.pieces[them];
+        if let Some(captured) = mv.capture {
+            their_pieces[captured as usize] &= !mv.to.bitboard();
+        }
+
+        is_square_attacked(king_sq, opponent, occupied, &their_pieces)
+    }
+
+    #[inline]
+    fn king_move_is_illegal(&self, mv: &Move, side: Color) -> bool {
+        let opponent = side.opponent();
+        let them = opponent as usize;
+
+        if mv.flags.is_castle {
+            let occupied = (self.cache.occupied & !mv.from.bitboard()) | mv.to.bitboard();
+            return is_square_attacked(mv.to, opponent, occupied, &self.pieces[them]);
+        }
+
+        let mut occupied = self.cache.occupied;
+        occupied &= !mv.from.bitboard();
+        occupied |= mv.to.bitboard();
+
+        let mut their_pieces = self.pieces[them];
+        if let Some(captured) = mv.capture {
+            their_pieces[captured as usize] &= !mv.to.bitboard();
+        }
+
+        is_square_attacked(mv.to, opponent, occupied, &their_pieces)
+    }
+
+    #[inline]
+    fn en_passant_is_illegal(&self, mv: &Move, side: Color) -> bool {
+        let opponent = side.opponent();
+        let us = side as usize;
+        let them = opponent as usize;
+
+        let king_sq = self.state.king_square[us];
+        let captured_sq = mv.to.down(side).expect("Invalid en passant");
+
+        let mut occupied = self.cache.occupied;
+        occupied &= !mv.from.bitboard();
+        occupied &= !captured_sq.bitboard();
+        occupied |= mv.to.bitboard();
+
+        let mut their_pieces = self.pieces[them];
+        their_pieces[Piece::Pawn as usize] &= !captured_sq.bitboard();
+
+        is_square_attacked(king_sq, opponent, occupied, &their_pieces)
     }
 
     #[inline(always)]
@@ -266,6 +385,42 @@ impl Board {
                 self.state.castling_rights[opponent as usize].long = None;
             }
         }
+    }
+
+    #[inline]
+    fn update_blockers(&mut self) {
+        let white_king_sq = self.state.king_square[Color::White as usize];
+        let black_king_sq = self.state.king_square[Color::Black as usize];
+        let white_occ = self.cache.color_combined[Color::White as usize];
+        let black_occ = self.cache.color_combined[Color::Black as usize];
+        let occupied = self.cache.occupied;
+
+        let (white_blockers, white_pinners) = compute_slider_blockers(
+            white_king_sq,
+            white_occ,
+            &self.pieces[Color::Black as usize],
+            occupied,
+        );
+        let (black_blockers, black_pinners) = compute_slider_blockers(
+            black_king_sq,
+            black_occ,
+            &self.pieces[Color::White as usize],
+            occupied,
+        );
+
+        self.state.blockers_for_king = [white_blockers, black_blockers];
+        self.state.pinners = [white_pinners, black_pinners];
+    }
+
+    #[inline(always)]
+    pub fn blockers_for_king(&self, color: Color) -> BitBoard {
+        self.state.blockers_for_king[color as usize]
+    }
+
+    /// Returns enemy pieces that are pinning our pieces to our king.
+    #[inline(always)]
+    pub fn pinners(&self, color: Color) -> BitBoard {
+        self.state.pinners[color as usize]
     }
 }
 

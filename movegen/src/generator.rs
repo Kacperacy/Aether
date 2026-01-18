@@ -1,8 +1,8 @@
 use crate::MoveGen;
 use aether_core::{
-    ALL_PIECES, BitBoard, Color, File, Move, MoveFlags, PROMOTION_PIECES, Piece, Square,
-    bishop_attacks, is_promotion_rank, is_square_attacked, king_attacks, knight_attacks,
-    pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
+    BitBoard, Color, File, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
+    is_promotion_rank, king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks,
+    rook_attacks,
 };
 use board::Board;
 
@@ -296,9 +296,7 @@ impl MoveGen for Generator {
 
     fn legal(&self, board: &Board, moves: &mut Vec<Move>) {
         self.pseudo_legal(board, moves);
-        let side = board.side_to_move();
-        let map = PieceMap::from_board(board);
-        moves.retain(|mv| is_move_legal(&map, side, mv));
+        moves.retain(|mv| !board.would_leave_king_in_check(mv));
     }
 
     fn captures(&self, board: &Board, moves: &mut Vec<Move>) {
@@ -314,10 +312,7 @@ impl MoveGen for Generator {
     fn checks(&self, board: &Board, moves: &mut Vec<Move>) {
         let side = board.side_to_move();
         let opponent = side.opponent();
-        let king_sq = match board.get_king_square(opponent) {
-            Some(sq) => sq,
-            None => return,
-        };
+        let king_sq = board.get_king_square(opponent);
 
         let own_pieces = board.occupied_by(side);
         let opp_pieces = board.occupied_by(opponent);
@@ -369,104 +364,6 @@ impl MoveGen for Generator {
     }
 }
 
-/// Piece map for legality checking
-#[derive(Debug, Clone, Copy)]
-struct PieceMap {
-    pieces: [[BitBoard; 6]; 2],
-    color_occ: [BitBoard; 2],
-    all_occ: BitBoard,
-}
-
-impl PieceMap {
-    fn from_board(board: &Board) -> Self {
-        // Copy bitboards directly - O(12) vs O(32) piece_at lookups
-        let mut pieces = [[BitBoard::EMPTY; 6]; 2];
-        for &piece in &ALL_PIECES {
-            pieces[Color::White as usize][piece as usize] = board.piece_bb(piece, Color::White);
-            pieces[Color::Black as usize][piece as usize] = board.piece_bb(piece, Color::Black);
-        }
-
-        let white_occ = board.occupied_by(Color::White);
-        let black_occ = board.occupied_by(Color::Black);
-
-        Self {
-            pieces,
-            color_occ: [white_occ, black_occ],
-            all_occ: white_occ | black_occ,
-        }
-    }
-
-    #[inline(always)]
-    fn is_king_attacked(&self, side: Color) -> bool {
-        let king_bb = self.pieces[side as usize][Piece::King as usize];
-        if let Some(king_sq) = king_bb.to_square() {
-            let opponent = side.opponent();
-            let their_pieces = &self.pieces[opponent as usize];
-            is_square_attacked(king_sq, opponent, self.all_occ, their_pieces)
-        } else {
-            false
-        }
-    }
-
-    #[inline(always)]
-    fn simulate_move(mut self, side: Color, mv: &Move) -> Self {
-        let us = side as usize;
-        let them = side.opponent() as usize;
-        let from_bb = mv.from.bitboard();
-        let to_bb = mv.to.bitboard();
-
-        // Remove piece from origin
-        self.pieces[us][mv.piece as usize] &= !from_bb;
-        self.color_occ[us] &= !from_bb;
-        self.all_occ &= !from_bb;
-
-        // Handle captures
-        if mv.flags.is_en_passant {
-            if let Some(captured_sq) = mv.to.down(side) {
-                let cap_bb = captured_sq.bitboard();
-                self.pieces[them][Piece::Pawn as usize] &= !cap_bb;
-                self.color_occ[them] &= !cap_bb;
-                self.all_occ &= !cap_bb;
-            }
-        } else if let Some(captured) = mv.capture {
-            self.pieces[them][captured as usize] &= !to_bb;
-            self.color_occ[them] &= !to_bb;
-        }
-
-        // Place piece on destination
-        let final_piece = mv.promotion.unwrap_or(mv.piece);
-        self.pieces[us][final_piece as usize] |= to_bb;
-        self.color_occ[us] |= to_bb;
-        self.all_occ |= to_bb;
-
-        // Handle castling rook move
-        if mv.flags.is_castle {
-            let (rook_from, rook_to) = match (side, mv.to) {
-                (Color::White, Square::G1) => (Square::H1, Square::F1),
-                (Color::White, Square::C1) => (Square::A1, Square::D1),
-                (Color::Black, Square::G8) => (Square::H8, Square::F8),
-                (Color::Black, Square::C8) => (Square::A8, Square::D8),
-                _ => (mv.to, mv.to),
-            };
-
-            let rf = rook_from.bitboard();
-            let rt = rook_to.bitboard();
-            self.pieces[us][Piece::Rook as usize] &= !rf;
-            self.pieces[us][Piece::Rook as usize] |= rt;
-            self.color_occ[us] = (self.color_occ[us] & !rf) | rt;
-            self.all_occ = (self.all_occ & !rf) | rt;
-        }
-
-        self
-    }
-}
-
-#[inline(always)]
-fn is_move_legal(map: &PieceMap, side: Color, mv: &Move) -> bool {
-    let next_map = map.simulate_move(side, mv);
-    !next_map.is_king_attacked(side)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -498,18 +395,5 @@ mod tests {
             moves1, moves2,
             "Both generators should produce identical moves"
         );
-    }
-
-    #[test]
-    fn test_piece_map_occupancy() {
-        let board = Board::starting_position().unwrap();
-        let map = PieceMap::from_board(&board);
-
-        // White should have 16 pieces
-        assert_eq!(map.color_occ[Color::White as usize].count(), 16);
-        // Black should have 16 pieces
-        assert_eq!(map.color_occ[Color::Black as usize].count(), 16);
-        // Total 32 pieces
-        assert_eq!(map.all_occ.count(), 32);
     }
 }

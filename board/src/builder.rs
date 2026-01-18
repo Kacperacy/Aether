@@ -103,6 +103,42 @@ impl BoardBuilder {
             }
         }
 
+        let white_king_sq = self.pieces[Color::White as usize][Piece::King as usize]
+            .to_square()
+            .expect("King validation passed but king not found");
+        let black_king_sq = self.pieces[Color::Black as usize][Piece::King as usize]
+            .to_square()
+            .expect("King validation passed but king not found");
+
+        let stm = self.side_to_move;
+        let king_sq = if stm == Color::White {
+            white_king_sq
+        } else {
+            black_king_sq
+        };
+        let checkers = aether_core::attackers_to_square(
+            king_sq,
+            stm.opponent(),
+            cache.occupied,
+            &self.pieces[stm.opponent() as usize],
+        );
+
+        let white_occ = cache.color_combined[Color::White as usize];
+        let black_occ = cache.color_combined[Color::Black as usize];
+
+        let (white_blockers, white_pinners) = aether_core::compute_slider_blockers(
+            white_king_sq,
+            white_occ,
+            &self.pieces[Color::Black as usize],
+            cache.occupied,
+        );
+        let (black_blockers, black_pinners) = aether_core::compute_slider_blockers(
+            black_king_sq,
+            black_occ,
+            &self.pieces[Color::White as usize],
+            cache.occupied,
+        );
+
         let mut board = super::Board {
             pieces: self.pieces,
             mailbox,
@@ -118,6 +154,10 @@ impl BoardBuilder {
                 game_phase,
                 pst_mg,
                 pst_eg,
+                king_square: [white_king_sq, black_king_sq],
+                checkers,
+                blockers_for_king: [white_blockers, black_blockers],
+                pinners: [white_pinners, black_pinners],
             },
             state_history: [StateInfo::default(); MAX_SEARCH_DEPTH],
             history_index: 0,
