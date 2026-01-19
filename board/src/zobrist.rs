@@ -82,12 +82,12 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FenOps;
 
     #[test]
     fn test_zobrist_consistency() {
-        let board =
-            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+        let board: Board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         let hash1 = board.calculate_zobrist_hash();
         let hash2 = board.calculate_zobrist_hash();
@@ -97,10 +97,12 @@ mod tests {
 
     #[test]
     fn test_zobrist_different_positions() {
-        let board1 =
-            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
-        let board2 =
-            Board::from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1").unwrap();
+        let board1: Board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            .parse()
+            .unwrap();
+        let board2: Board = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+            .parse()
+            .unwrap();
 
         let hash1 = board1.calculate_zobrist_hash();
         let hash2 = board2.calculate_zobrist_hash();
@@ -113,8 +115,8 @@ mod tests {
 
     #[test]
     fn test_zobrist_side_to_move() {
-        let board1 = Board::from_fen("k7/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
-        let board2 = Board::from_fen("k7/8/8/8/8/8/8/4K3 b - - 0 1").unwrap();
+        let board1: Board = "k7/8/8/8/8/8/8/4K3 w - - 0 1".parse().unwrap();
+        let board2: Board = "k7/8/8/8/8/8/8/4K3 b - - 0 1".parse().unwrap();
 
         let hash1 = board1.calculate_zobrist_hash();
         let hash2 = board2.calculate_zobrist_hash();
@@ -124,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_zobrist_toggle_piece() {
-        let mut board = Board::from_fen("k7/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        let mut board: Board = "k7/8/8/8/8/8/8/4K3 w - - 0 1".parse().unwrap();
         let initial_hash = board.calculate_zobrist_hash();
 
         // Toggle piece twice should return to original hash
@@ -138,9 +140,9 @@ mod tests {
     fn test_incremental_vs_full_hash() {
         use aether_core::{Move, MoveFlags};
 
-        // Position with knights on g1/b8 for castling test
-        let mut board =
-            Board::from_fen("rn2k2r/pppppppp/8/8/8/8/PPPPPPPP/RN2K2R w KQkq - 0 1").unwrap();
+        let mut board: Board = "rn2k2r/pppppppp/8/8/8/8/PPPPPPPP/RN2K2R w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         assert_eq!(
             board.zobrist_hash_raw(),
@@ -202,8 +204,9 @@ mod tests {
     fn test_incremental_hash_with_captures_and_promotion() {
         use aether_core::{Move, MoveFlags};
 
-        let mut board =
-            Board::from_fen("r3k2r/pPpppppp/8/3Pp3/8/8/P1PPPPPP/R3K2R w KQkq e6 0 1").unwrap();
+        let mut board: Board = "r3k2r/pPpppppp/8/3Pp3/8/8/P1PPPPPP/R3K2R w KQkq e6 0 1"
+            .parse()
+            .unwrap();
 
         assert_eq!(
             board.zobrist_hash_raw(),

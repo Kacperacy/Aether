@@ -192,7 +192,6 @@ impl BoardBuilder {
     }
 
     fn validate(&self) -> Result<()> {
-        // Check for exactly one king per side
         for color in ALL_COLORS {
             let king_count = self.pieces[color as usize][Piece::King as usize].count();
             match king_count {
@@ -202,7 +201,6 @@ impl BoardBuilder {
             }
         }
 
-        // Validate castling rights
         self.validate_castling_rights()?;
 
         Ok(())

@@ -10,7 +10,7 @@ mod zobrist;
 
 pub use builder::BoardBuilder;
 pub use error::{BoardError, FenError, MoveError};
-pub use fen::{FenOps, STARTING_POSITION_FEN};
+pub use fen::STARTING_POSITION_FEN;
 
 use aether_core::{BitBoard, Color, File, Piece, Rank, Square};
 use cache::BoardCache;
@@ -156,7 +156,6 @@ impl Default for Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FenOps;
     use aether_core::{Move, Piece, Square};
 
     #[test]
@@ -306,79 +305,49 @@ mod tests {
 
     #[test]
     fn test_insufficient_material_king_vs_king() {
-        // K vs K
-        let fen = "8/8/8/4k3/8/8/8/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/8/4K3 w - - 0 1".parse().unwrap();
         assert!(board.is_insufficient_material());
     }
 
     #[test]
     fn test_insufficient_material_kb_vs_k() {
-        // K+B vs K
-        let fen = "8/8/8/4k3/8/8/2B5/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/2B5/4K3 w - - 0 1".parse().unwrap();
         assert!(board.is_insufficient_material());
     }
 
     #[test]
     fn test_insufficient_material_kn_vs_k() {
-        // K+N vs K
-        let fen = "8/8/8/4k3/8/8/2N5/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/2N5/4K3 w - - 0 1".parse().unwrap();
         assert!(board.is_insufficient_material());
     }
 
     #[test]
     fn test_sufficient_material_kq_vs_k() {
-        // K+Q vs K - sufficient (can mate)
-        let fen = "8/8/8/4k3/8/8/2Q5/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/2Q5/4K3 w - - 0 1".parse().unwrap();
         assert!(!board.is_insufficient_material());
     }
 
     #[test]
     fn test_sufficient_material_kr_vs_k() {
-        // K+R vs K - sufficient (can mate)
-        let fen = "8/8/8/4k3/8/8/2R5/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/2R5/4K3 w - - 0 1".parse().unwrap();
         assert!(!board.is_insufficient_material());
     }
 
     #[test]
     fn test_sufficient_material_kbn_vs_k() {
-        // K+B+N vs K - sufficient (can mate)
-        let fen = "8/8/8/4k3/8/8/2BN4/4K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/8/2BN4/4K3 w - - 0 1".parse().unwrap();
         assert!(!board.is_insufficient_material());
     }
 
     #[test]
     fn test_insufficient_material_kb_vs_kb_same_color() {
-        // K+B vs K+B on same color squares (both light squares)
-        // Use correct squares: a1 (light) and c3 (light)
-        // a1: (0+0) % 2 = 0 (light)
-        // c3: (2+2) % 2 = 0 (light)
-        let fen = "8/8/8/4k3/8/2b5/8/B3K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-
+        let board: Board = "8/8/8/4k3/8/2b5/8/B3K3 w - - 0 1".parse().unwrap();
         assert!(board.is_insufficient_material());
     }
 
     #[test]
     fn test_sufficient_material_kb_vs_kb_different_color() {
-        // K+B vs K+B on different color squares
-        let fen = "8/8/8/4k3/8/2b5/8/1B2K3 w - - 0 1";
-        let board = Board::from_fen(fen).unwrap();
-        // b1: (1+0) % 2 = 1 (dark)
-        // c3: (2+2) % 2 = 0 (light)
-        // Different colors - not insufficient
-
+        let board: Board = "8/8/8/4k3/8/2b5/8/1B2K3 w - - 0 1".parse().unwrap();
         assert!(!board.is_insufficient_material());
     }
 

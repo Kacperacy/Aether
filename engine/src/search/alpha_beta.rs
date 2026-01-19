@@ -663,7 +663,6 @@ where
 mod tests {
     use super::*;
     use crate::eval::SimpleEvaluator;
-    use board::FenOps;
 
     #[test]
     fn test_search_basic() {
@@ -684,7 +683,7 @@ mod tests {
     fn test_mate_in_one() {
         // Position with mate in 1 for white
         let fen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
-        let mut board = Board::from_fen(fen).unwrap();
+        let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
@@ -702,7 +701,7 @@ mod tests {
     fn test_search_detects_threefold_repetition() {
         // Setup a position where repetition can occur
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let mut board = Board::from_fen(fen).unwrap();
+        let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
@@ -721,7 +720,7 @@ mod tests {
     fn test_search_avoids_immediate_repetition() {
         // Position where bot could repeat immediately
         let fen = "4k3/8/8/8/8/8/8/4K2R w - - 0 1";
-        let mut board = Board::from_fen(fen).unwrap();
+        let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 16);
@@ -752,7 +751,7 @@ mod tests {
     fn test_search_recognizes_insufficient_material_draw() {
         // K+B vs K - insufficient material
         let fen = "8/8/8/4k3/8/8/2B5/4K3 w - - 0 1";
-        let mut board = Board::from_fen(fen).unwrap();
+        let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
@@ -771,7 +770,7 @@ mod tests {
     fn test_fifty_move_rule_in_search() {
         // Position with halfmove clock near 100
         let fen = "4k3/8/8/8/8/8/8/4K3 w - - 100 1";
-        let mut board = Board::from_fen(fen).unwrap();
+        let mut board: Board = fen.parse().unwrap();
 
         assert!(board.is_fifty_move_draw());
 

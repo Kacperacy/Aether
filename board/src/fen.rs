@@ -1,80 +1,69 @@
 use crate::error::BoardError::FenParsingError;
 use crate::error::FenError;
-use crate::error::FenError::{
-    InvalidEmptySquareCount, InvalidPieceCharacter, InvalidRankSquares, TooManySquaresInRank,
-};
 use crate::{Board, BoardBuilder, Result};
 use aether_core::{CastlingRights, Color, File, Piece, Rank, Square};
+use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
 pub const STARTING_POSITION_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-pub fn parse_fen(fen: &str) -> Result<Board> {
-    let fen_parser = FenParser::new(fen)?;
-    fen_parser.build_board()
+const DEFAULT_FEN_FIELDS: [&str; 6] = ["", "w", "-", "-", "0", "1"];
+
+impl FromStr for Board {
+    type Err = crate::BoardError;
+
+    fn from_str(fen: &str) -> Result<Self> {
+        FenParser::new(fen)?.build_board()
+    }
 }
 
-pub fn board_to_fen(board: &Board) -> String {
-    FenGenerator::new(board).generate()
+impl Display for Board {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", FenGenerator::new(self).generate())
+    }
 }
 
 struct FenParser<'a> {
-    fields: Vec<&'a str>,
+    fields: [&'a str; 6],
 }
 
 impl<'a> FenParser<'a> {
-    pub fn new(fen: &'a str) -> Result<Self> {
+    fn new(fen: &'a str) -> Result<Self> {
         let trimmed = fen.trim();
         if trimmed.is_empty() {
             return Err(FenParsingError(FenError::EmptyFen));
         }
 
-        let fields: Vec<&str> = trimmed.split_whitespace().collect();
-        // Note: fields cannot be empty here because trimmed is non-empty after trim()
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
 
-        // Ensure we have exactly 6 fields, padding with defaults if necessary
-        let mut complete_fields = fields;
-        while complete_fields.len() < 6 {
-            match complete_fields.len() {
-                1 => complete_fields.push("w"), // Default: white to move
-                2 => complete_fields.push("-"), // Default: no castling rights
-                3 => complete_fields.push("-"), // Default: no en passant
-                4 => complete_fields.push("0"), // Default: halfmove clock = 0
-                5 => complete_fields.push("1"), // Default: fullmove number = 1
-                _ => break,
-            }
-        }
-
-        if complete_fields.len() > 6 {
+        if parts.len() > 6 {
             return Err(FenParsingError(FenError::TooManyFields));
         }
 
-        Ok(FenParser {
-            fields: complete_fields,
-        })
+        let mut fields = DEFAULT_FEN_FIELDS;
+        for (i, part) in parts.into_iter().enumerate() {
+            fields[i] = part;
+        }
+
+        Ok(FenParser { fields })
     }
 
-    pub fn build_board(self) -> Result<Board> {
+    fn build_board(self) -> Result<Board> {
         let mut builder = BoardBuilder::new();
 
-        // Parse piece placement (field 0)
         self.parse_piece_placement(&mut builder)?;
 
-        // Parse side to move (field 1)
         let side_to_move = self.parse_side_to_move()?;
         builder.set_side_to_move(side_to_move);
 
-        // Parse castling rights (field 2)
         let (white_castling, black_castling) = self.parse_castling_rights()?;
         builder
             .set_castling_rights(Color::White, white_castling)
             .set_castling_rights(Color::Black, black_castling);
 
-        // Parse en passant square (field 3)
         let en_passant = self.parse_en_passant(side_to_move)?;
         builder.set_en_passant(en_passant)?;
 
-        // Parse halfmove clock (field 4) and fullmove number (field 5)
         let halfmove_clock = self.parse_halfmove_clock()?;
         let fullmove_number = self.parse_fullmove_number()?;
 
@@ -96,29 +85,27 @@ impl<'a> FenParser<'a> {
         }
 
         for (rank_index, rank_str) in ranks.iter().enumerate() {
-            let rank = Rank::from_index((Rank::NUM - 1 - rank_index) as i8); // FEN starts from rank 8
-            let mut file_index = 0;
+            let rank = Rank::from_index((Rank::NUM - 1 - rank_index) as i8);
+            let mut file_index: usize = 0;
 
             for ch in rank_str.chars() {
-                if file_index >= File::NUM as i8 {
-                    return Err(FenParsingError(TooManySquaresInRank {
+                if file_index >= File::NUM {
+                    return Err(FenParsingError(FenError::TooManySquaresInRank {
                         rank: Rank::from_index(rank_index as i8),
                     }));
                 }
 
-                if ch.is_ascii_digit() {
-                    // Empty squares
-                    let empty_count = ch.to_digit(10).unwrap() as i8;
-                    if !(1..=File::NUM as i8).contains(&empty_count) {
-                        return Err(FenParsingError(InvalidEmptySquareCount {
-                            count: empty_count as usize,
+                if let Some(empty_count) = ch.to_digit(10) {
+                    let empty_count = empty_count as usize;
+                    if !(1..=File::NUM).contains(&empty_count) {
+                        return Err(FenParsingError(FenError::InvalidEmptySquareCount {
+                            count: empty_count,
                         }));
                     }
                     file_index += empty_count;
                 } else {
-                    // Piece
-                    let (piece, color) = self.parse_piece_char(ch)?;
-                    let file = File::from_index(file_index);
+                    let (piece, color) = parse_piece_char(ch)?;
+                    let file = File::from_index(file_index as i8);
                     let square = Square::new(file, rank);
 
                     builder.place_piece(square, piece, color)?;
@@ -126,25 +113,15 @@ impl<'a> FenParser<'a> {
                 }
             }
 
-            if file_index != File::NUM as i8 {
-                return Err(FenParsingError(InvalidRankSquares {
+            if file_index != File::NUM {
+                return Err(FenParsingError(FenError::InvalidRankSquares {
                     rank: Rank::from_index(rank_index as i8),
-                    amount: file_index as usize,
+                    amount: file_index,
                 }));
             }
         }
 
         Ok(())
-    }
-
-    fn parse_piece_char(&self, ch: char) -> Result<(Piece, Color)> {
-        let piece = Piece::from_char(ch).ok_or(FenParsingError(InvalidPieceCharacter { ch }))?;
-        let color = if ch.is_ascii_uppercase() {
-            Color::White
-        } else {
-            Color::Black
-        };
-        Ok((piece, color))
     }
 
     fn parse_side_to_move(&self) -> Result<Color> {
@@ -173,9 +150,6 @@ impl<'a> FenParser<'a> {
                 'Q' => white_rights.long = Some(File::A),
                 'k' => black_rights.short = Some(File::H),
                 'q' => black_rights.long = Some(File::A),
-                // Support Chess960 castling rights
-                'A'..='H' => white_rights.long = Some(File::from_str(&ch.to_string()).unwrap()),
-                'a'..='h' => black_rights.long = Some(File::from_str(&ch.to_string()).unwrap()),
                 _ => return Err(FenParsingError(FenError::InvalidCastlingRights { ch })),
             }
         }
@@ -196,24 +170,21 @@ impl<'a> FenParser<'a> {
             }));
         }
 
-        match Square::from_str(en_passant_str) {
-            Ok(square) => {
-                // Validate en passant square is on correct rank
-                let expected_rank = side_to_move.en_passant_rank();
-
-                if square.rank() != expected_rank {
-                    return Err(FenParsingError(FenError::InvalidEnPassantRank {
-                        square,
-                        rank: expected_rank,
-                    }));
-                }
-
-                Ok(Some(square))
-            }
-            Err(_) => Err(FenParsingError(FenError::InvalidEnPassantSquare {
+        let square = Square::from_str(en_passant_str).map_err(|_| {
+            FenParsingError(FenError::InvalidEnPassantSquare {
                 en_passant_str: en_passant_str.to_string(),
-            })),
+            })
+        })?;
+
+        let expected_rank = side_to_move.en_passant_rank();
+        if square.rank() != expected_rank {
+            return Err(FenParsingError(FenError::InvalidEnPassantRank {
+                square,
+                rank: expected_rank,
+            }));
         }
+
+        Ok(Some(square))
     }
 
     fn parse_halfmove_clock(&self) -> Result<u16> {
@@ -231,9 +202,19 @@ impl<'a> FenParser<'a> {
             })
         })?;
 
-        // Ensure fullmove number is at least 1
-        if fullmove == 0 { Ok(1) } else { Ok(fullmove) }
+        Ok(fullmove.max(1))
     }
+}
+
+fn parse_piece_char(ch: char) -> Result<(Piece, Color)> {
+    let piece =
+        Piece::from_char(ch).ok_or(FenParsingError(FenError::InvalidPieceCharacter { ch }))?;
+    let color = if ch.is_ascii_uppercase() {
+        Color::White
+    } else {
+        Color::Black
+    };
+    Ok((piece, color))
 }
 
 struct FenGenerator<'a> {
@@ -241,26 +222,31 @@ struct FenGenerator<'a> {
 }
 
 impl<'a> FenGenerator<'a> {
-    pub fn new(board: &'a Board) -> Self {
+    fn new(board: &'a Board) -> Self {
         FenGenerator { board }
     }
 
-    pub fn generate(&self) -> String {
-        let placement = self.generate_piece_placement();
-        let side_to_move = self.generate_side_to_move();
-        let castling = self.generate_castling_rights();
-        let en_passant = self.generate_en_passant();
-        let halfmove = self.generate_halfmove_clock();
-        let fullmove = self.generate_fullmove_number();
-
-        format!("{placement} {side_to_move} {castling} {en_passant} {halfmove} {fullmove}")
+    fn generate(&self) -> String {
+        format!(
+            "{} {} {} {} {} {}",
+            self.generate_piece_placement(),
+            self.generate_side_to_move(),
+            self.generate_castling_rights(),
+            self.generate_en_passant(),
+            self.board.halfmove_clock(),
+            self.board.fullmove_number()
+        )
     }
 
     fn generate_piece_placement(&self) -> String {
-        let mut placement = String::new();
+        let mut placement = String::with_capacity(71); // max FEN piece placement length
 
-        for rank_index in 0..Rank::NUM {
-            let rank = Rank::from_index((Rank::NUM - 1 - rank_index) as i8); // Start from rank 8
+        for rank_index in (0..Rank::NUM).rev() {
+            if rank_index < Rank::NUM - 1 {
+                placement.push('/');
+            }
+
+            let rank = Rank::from_index(rank_index as i8);
             let mut empty_count = 0;
 
             for file_index in 0..File::NUM {
@@ -268,13 +254,11 @@ impl<'a> FenGenerator<'a> {
                 let square = Square::new(file, rank);
 
                 if let Some((piece, color)) = self.board.piece_at(square) {
-                    // Place any accumulated empty squares
                     if empty_count > 0 {
-                        placement.push_str(&empty_count.to_string());
+                        placement.push(char::from_digit(empty_count, 10).unwrap());
                         empty_count = 0;
                     }
 
-                    // Add piece character
                     let piece_char = if color == Color::White {
                         piece.as_char().to_ascii_uppercase()
                     } else {
@@ -282,29 +266,22 @@ impl<'a> FenGenerator<'a> {
                     };
                     placement.push(piece_char);
                 } else {
-                    // Empty square
                     empty_count += 1;
                 }
             }
 
-            // Add any remaining empty squares for this rank
             if empty_count > 0 {
-                placement.push_str(&empty_count.to_string());
-            }
-
-            // Add rank separator (except for last rank)
-            if rank_index < Rank::NUM - 1 {
-                placement.push('/');
+                placement.push(char::from_digit(empty_count, 10).unwrap());
             }
         }
 
         placement
     }
 
-    fn generate_side_to_move(&self) -> &'static str {
+    fn generate_side_to_move(&self) -> char {
         match self.board.side_to_move() {
-            Color::White => "w",
-            Color::Black => "b",
+            Color::White => 'w',
+            Color::Black => 'b',
         }
     }
 
@@ -312,17 +289,14 @@ impl<'a> FenGenerator<'a> {
         let white_rights = self.board.castling_rights(Color::White);
         let black_rights = self.board.castling_rights(Color::Black);
 
-        let mut castling = String::new();
+        let mut castling = String::with_capacity(4);
 
-        // White castling rights
         if white_rights.short.is_some() {
             castling.push('K');
         }
         if white_rights.long.is_some() {
             castling.push('Q');
         }
-
-        // Black castling rights
         if black_rights.short.is_some() {
             castling.push('k');
         }
@@ -331,40 +305,16 @@ impl<'a> FenGenerator<'a> {
         }
 
         if castling.is_empty() {
-            "-".to_string()
-        } else {
-            castling
+            castling.push('-');
         }
+
+        castling
     }
 
     fn generate_en_passant(&self) -> String {
-        match self.board.en_passant_square() {
-            Some(square) => square.to_string(),
-            None => "-".to_string(),
-        }
-    }
-
-    fn generate_halfmove_clock(&self) -> String {
-        self.board.halfmove_clock().to_string()
-    }
-
-    fn generate_fullmove_number(&self) -> String {
-        self.board.fullmove_number().to_string()
-    }
-}
-
-pub trait FenOps {
-    fn from_fen(fen: &str) -> Result<Board>;
-    fn to_fen(&self) -> String;
-}
-
-impl FenOps for Board {
-    fn from_fen(fen: &str) -> Result<Board> {
-        parse_fen(fen)
-    }
-
-    fn to_fen(&self) -> String {
-        board_to_fen(self)
+        self.board
+            .en_passant_square()
+            .map_or_else(|| "-".to_string(), |sq| sq.to_string())
     }
 }
 
@@ -374,22 +324,16 @@ mod tests {
 
     #[test]
     fn test_parse_starting_position() {
-        let board =
-            Board::from_fen(STARTING_POSITION_FEN).expect("Failed to parse starting position");
+        let board: Board = STARTING_POSITION_FEN
+            .parse()
+            .expect("Failed to parse starting position");
 
-        // Verify side to move
         assert_eq!(board.side_to_move(), Color::White);
-
-        // Verify castling rights
         assert!(board.can_castle_short(Color::White));
         assert!(board.can_castle_long(Color::White));
         assert!(board.can_castle_short(Color::Black));
         assert!(board.can_castle_long(Color::Black));
-
-        // Verify en passant
         assert!(board.en_passant_square().is_none());
-
-        // Verify move counters
         assert_eq!(board.halfmove_clock(), 0);
         assert_eq!(board.fullmove_number(), 1);
     }
@@ -404,40 +348,27 @@ mod tests {
         ];
 
         for fen in &test_fens {
-            let board = Board::from_fen(fen).expect(&format!("Failed to parse FEN: {}", fen));
-            let generated_fen = board.to_fen();
+            let board: Board = fen
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to parse FEN: {}", fen));
+            let generated_fen = board.to_string();
 
-            // FEN should roundtrip exactly
             assert_eq!(
                 *fen, generated_fen,
                 "FEN roundtrip mismatch:\n  input:  {}\n  output: {}",
                 fen, generated_fen
             );
 
-            // And reparsing should work
-            let reparsed_board =
-                Board::from_fen(&generated_fen).expect("Failed to parse generated FEN");
+            let reparsed_board: Board = generated_fen
+                .parse()
+                .expect("Failed to parse generated FEN");
 
-            // Verify all game state fields match
-            assert_eq!(
-                board.side_to_move(),
-                reparsed_board.side_to_move(),
-                "Side to move mismatch"
-            );
-            assert_eq!(
-                board.halfmove_clock(),
-                reparsed_board.halfmove_clock(),
-                "Halfmove clock mismatch"
-            );
-            assert_eq!(
-                board.fullmove_number(),
-                reparsed_board.fullmove_number(),
-                "Fullmove number mismatch"
-            );
+            assert_eq!(board.side_to_move(), reparsed_board.side_to_move());
+            assert_eq!(board.halfmove_clock(), reparsed_board.halfmove_clock());
+            assert_eq!(board.fullmove_number(), reparsed_board.fullmove_number());
             assert_eq!(
                 board.en_passant_square(),
-                reparsed_board.en_passant_square(),
-                "En passant mismatch"
+                reparsed_board.en_passant_square()
             );
         }
     }
@@ -445,19 +376,37 @@ mod tests {
     #[test]
     fn test_invalid_fen_errors() {
         let invalid_fens = [
-            "",                                                          // Empty
-            "rnbqkbnr/pppppppp/8/8/8/8/8 w KQkq - 0 1",                  // Too few ranks
-            "rnbqkbnr/pppppppp/8/8/8/8/8/8/8 w KQkq - 0 1",              // Too many ranks
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR x KQkq - 0 1",  // Invalid side to move
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e2 0 1", // Invalid en passant rank
+            "",
+            "rnbqkbnr/pppppppp/8/8/8/8/8 w KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/8/8/8 w KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR x KQkq - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e2 0 1",
         ];
 
         for fen in &invalid_fens {
             assert!(
-                Board::from_fen(fen).is_err(),
+                fen.parse::<Board>().is_err(),
                 "Expected error for FEN: {}",
                 fen
             );
         }
+    }
+
+    #[test]
+    fn test_display_trait() {
+        let board: Board = STARTING_POSITION_FEN.parse().unwrap();
+        let displayed = format!("{}", board);
+        assert_eq!(displayed, STARTING_POSITION_FEN);
+    }
+
+    #[test]
+    fn test_partial_fen_with_defaults() {
+        let partial_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+        let board: Board = partial_fen.parse().expect("Failed to parse partial FEN");
+
+        assert_eq!(board.side_to_move(), Color::White);
+        assert!(board.en_passant_square().is_none());
+        assert_eq!(board.halfmove_clock(), 0);
+        assert_eq!(board.fullmove_number(), 1);
     }
 }

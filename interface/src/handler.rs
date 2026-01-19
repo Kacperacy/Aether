@@ -5,7 +5,7 @@ use crate::uci::{
     UciResponse, send_response, send_responses,
 };
 use aether_core::{Color, Move, Piece};
-use board::{Board, FenOps};
+use board::Board;
 use engine::Engine;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -168,7 +168,7 @@ impl UciHandler {
     fn cmd_position(&mut self, fen: Option<String>, moves: Vec<String>) {
         // Set up the position
         if let Some(fen_str) = fen {
-            match Board::from_fen(&fen_str) {
+            match fen_str.parse::<Board>() {
                 Ok(board) => self.board = board,
                 Err(e) => {
                     if self.options.debug {
@@ -279,7 +279,7 @@ impl UciHandler {
 
     fn cmd_display(&self) {
         println!("{}", self.board.as_ascii());
-        println!("Fen: {}", self.board.to_fen());
+        println!("Fen: {}", self.board);
         println!("Zobrist: 0x{:016x}", self.board.zobrist_hash_raw());
 
         let legal_moves = self.engine.legal_moves(&self.board);
@@ -346,7 +346,7 @@ mod tests {
     fn test_position_startpos() {
         let mut handler = UciHandler::new();
         handler.cmd_position(None, vec![]);
-        assert_eq!(handler.board.to_fen(), STARTING_POSITION_FEN);
+        assert_eq!(handler.board.to_string(), STARTING_POSITION_FEN);
     }
 
     #[test]

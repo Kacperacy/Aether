@@ -1,11 +1,11 @@
 use aether_core::{File, Move, Rank, Square};
-use board::{Board, FenOps};
+use board::Board;
 use movegen::{Generator, MoveGen};
 
 #[test]
 fn test_make_unmake_symmetry_starting_position() {
     let mut board = Board::starting_position().unwrap();
-    let original_fen = board.to_fen();
+    let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash();
 
     let generator = Generator::new();
@@ -17,7 +17,7 @@ fn test_make_unmake_symmetry_starting_position() {
         board.unmake_move(&mv).unwrap();
 
         assert_eq!(
-            board.to_fen(),
+            board.to_string(),
             original_fen,
             "Position changed after make/unmake for move: {}",
             mv
@@ -34,9 +34,10 @@ fn test_make_unmake_symmetry_starting_position() {
 
 #[test]
 fn test_make_unmake_complex_position() {
-    let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-    let mut board = Board::from_fen(fen).unwrap();
-    let original_fen = board.to_fen();
+    let mut board: Board = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+        .parse()
+        .unwrap();
+    let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash();
 
     let generator = Generator::new();
@@ -47,16 +48,17 @@ fn test_make_unmake_complex_position() {
         board.make_move(&mv).unwrap();
         board.unmake_move(&mv).unwrap();
 
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
         assert_eq!(board.zobrist_hash(), original_zobrist);
     }
 }
 
 #[test]
 fn test_make_unmake_castling() {
-    let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
-    let mut board = Board::from_fen(fen).unwrap();
-    let original_fen = board.to_fen();
+    let mut board: Board = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"
+        .parse()
+        .unwrap();
+    let original_fen = board.to_string();
 
     let generator = Generator::new();
     let mut moves = Vec::new();
@@ -70,14 +72,15 @@ fn test_make_unmake_castling() {
     board.make_move(castle_move).unwrap();
     board.unmake_move(castle_move).unwrap();
 
-    assert_eq!(board.to_fen(), original_fen);
+    assert_eq!(board.to_string(), original_fen);
 }
 
 #[test]
 fn test_make_unmake_en_passant() {
-    let fen = "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 1";
-    let mut board = Board::from_fen(fen).unwrap();
-    let original_fen = board.to_fen();
+    let mut board: Board = "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 1"
+        .parse()
+        .unwrap();
+    let original_fen = board.to_string();
 
     let generator = Generator::new();
     let mut moves = Vec::new();
@@ -91,14 +94,13 @@ fn test_make_unmake_en_passant() {
     board.make_move(ep_move).unwrap();
     board.unmake_move(ep_move).unwrap();
 
-    assert_eq!(board.to_fen(), original_fen);
+    assert_eq!(board.to_string(), original_fen);
 }
 
 #[test]
 fn test_make_unmake_promotion() {
-    let fen = "7k/P7/8/8/8/8/7p/K7 w - - 0 1";
-    let mut board = Board::from_fen(fen).unwrap();
-    let original_fen = board.to_fen();
+    let mut board: Board = "7k/P7/8/8/8/8/7p/K7 w - - 0 1".parse().unwrap();
+    let original_fen = board.to_string();
 
     let generator = Generator::new();
     let mut moves = Vec::new();
@@ -112,7 +114,7 @@ fn test_make_unmake_promotion() {
     board.make_move(promo_move).unwrap();
     board.unmake_move(promo_move).unwrap();
 
-    assert_eq!(board.to_fen(), original_fen);
+    assert_eq!(board.to_string(), original_fen);
 }
 
 #[test]

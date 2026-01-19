@@ -427,11 +427,11 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FenOps, STARTING_POSITION_FEN};
+    use crate::STARTING_POSITION_FEN;
 
     #[test]
     fn test_is_in_check_starting_position() {
-        let board = Board::from_fen(STARTING_POSITION_FEN).unwrap();
+        let board: Board = STARTING_POSITION_FEN.parse().unwrap();
 
         assert!(!board.is_in_check(Color::White));
         assert!(!board.is_in_check(Color::Black));
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_is_in_check_white_checked_by_rook() {
-        let board = Board::from_fen("3kr3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        let board: Board = "3kr3/8/8/8/8/8/8/4K3 w - - 0 1".parse().unwrap();
 
         assert!(board.is_in_check(Color::White));
         assert!(!board.is_in_check(Color::Black));
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_is_in_check_black_checked_by_queen() {
-        let board = Board::from_fen("4k3/8/8/8/8/8/8/4QK2 b - - 0 1").unwrap();
+        let board: Board = "4k3/8/8/8/8/8/8/4QK2 b - - 0 1".parse().unwrap();
 
         assert!(!board.is_in_check(Color::White));
         assert!(board.is_in_check(Color::Black));
@@ -455,14 +455,14 @@ mod tests {
 
     #[test]
     fn test_is_in_check_blocked_attack() {
-        let board = Board::from_fen("3kr3/8/8/8/4P3/8/8/4K3 w - - 0 1").unwrap();
+        let board: Board = "3kr3/8/8/8/4P3/8/8/4K3 w - - 0 1".parse().unwrap();
 
         assert!(!board.is_in_check(Color::White));
     }
 
     #[test]
     fn test_attackers_to_square_multiple() {
-        let board = Board::from_fen("7k/8/8/8/4p3/8/3N4/1B5K w - - 0 1").unwrap();
+        let board: Board = "7k/8/8/8/4p3/8/3N4/1B5K w - - 0 1".parse().unwrap();
 
         let attackers = board.attackers_to_square(Square::E4, Color::White);
 
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn test_attackers_to_square_none() {
-        let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        let board: Board = "4k3/8/8/8/8/8/8/4K3 w - - 0 1".parse().unwrap();
 
         let white_attackers = board.attackers_to_square(Square::E4, Color::White);
         let black_attackers = board.attackers_to_square(Square::E4, Color::Black);
@@ -484,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_is_in_check_knight_check() {
-        let board = Board::from_fen("4k3/8/3N4/8/8/8/8/4K3 b - - 0 1").unwrap();
+        let board: Board = "4k3/8/3N4/8/8/8/8/4K3 b - - 0 1".parse().unwrap();
 
         assert!(board.is_in_check(Color::Black));
         assert!(!board.is_in_check(Color::White));
@@ -492,15 +492,15 @@ mod tests {
 
     #[test]
     fn test_is_in_check_pawn_check() {
-        let board = Board::from_fen("8/8/8/4k3/3P1P2/8/8/4K3 b - - 0 1").unwrap();
+        let board: Board = "8/8/8/4k3/3P1P2/8/8/4K3 b - - 0 1".parse().unwrap();
 
         assert!(board.is_in_check(Color::Black));
     }
 
     #[test]
     fn test_make_unmake_simple_pawn_move() {
-        let mut board = Board::from_fen(STARTING_POSITION_FEN).unwrap();
-        let original_fen = board.to_fen();
+        let mut board: Board = STARTING_POSITION_FEN.parse().unwrap();
+        let original_fen = board.to_string();
 
         let mv =
             Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
@@ -518,29 +518,30 @@ mod tests {
         board.unmake_move(&mv).unwrap();
 
         // Verify position restored
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
     }
 
     #[test]
     fn test_make_unmake_capture() {
-        let mut board =
-            Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2")
-                .unwrap();
-        let original_fen = board.to_fen();
+        let mut board: Board = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2"
+            .parse()
+            .unwrap();
+        let original_fen = board.to_string();
 
         let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
 
         board.make_move(&mv).unwrap();
         board.unmake_move(&mv).unwrap();
 
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
     }
 
     #[test]
     fn test_make_unmake_castling_kingside() {
-        let mut board =
-            Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
-        let original_fen = board.to_fen();
+        let mut board: Board = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"
+            .parse()
+            .unwrap();
+        let original_fen = board.to_string();
 
         let mv =
             Move::new(Square::E1, Square::G1, Piece::King).with_flags(aether_core::MoveFlags {
@@ -558,15 +559,15 @@ mod tests {
 
         board.unmake_move(&mv).unwrap();
 
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
     }
 
     #[test]
     fn test_make_unmake_en_passant() {
-        let mut board =
-            Board::from_fen("rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 1")
-                .unwrap();
-        let original_fen = board.to_fen();
+        let mut board: Board = "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 1"
+            .parse()
+            .unwrap();
+        let original_fen = board.to_string();
 
         let mv = Move::new(Square::D5, Square::E6, Piece::Pawn)
             .with_capture(Piece::Pawn)
@@ -584,13 +585,13 @@ mod tests {
 
         board.unmake_move(&mv).unwrap();
 
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
     }
 
     #[test]
     fn test_make_unmake_promotion() {
-        let mut board = Board::from_fen("8/P7/8/8/8/8/8/4K2k w - - 0 1").unwrap();
-        let original_fen = board.to_fen();
+        let mut board: Board = "8/P7/8/8/8/8/8/4K2k w - - 0 1".parse().unwrap();
+        let original_fen = board.to_string();
 
         let mv = Move::new(Square::A7, Square::A8, Piece::Pawn).with_promotion(Piece::Queen);
 
@@ -602,13 +603,14 @@ mod tests {
 
         board.unmake_move(&mv).unwrap();
 
-        assert_eq!(board.to_fen(), original_fen);
+        assert_eq!(board.to_string(), original_fen);
     }
 
     #[test]
     fn test_halfmove_clock_reset_on_pawn_move() {
-        let mut board =
-            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 3").unwrap();
+        let mut board: Board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 3"
+            .parse()
+            .unwrap();
 
         let mv =
             Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
@@ -623,9 +625,9 @@ mod tests {
 
     #[test]
     fn test_halfmove_clock_reset_on_capture() {
-        let mut board =
-            Board::from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 5 2")
-                .unwrap();
+        let mut board: Board = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 5 2"
+            .parse()
+            .unwrap();
 
         let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
 
@@ -636,8 +638,9 @@ mod tests {
 
     #[test]
     fn test_halfmove_clock_increment() {
-        let mut board =
-            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+        let mut board: Board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         let mv = Move::new(Square::G1, Square::F3, Piece::Knight);
 
@@ -648,8 +651,9 @@ mod tests {
 
     #[test]
     fn test_castling_rights_removed_on_king_move() {
-        let mut board =
-            Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
+        let mut board: Board = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         let mv = Move::new(Square::E1, Square::F1, Piece::King);
 
@@ -664,8 +668,9 @@ mod tests {
 
     #[test]
     fn test_castling_rights_removed_on_rook_move() {
-        let mut board =
-            Board::from_fen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
+        let mut board: Board = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         let mv = Move::new(Square::H1, Square::G1, Piece::Rook);
 
@@ -677,8 +682,9 @@ mod tests {
 
     #[test]
     fn test_castling_rights_removed_on_rook_capture() {
-        let mut board =
-            Board::from_fen("r3k2r/pppppppp/8/8/8/7B/PPPPPPPP/R3K2R w KQkq - 0 1").unwrap();
+        let mut board: Board = "r3k2r/pppppppp/8/8/8/7B/PPPPPPPP/R3K2R w KQkq - 0 1"
+            .parse()
+            .unwrap();
 
         let mv = Move::new(Square::H3, Square::H8, Piece::Bishop).with_capture(Piece::Rook);
 
