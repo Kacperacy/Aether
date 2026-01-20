@@ -6,13 +6,11 @@ use crate::search::alpha_beta::AlphaBetaSearcher;
 use crate::search::{SearchInfo, SearchLimits, SearchResult};
 use aether_core::{Move, Score};
 use board::Board;
-use movegen::{Generator, MoveGen};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 pub struct Engine {
-    generator: Generator,
     searcher: AlphaBetaSearcher<SimpleEvaluator>,
 }
 
@@ -22,10 +20,7 @@ impl Engine {
         let evaluator = SimpleEvaluator::new();
         let searcher = AlphaBetaSearcher::new(evaluator, hash_size_mb);
 
-        Self {
-            generator: Generator::new(),
-            searcher,
-        }
+        Self { searcher }
     }
 
     #[must_use]
@@ -54,7 +49,7 @@ impl Engine {
     #[must_use]
     pub fn legal_moves(&self, board: &Board) -> Vec<Move> {
         let mut moves = Vec::new();
-        self.generator.legal(board, &mut moves);
+        movegen::legal(board, &mut moves);
         moves
     }
 
@@ -65,10 +60,7 @@ impl Engine {
         time_limit: Option<Duration>,
         on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
-        // Convert parameters to SearchLimits
         let limits = self.create_search_limits(depth, time_limit);
-
-        // Delegate to AlphaBetaSearcher
         self.searcher.search(board, &limits, on_info)
     }
 
@@ -79,7 +71,6 @@ impl Engine {
     ) -> SearchLimits {
         let soft_limit = time_limit;
         let hard_limit = time_limit.map(|t| {
-            // Hard limit = soft limit + 10%, capped at +100ms
             let soft_ms = t.as_millis() as u64;
             let extra = (soft_ms / 10).min(100);
             Duration::from_millis(soft_ms + extra)
@@ -101,7 +92,7 @@ impl Engine {
         }
 
         let mut moves = Vec::new();
-        self.generator.legal(board, &mut moves);
+        movegen::legal(board, &mut moves);
 
         if depth == 1 {
             return moves.len() as u64;
@@ -120,7 +111,7 @@ impl Engine {
     #[must_use]
     pub fn perft_divide(&self, board: &mut Board, depth: u8) -> Vec<(Move, u64)> {
         let mut moves = Vec::new();
-        self.generator.legal(board, &mut moves);
+        movegen::legal(board, &mut moves);
 
         let mut results = Vec::new();
 
@@ -157,7 +148,7 @@ mod tests {
         let engine = Engine::new(16);
         let board = Board::starting_position().unwrap();
         let moves = engine.legal_moves(&board);
-        assert_eq!(moves.len(), 20); // 20 legal moves from starting position
+        assert_eq!(moves.len(), 20);
     }
 
     #[test]
@@ -177,7 +168,6 @@ mod tests {
         let engine = Engine::new(16);
         let mut board = Board::starting_position().unwrap();
 
-        // Known perft values for starting position
         assert_eq!(engine.perft(&mut board, 1), 20);
         assert_eq!(engine.perft(&mut board, 2), 400);
         assert_eq!(engine.perft(&mut board, 3), 8902);
@@ -188,8 +178,6 @@ mod tests {
         let mut engine = Engine::new(16);
         let stop_flag = engine.stop_flag();
 
-        // Start search in background would go here
-        // For now, just test that stop works
         engine.stop();
         assert!(stop_flag.load(Ordering::SeqCst));
     }
@@ -199,11 +187,9 @@ mod tests {
         let mut engine = Engine::new(16);
         let mut board = Board::starting_position().unwrap();
 
-        // Do a search to populate TT (deeper search to ensure TT gets populated)
         engine.search(&mut board, Some(6), None, |_, _, _| {});
         assert!(engine.hashfull() > 0);
 
-        // New game should clear TT
         engine.new_game();
         assert_eq!(engine.hashfull(), 0);
     }

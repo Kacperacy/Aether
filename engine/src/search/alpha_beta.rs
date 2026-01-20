@@ -6,13 +6,12 @@ use crate::search::{
 };
 use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, QUEEN_VALUE, Score, mated_in};
 use board::Board;
-use movegen::{Generator, MoveGen};
 use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-const NODE_CHECK_MASK: u64 = 0xFFF; // Check every 4096 nodes (power of 2 for fast bitwise AND)
+const NODE_CHECK_MASK: u64 = 0xFFF;
 const DELTA_PRUNING_MARGIN: Score = 200;
 const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
@@ -31,7 +30,6 @@ const MOVE_LIST_POOL_SIZE: usize = 128;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
-    generator: Generator,
     tt: TranspositionTable,
     move_orderer: MoveOrderer,
     info: SearchInfo,
@@ -52,7 +50,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         Self {
             evaluator,
-            generator: Generator::new(),
             tt: TranspositionTable::new(tt_size_mb),
             move_orderer: MoveOrderer::new(),
             info: SearchInfo::new(),
@@ -115,7 +112,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut pv = Vec::with_capacity(max_depth as usize);
 
         let mut legal_moves = Vec::with_capacity(AVG_LEGAL_MOVES);
-        self.generator.legal(board, &mut legal_moves);
+        movegen::legal(board, &mut legal_moves);
 
         if legal_moves.is_empty() {
             return SearchResult {
@@ -123,7 +120,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 score: if board.is_in_check(board.side_to_move()) {
                     NEG_MATE_SCORE
                 } else {
-                    0 // Stalemate
+                    0
                 },
                 pv: Vec::new(),
                 info: self.info.clone(),
@@ -146,7 +143,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         let mut prev_score: Score = 0;
 
-        // Iterative deepening
         for depth in 1..=max_depth {
             if let Some(limit) = self.soft_limit {
                 if start_time.elapsed() >= limit {
@@ -249,7 +245,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
     }
 
-    /// Main alpha-beta search function
     fn alpha_beta(
         &mut self,
         board: &mut Board,
@@ -259,7 +254,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         beta: Score,
         is_pv_node: bool,
     ) -> Score {
-        // ===== Node initialization =====
         self.info.nodes += 1;
         if ply < PV_COLLECTION_LIMIT {
             self.pv_length[ply] = 0;
@@ -279,7 +273,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return self.evaluator.evaluate(board);
         }
 
-        // Draw detection (ordered from O(1) to O(n) complexity)
         if ply > 0 {
             if board.is_fifty_move_draw() {
                 return 0;
@@ -331,7 +324,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             && depth <= RFP_MAX_DEPTH
             && static_eval - RFP_MARGIN * (depth as Score) >= beta
         {
-            return beta; // fail-high cutoff
+            return beta;
         }
 
         // ===== Null move pruning =====
@@ -367,10 +360,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // ===== Generate and order moves =====
         let mut moves = mem::take(&mut self.move_lists[ply]);
         moves.clear();
-        self.generator.legal(board, &mut moves);
+        movegen::legal(board, &mut moves);
 
         if moves.is_empty() {
-            self.move_lists[ply] = moves; // Return to pool
+            self.move_lists[ply] = moves;
             return if in_check { mated_in(ply as u32) } else { 0 };
         }
 
@@ -479,7 +472,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 best_score = score;
                 best_move = Some(*mv);
 
-                // Update triangular PV table only for shallow plies
                 if ply < PV_COLLECTION_LIMIT {
                     self.pv_table[ply][0] = *mv;
                     let child_len = self.pv_length[ply + 1].min(MAX_PV_LENGTH - ply - 2);
@@ -507,7 +499,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 );
                 self.tt.store(entry);
 
-                self.move_lists[ply] = moves; // Return to pool
+                self.move_lists[ply] = moves;
                 return beta;
             }
 
@@ -529,12 +521,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         );
         self.tt.store(entry);
 
-        self.move_lists[ply] = moves; // Return to pool
+        self.move_lists[ply] = moves;
         best_score
     }
 
-    /// Quiescence search - search captures until a quiet position is reached
-    /// depth: quiescence depth (0 = first call, -1, -2, ... for deeper levels)
     fn quiescence(
         &mut self,
         board: &mut Board,
@@ -566,28 +556,23 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 alpha = stand_pat;
             }
 
-            // Delta pruning: if even the best possible capture (queen)
-            // can't improve alpha, skip search
             if stand_pat + QUEEN_VALUE + DELTA_PRUNING_MARGIN < alpha {
                 return alpha;
             }
         }
 
-        // Pre-allocate for captures (~10-15 typical) or all moves if in check
         let mut moves = Vec::with_capacity(if in_check { AVG_LEGAL_MOVES } else { 16 });
         if in_check {
-            self.generator.legal(board, &mut moves);
+            movegen::legal(board, &mut moves);
 
             if moves.is_empty() {
                 return mated_in(ply as u32);
             }
         } else {
-            // Generate captures
-            self.generator.captures(board, &mut moves);
+            movegen::captures(board, &mut moves);
 
-            // Generate checks at root quiescence
             if depth == 0 {
-                self.generator.checks(board, &mut moves);
+                movegen::checks(board, &mut moves);
             }
         }
 
@@ -595,7 +580,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         for mv in moves {
             if board.make_move(&mv).is_err() {
-                continue; // Skip illegal moves
+                continue;
             }
             let score = -self.quiescence(board, ply + 1, depth - 1, -beta, -alpha);
             let _ = board.unmake_move(&mv);
@@ -614,7 +599,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
     #[inline]
     fn should_abort_search(&self) -> bool {
-        // Use Relaxed for quick check - we don't need strict ordering here
         if self.stop_flag.load(Ordering::Relaxed) {
             return true;
         }
@@ -655,7 +639,7 @@ where
     E: Default,
 {
     fn default() -> Self {
-        Self::new(E::default(), 16) // Default TT size of 16 MB
+        Self::new(E::default(), 16)
     }
 }
 
@@ -681,7 +665,6 @@ mod tests {
 
     #[test]
     fn test_mate_in_one() {
-        // Position with mate in 1 for white
         let fen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
         let mut board: Board = fen.parse().unwrap();
 
@@ -692,64 +675,52 @@ mod tests {
         let result = searcher.search(&mut board, &limits, |_, _, _| {});
 
         assert!(result.best_move.is_some());
-        // Should find Ra8# (mate)
         let best = result.best_move.unwrap();
         assert_eq!(best.to.to_string(), "a8");
     }
 
     #[test]
     fn test_search_detects_threefold_repetition() {
-        // Setup a position where repetition can occur
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
 
-        // Make moves that repeat position
-        // (This is a conceptual test - full implementation needs move setup)
-
         let limits = SearchLimits::depth(6);
         let result = searcher.search(&mut board, &limits, |_, _, _| {});
 
-        // Search should complete without hanging on repetitions
         assert!(result.best_move.is_some());
     }
 
     #[test]
     fn test_search_avoids_immediate_repetition() {
-        // Position where bot could repeat immediately
         let fen = "4k3/8/8/8/8/8/8/4K2R w - - 0 1";
         let mut board: Board = fen.parse().unwrap();
 
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 16);
 
-        // First move
         let limits = SearchLimits::depth(6);
         let result1 = searcher.search(&mut board, &limits, |_, _, _| {});
         let best_move1 = result1.best_move.unwrap();
 
         board.make_move(&best_move1).unwrap();
 
-        // Opponent moves (simulate)
         let mut opponent_moves = Vec::new();
-        searcher.generator.legal(&board, &mut opponent_moves);
+        movegen::legal(&board, &mut opponent_moves);
         board.make_move(&opponent_moves[0]).unwrap();
 
-        // Second move - should NOT repeat position
         let result2 = searcher.search(&mut board, &limits, |_, _, _| {});
         let best_move2 = result2.best_move.unwrap();
 
         board.make_move(&best_move2).unwrap();
 
-        // Check that position didn't repeat
         assert!(!board.is_threefold_repetition());
     }
 
     #[test]
     fn test_search_recognizes_insufficient_material_draw() {
-        // K+B vs K - insufficient material
         let fen = "8/8/8/4k3/8/8/2B5/4K3 w - - 0 1";
         let mut board: Board = fen.parse().unwrap();
 
@@ -759,7 +730,6 @@ mod tests {
         let limits = SearchLimits::depth(6);
         let result = searcher.search(&mut board, &limits, |_, _, _| {});
 
-        // Score should be close to 0 (draw)
         assert!(
             result.score.abs() < 50,
             "Insufficient material should evaluate near 0"
@@ -768,7 +738,6 @@ mod tests {
 
     #[test]
     fn test_fifty_move_rule_in_search() {
-        // Position with halfmove clock near 100
         let fen = "4k3/8/8/8/8/8/8/4K3 w - - 100 1";
         let mut board: Board = fen.parse().unwrap();
 
@@ -777,11 +746,7 @@ mod tests {
         let evaluator = SimpleEvaluator::new();
         let mut searcher = AlphaBetaSearcher::new(evaluator, 1);
 
-        // Search should immediately return draw score
-        let score = searcher.alpha_beta(
-            &mut board, 1, 1, // ply > 0 to trigger draw detection
-            -1000, 1000, true,
-        );
+        let score = searcher.alpha_beta(&mut board, 1, 1, -1000, 1000, true);
 
         assert_eq!(score, 0, "Fifty-move rule should return 0 (draw)");
     }

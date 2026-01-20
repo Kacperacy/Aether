@@ -1,6 +1,5 @@
 use aether_core::{File, Move, Rank, Square};
 use board::Board;
-use movegen::{Generator, MoveGen};
 
 #[test]
 fn test_make_unmake_symmetry_starting_position() {
@@ -8,9 +7,8 @@ fn test_make_unmake_symmetry_starting_position() {
     let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash();
 
-    let generator = Generator::new();
     let mut moves = Vec::new();
-    generator.legal(&board, &mut moves);
+    movegen::legal(&board, &mut moves);
 
     for mv in moves {
         board.make_move(&mv).unwrap();
@@ -40,9 +38,8 @@ fn test_make_unmake_complex_position() {
     let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash();
 
-    let generator = Generator::new();
     let mut moves = Vec::new();
-    generator.legal(&board, &mut moves);
+    movegen::legal(&board, &mut moves);
 
     for mv in moves {
         board.make_move(&mv).unwrap();
@@ -60,9 +57,8 @@ fn test_make_unmake_castling() {
         .unwrap();
     let original_fen = board.to_string();
 
-    let generator = Generator::new();
     let mut moves = Vec::new();
-    generator.legal(&board, &mut moves);
+    movegen::legal(&board, &mut moves);
 
     let castle_move = moves
         .iter()
@@ -82,9 +78,8 @@ fn test_make_unmake_en_passant() {
         .unwrap();
     let original_fen = board.to_string();
 
-    let generator = Generator::new();
     let mut moves = Vec::new();
-    generator.legal(&board, &mut moves);
+    movegen::legal(&board, &mut moves);
 
     let ep_move = moves
         .iter()
@@ -102,9 +97,8 @@ fn test_make_unmake_promotion() {
     let mut board: Board = "7k/P7/8/8/8/8/7p/K7 w - - 0 1".parse().unwrap();
     let original_fen = board.to_string();
 
-    let generator = Generator::new();
     let mut moves = Vec::new();
-    generator.legal(&board, &mut moves);
+    movegen::legal(&board, &mut moves);
 
     let promo_move = moves
         .iter()
@@ -121,7 +115,6 @@ fn test_make_unmake_promotion() {
 fn test_halfmove_clock() {
     let mut board = Board::starting_position().unwrap();
 
-    // e2e4 (pawn move - reset clock)
     let e2 = Square::new(File::E, Rank::Two);
     let e4 = Square::new(File::E, Rank::Four);
     let mv = Move::new(e2, e4, aether_core::Piece::Pawn).with_flags(aether_core::MoveFlags {
