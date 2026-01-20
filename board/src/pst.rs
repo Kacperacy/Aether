@@ -1,6 +1,5 @@
 use aether_core::{Color, PIECE_VALUES, Piece, Square};
 
-/// Pawn middlegame PST
 #[rustfmt::skip]
 const PAWN_PST_MG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -13,7 +12,6 @@ const PAWN_PST_MG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Knight middlegame PST
 #[rustfmt::skip]
 const KNIGHT_PST_MG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
@@ -26,7 +24,6 @@ const KNIGHT_PST_MG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
 ];
 
-/// Bishop middlegame PST
 #[rustfmt::skip]
 const BISHOP_PST_MG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
@@ -39,7 +36,6 @@ const BISHOP_PST_MG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
 ];
 
-/// Rook middlegame PST
 #[rustfmt::skip]
 const ROOK_PST_MG: [i32; 64] = [
       0,   0,   0,   5,   5,   0,   0,   0,
@@ -52,7 +48,6 @@ const ROOK_PST_MG: [i32; 64] = [
      -5,   0,   5,  10,  10,   5,   0,  -5,
 ];
 
-/// Queen middlegame PST
 #[rustfmt::skip]
 const QUEEN_PST_MG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
@@ -65,7 +60,6 @@ const QUEEN_PST_MG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
 ];
 
-/// King middlegame PST
 #[rustfmt::skip]
 const KING_PST_MG: [i32; 64] = [
     -50, -40, -30, -20, -20, -30, -40, -50,
@@ -78,7 +72,6 @@ const KING_PST_MG: [i32; 64] = [
      20,  30,  -5, -30, -10, -30,  30,  20,
 ];
 
-/// Pawn endgame PST
 #[rustfmt::skip]
 const PAWN_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -91,7 +84,6 @@ const PAWN_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Knight endgame PST
 #[rustfmt::skip]
 const KNIGHT_PST_EG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
@@ -104,7 +96,6 @@ const KNIGHT_PST_EG: [i32; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
 ];
 
-/// Bishop endgame PST
 #[rustfmt::skip]
 const BISHOP_PST_EG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
@@ -117,7 +108,6 @@ const BISHOP_PST_EG: [i32; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
 ];
 
-/// Rook endgame PST
 #[rustfmt::skip]
 const ROOK_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -130,7 +120,6 @@ const ROOK_PST_EG: [i32; 64] = [
       0,   0,   0,   0,   0,   0,   0,   0,
 ];
 
-/// Queen endgame PST
 #[rustfmt::skip]
 const QUEEN_PST_EG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
@@ -143,7 +132,6 @@ const QUEEN_PST_EG: [i32; 64] = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
 ];
 
-/// King endgame PST
 #[rustfmt::skip]
 const KING_PST_EG: [i32; 64] = [
     -50, -30, -20, -10, -10, -20, -30, -50,
@@ -156,7 +144,6 @@ const KING_PST_EG: [i32; 64] = [
     -50, -30, -20, -10, -10, -20, -30, -50,
 ];
 
-/// All PST tables for middlegame indexed by piece type
 const PST_MG: [[i32; 64]; 6] = [
     PAWN_PST_MG,
     KNIGHT_PST_MG,
@@ -166,7 +153,6 @@ const PST_MG: [[i32; 64]; 6] = [
     KING_PST_MG,
 ];
 
-/// All PST tables for endgame indexed by piece type
 const PST_EG: [[i32; 64]; 6] = [
     PAWN_PST_EG,
     KNIGHT_PST_EG,
@@ -176,7 +162,6 @@ const PST_EG: [[i32; 64]; 6] = [
     KING_PST_EG,
 ];
 
-/// Get PST index for a square from a specific color's perspective
 #[inline(always)]
 fn pst_index(square: Square, color: Color) -> usize {
     match color {
@@ -185,8 +170,6 @@ fn pst_index(square: Square, color: Color) -> usize {
     }
 }
 
-/// Get the PST + material value for a piece on a square
-/// Returns (middlegame_value, endgame_value) from white's perspective
 #[inline(always)]
 pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
     let idx = pst_index(square, color);
@@ -202,8 +185,6 @@ pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
     }
 }
 
-/// Compute full PST score for a board position
-/// Returns (middlegame_score, endgame_score) from white's perspective
 pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32) {
     use aether_core::{ALL_COLORS, ALL_PIECES};
 

@@ -1,35 +1,20 @@
 use aether_core::{BitBoard, CastlingRights, Color, Piece, Square};
 
-/// Stores all irreversible game state that must be preserved for unmake_move.
-/// This follows the Stockfish pattern where StateInfo contains both the current
-/// game state and serves as history entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StateInfo {
-    /// Castling availability for both sides
     pub castling_rights: [CastlingRights; 2],
-    /// Valid en passant target square (if any)
     pub en_passant_square: Option<Square>,
-    /// Halfmove clock for 50-move rule (resets on pawn move or capture)
     pub halfmove_clock: u16,
-    /// Piece captured on this move (for unmake)
     pub captured_piece: Option<(Piece, Color)>,
 
-    /// Zobrist hash of the position
     pub zobrist_hash: u64,
-    /// Game phase for tapered evaluation (0 = endgame, 256 = opening)
     pub game_phase: i16,
-    /// Piece-square table middlegame score
     pub pst_mg: i32,
-    /// Piece-square table endgame score
     pub pst_eg: i32,
 
-    /// Cached king squares for both sides [White, Black]
     pub king_square: [Square; 2],
-    /// Pieces giving check to the side to move (computed after each move)
     pub checkers: BitBoard,
-    /// Pieces blocking slider attacks on our king [White, Black]
     pub blockers_for_king: [BitBoard; 2],
-    /// Enemy pieces pinning our pieces to our king [White, Black]
     pub pinners: [BitBoard; 2],
 }
 
