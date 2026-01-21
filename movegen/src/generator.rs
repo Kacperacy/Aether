@@ -188,8 +188,7 @@ fn generate_castling_moves(board: &Board, king_square: Square, side: Color, move
         let f_square = Square::new(File::F, back);
         let g_square = Square::new(File::G, back);
 
-        let path_clear =
-            !board.is_square_occupied(f_square) && !board.is_square_occupied(g_square);
+        let path_clear = !board.is_square_occupied(f_square) && !board.is_square_occupied(g_square);
         let path_safe = !board.is_square_attacked(king_start, opponent)
             && !board.is_square_attacked(f_square, opponent)
             && !board.is_square_attacked(g_square, opponent);
@@ -248,9 +247,7 @@ pub fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
                 Piece::Pawn => {
                     generate_pawn_moves(board, square, side, occupied, opponent_pieces, moves)
                 }
-                Piece::Knight => {
-                    generate_knight_moves(board, square, occupied, own_pieces, moves)
-                }
+                Piece::Knight => generate_knight_moves(board, square, occupied, own_pieces, moves),
                 Piece::Bishop | Piece::Rook | Piece::Queen => {
                     generate_slider_moves(board, square, piece, occupied, own_pieces, moves)
                 }
