@@ -6,19 +6,10 @@ pub mod tt;
 pub use tt::{NodeType, TTEntry, TranspositionTable};
 
 use aether_core::{Move, Score};
-use board::Board;
 use std::time::Duration;
 
 const MAX_PLY: usize = 128;
-const MAX_PV_LENGTH: usize = 64;
-
-pub trait Searcher {
-    fn search(&mut self, board: &Board, limits: &SearchLimits) -> SearchResult;
-
-    fn get_info(&self) -> &SearchInfo;
-
-    fn stop(&mut self);
-}
+const MAX_PV_LENGTH: usize = MAX_PLY;
 
 #[derive(Debug, Clone)]
 pub struct SearchLimits {

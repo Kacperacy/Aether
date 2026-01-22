@@ -4,7 +4,9 @@ use crate::search::{
     MAX_PLY, MAX_PV_LENGTH, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry,
     TranspositionTable,
 };
-use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, QUEEN_VALUE, Score, mated_in};
+use aether_core::{
+    MATE_SCORE, Move, NEG_MATE_SCORE, PAWN_VALUE, Piece, QUEEN_VALUE, Score, mated_in,
+};
 use board::Board;
 use std::mem;
 use std::sync::Arc;
@@ -13,6 +15,7 @@ use std::time::{Duration, Instant};
 
 const NODE_CHECK_MASK: u64 = 0xFFF;
 const DELTA_PRUNING_MARGIN: Score = 200;
+const DELTA_MAX_GAIN: Score = QUEEN_VALUE * 2 - PAWN_VALUE;
 const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
 const LMR_FULL_DEPTH_MOVES: usize = 4;
@@ -26,7 +29,6 @@ const FUTILITY_MAX_DEPTH: u8 = 3;
 const RFP_MARGIN: Score = 120;
 const RFP_MAX_DEPTH: u8 = 3;
 const PV_COLLECTION_LIMIT: usize = 32;
-const MOVE_LIST_POOL_SIZE: usize = 128;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -37,6 +39,7 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     start_time: Option<Instant>,
     soft_limit: Option<Duration>,
     hard_limit: Option<Duration>,
+    nodes_limit: Option<u64>,
     pv_table: [[Move; MAX_PV_LENGTH]; MAX_PV_LENGTH],
     pv_length: [usize; MAX_PV_LENGTH],
     move_lists: Vec<Vec<Move>>,
@@ -44,7 +47,7 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
     pub fn new(evaluator: E, tt_size_mb: usize) -> Self {
-        let move_lists = (0..MOVE_LIST_POOL_SIZE)
+        let move_lists = (0..MAX_PLY)
             .map(|_| Vec::with_capacity(AVG_LEGAL_MOVES))
             .collect();
 
@@ -57,6 +60,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             start_time: None,
             soft_limit: None,
             hard_limit: None,
+            nodes_limit: None,
             pv_table: [[Move::default(); MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
             move_lists,
@@ -102,7 +106,9 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.start_time = Some(Instant::now());
         self.soft_limit = limits.time;
         self.hard_limit = limits.hard_time;
+        self.nodes_limit = limits.nodes;
         self.move_orderer.clear_repetitions();
+        self.tt.new_search();
 
         let start_time = self.start_time.unwrap();
         let max_depth = limits.depth.unwrap_or(MAX_PLY as u8).min(MAX_PLY as u8);
@@ -129,9 +135,17 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         if legal_moves.len() == 1 {
             let only_move = legal_moves[0];
-            board.make_move(&only_move).ok();
-            let score = -self.evaluator.evaluate(board);
-            board.unmake_move(&only_move).ok();
+            board
+                .make_move(&only_move)
+                .expect("legal move should not fail");
+            let score = -self.quiescence(board, 1, 0, NEG_MATE_SCORE, MATE_SCORE);
+            board
+                .unmake_move(&only_move)
+                .expect("unmake should not fail");
+
+            self.info.depth = 1;
+            self.info.time_elapsed = start_time.elapsed();
+            self.info.calculate_nps();
 
             return SearchResult {
                 best_move: Some(only_move),
@@ -255,6 +269,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         is_pv_node: bool,
     ) -> Score {
         self.info.nodes += 1;
+
+        if ply as u8 > self.info.selective_depth {
+            self.info.selective_depth = ply as u8;
+        }
+
         if ply < PV_COLLECTION_LIMIT {
             self.pv_length[ply] = 0;
         }
@@ -294,6 +313,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         // ===== Transposition table probe =====
         let zobrist_key = board.zobrist_hash_raw();
+        self.tt.prefetch(zobrist_key);
         let mut tt_move: Option<Move> = None;
 
         if let Some(entry) = self.tt.probe(zobrist_key) {
@@ -488,7 +508,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     self.move_orderer.update_history(*mv, depth as usize);
                 }
 
-                let tt_score = TTEntry::score_to_tt(beta, ply);
+                let tt_score = TTEntry::score_to_tt(best_score, ply);
                 let entry = TTEntry::new(
                     zobrist_key,
                     best_move,
@@ -500,7 +520,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 self.tt.store(entry);
 
                 self.move_lists[ply] = moves;
-                return beta;
+                return best_score;
             }
 
             if score > alpha {
@@ -535,6 +555,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
     ) -> Score {
         self.info.nodes += 1;
 
+        if ply as u8 > self.info.selective_depth {
+            self.info.selective_depth = ply as u8;
+        }
+
         if self.should_abort_search() {
             return 0;
         }
@@ -549,14 +573,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let stand_pat = self.evaluator.evaluate(board);
 
             if stand_pat >= beta {
-                return beta;
+                return stand_pat;
             }
 
             if stand_pat > alpha {
                 alpha = stand_pat;
             }
 
-            if stand_pat + QUEEN_VALUE + DELTA_PRUNING_MARGIN < alpha {
+            if stand_pat + DELTA_MAX_GAIN + DELTA_PRUNING_MARGIN < alpha {
                 return alpha;
             }
         }
@@ -576,7 +600,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        self.move_orderer.order_moves(&mut moves);
+        let side = board.side_to_move();
+        let occupied = board.occupied();
+        let pieces = board.pieces();
+        self.move_orderer
+            .order_moves_with_see(&mut moves, None, ply, side, occupied, pieces);
 
         for mv in moves {
             if board.make_move(&mv).is_err() {
@@ -586,7 +614,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let _ = board.unmake_move(&mv);
 
             if score >= beta {
-                return beta;
+                return score;
             }
 
             if score > alpha {
@@ -618,6 +646,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 if start.elapsed() >= limit {
                     return true;
                 }
+            }
+        }
+
+        if let Some(limit) = self.nodes_limit {
+            if self.info.nodes >= limit {
+                return true;
             }
         }
 

@@ -4,7 +4,7 @@ use crate::uci::{
     EngineInfo, InfoResponse, OptionInfo, OptionType, SearchParams, UciCommand, UciInput,
     UciResponse, send_response, send_responses,
 };
-use aether_core::{Color, Move, Piece};
+use aether_core::{Color, Move, Piece, score_to_mate_moves};
 use board::Board;
 use engine::Engine;
 use std::str::FromStr;
@@ -221,28 +221,37 @@ impl UciHandler {
     fn cmd_go(&mut self, params: SearchParams) {
         let is_white = self.board.side_to_move() == Color::White;
         let time_limit = params.calculate_move_time(is_white);
+        let hard_limit = params.calculate_hard_limit(is_white);
         let depth_limit = params.depth;
+        let nodes_limit = params.nodes;
+        let infinite = params.infinite;
 
         // Perform search with callback for UCI info
         let result = self.engine.search(
             &mut self.board,
             depth_limit,
             time_limit,
+            hard_limit,
+            nodes_limit,
+            infinite,
             |info, best_move, score| {
                 // Send UCI info for each completed depth
                 if let Some(_mv) = best_move {
                     let pv: Vec<String> = info.pv.iter().map(|m| Self::move_to_uci(m)).collect();
 
-                    send_response(&UciResponse::Info(
-                        InfoResponse::new()
-                            .with_depth(info.depth)
-                            .with_score_cp(score)
-                            .with_nodes(info.nodes)
-                            .with_time(info.time_elapsed.as_millis() as u64)
-                            .with_nps(info.nps)
-                            .with_hashfull(info.hash_full)
-                            .with_pv(pv),
-                    ));
+                    let mut response = InfoResponse::new()
+                        .with_depth(info.depth)
+                        .with_seldepth(info.selective_depth)
+                        .with_nodes(info.nodes)
+                        .with_time(info.time_elapsed.as_millis() as u64)
+                        .with_nps(info.nps)
+                        .with_hashfull(info.hash_full)
+                        .with_pv(pv);
+
+                    // Handle mate scores vs centipawn scores
+                    response = Self::add_score_to_info(response, score);
+
+                    send_response(&UciResponse::Info(response));
                 }
             },
         );
@@ -271,6 +280,13 @@ impl UciHandler {
             });
         }
         s
+    }
+
+    fn add_score_to_info(info: InfoResponse, score: i32) -> InfoResponse {
+        match score_to_mate_moves(score) {
+            Some(mate_moves) => info.with_score_mate(mate_moves),
+            None => info.with_score_cp(score),
+        }
     }
 
     fn cmd_stop(&mut self) {

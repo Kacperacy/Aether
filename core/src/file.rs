@@ -3,6 +3,17 @@ use crate::{BitBoard, CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
+pub const FILE_MASKS: [u64; 8] = [
+    0x0101010101010101,
+    0x0202020202020202,
+    0x0404040404040404,
+    0x0808080808080808,
+    0x1010101010101010,
+    0x2020202020202020,
+    0x4040404040404040,
+    0x8080808080808080,
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum File {

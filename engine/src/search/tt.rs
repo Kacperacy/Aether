@@ -1,12 +1,10 @@
-use aether_core::{Move, Score};
-
-const MATE_THRESHOLD: Score = 90000;
+use aether_core::{MATE_THRESHOLD, Move, Score};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
-    Exact,      // PV node
-    LowerBound, // fail-high
-    UpperBound, // fail-low
+    Exact,
+    LowerBound,
+    UpperBound,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -38,7 +36,6 @@ impl TTEntry {
         }
     }
 
-    /// Adjusts mate scores for storage (accounts for ply)
     #[inline]
     pub fn score_to_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
@@ -50,7 +47,6 @@ impl TTEntry {
         }
     }
 
-    /// Adjusts mate scores for retrieval (accounts for ply)
     #[inline]
     pub fn score_from_tt(score: Score, ply: usize) -> Score {
         if score > MATE_THRESHOLD {
@@ -67,7 +63,6 @@ pub struct TranspositionTable {
     entries: Vec<Option<TTEntry>>,
     size: usize,
     generation: u8,
-    used: usize,
 }
 
 impl TranspositionTable {
@@ -75,14 +70,16 @@ impl TranspositionTable {
         let entry_size = std::mem::size_of::<Option<TTEntry>>();
         let num_entries = (size_mb * 1024 * 1024) / entry_size;
 
-        // Round down to power of 2 for fast indexing
-        let size = num_entries.next_power_of_two() / 2;
+        let size = if num_entries.is_power_of_two() {
+            num_entries
+        } else {
+            num_entries.next_power_of_two() / 2
+        };
 
         Self {
             entries: vec![None; size],
             size,
             generation: 0,
-            used: 0,
         }
     }
 
@@ -91,14 +88,11 @@ impl TranspositionTable {
         (key as usize) & (self.size - 1)
     }
 
-    /// Prefetch TT entry for the given key into CPU cache
-    /// This should be called before make_move to hide memory latency
     #[inline]
     pub fn prefetch(&self, key: u64) {
         let idx = self.index(key);
         let ptr = self.entries.as_ptr().wrapping_add(idx) as *const i8;
 
-        // Use platform-specific prefetch intrinsics
         #[cfg(target_arch = "x86_64")]
         unsafe {
             std::arch::x86_64::_mm_prefetch(ptr, std::arch::x86_64::_MM_HINT_T0);
@@ -109,7 +103,6 @@ impl TranspositionTable {
             std::arch::x86::_mm_prefetch(ptr, std::arch::x86::_MM_HINT_T0);
         }
 
-        // For other architectures, this is a no-op
         #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
         let _ = ptr;
     }
@@ -124,16 +117,12 @@ impl TranspositionTable {
     pub fn store(&mut self, entry: TTEntry) {
         let idx = self.index(entry.key);
 
-        // Replace if: empty, same position, higher depth, or newer generation
         let should_replace = match &self.entries[idx] {
-            None => {
-                self.used += 1;
-                true
-            }
+            None => true,
             Some(existing) => {
                 existing.key == entry.key
                     || entry.depth >= existing.depth
-                    || entry.age != existing.age
+                    || (entry.age != existing.age && entry.depth + 3 >= existing.depth)
             }
         };
 
@@ -144,7 +133,6 @@ impl TranspositionTable {
 
     pub fn clear(&mut self) {
         self.entries.fill(None);
-        self.used = 0;
         self.generation = 0;
     }
 
@@ -156,27 +144,30 @@ impl TranspositionTable {
         self.generation
     }
 
-    /// Returns usage in permille (0-1000)
     pub fn hashfull(&self) -> u16 {
-        ((self.used as u64 * 1000) / self.size as u64) as u16
-    }
+        const SAMPLE_SIZE: usize = 1000;
+        let sample_count = SAMPLE_SIZE.min(self.size);
 
-    pub fn len(&self) -> usize {
-        self.used
-    }
+        let filled = self.entries[..sample_count]
+            .iter()
+            .filter(|e| e.is_some())
+            .count();
 
-    pub fn is_empty(&self) -> bool {
-        self.used == 0
+        ((filled * 1000) / sample_count) as u16
     }
 
     pub fn resize(&mut self, size_mb: usize) {
         let entry_size = std::mem::size_of::<Option<TTEntry>>();
         let num_entries = (size_mb * 1024 * 1024) / entry_size;
-        let size = num_entries.next_power_of_two() / 2;
+
+        let size = if num_entries.is_power_of_two() {
+            num_entries
+        } else {
+            num_entries.next_power_of_two() / 2
+        };
 
         self.entries = vec![None; size];
         self.size = size;
-        self.used = 0;
         self.generation = 0;
     }
 }

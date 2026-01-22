@@ -1,15 +1,9 @@
-//! Static Exchange Evaluation (SEE)
-//!
-//! Evaluates the outcome of a sequence of captures on a single square,
-//! assuming both sides always recapture with their least valuable piece.
-
 use aether_core::{
     BISHOP_VALUE, BitBoard, Color, KNIGHT_VALUE, Move, PAWN_VALUE, PIECE_VALUES, Piece,
     QUEEN_VALUE, ROOK_VALUE, Score, Square, bishop_attacks, king_attacks, knight_attacks,
     pawn_attacks, rook_attacks,
 };
 
-/// Returns true if the capture's SEE value is >= threshold.
 #[inline]
 pub fn see_ge(
     mv: &Move,
@@ -26,12 +20,19 @@ pub fn see_ge(
         None => return threshold <= 0,
     };
 
-    let mut swap = target_value - threshold;
+    let (promotion_gain, attacker_value) = match mv.promotion {
+        Some(promo_piece) => {
+            let promo_value = PIECE_VALUES[promo_piece as usize];
+            (promo_value - PAWN_VALUE, promo_value)
+        }
+        None => (0, PIECE_VALUES[mv.piece as usize]),
+    };
+
+    let mut swap = target_value + promotion_gain - threshold;
     if swap < 0 {
         return false;
     }
 
-    let attacker_value = PIECE_VALUES[mv.piece as usize];
     swap = attacker_value - swap;
     if swap <= 0 {
         return true;
@@ -53,7 +54,6 @@ pub fn see_ge(
 
         result ^= 1;
 
-        // Pawns
         let pawn_attackers = stm_attackers & pieces[stm as usize][Piece::Pawn as usize];
         if !pawn_attackers.is_empty() {
             swap = PAWN_VALUE - swap;
@@ -67,7 +67,6 @@ pub fn see_ge(
             continue;
         }
 
-        // Knights
         let knight_attackers = stm_attackers & pieces[stm as usize][Piece::Knight as usize];
         if !knight_attackers.is_empty() {
             swap = KNIGHT_VALUE - swap;
@@ -80,7 +79,6 @@ pub fn see_ge(
             continue;
         }
 
-        // Bishops
         let bishop_attackers = stm_attackers & pieces[stm as usize][Piece::Bishop as usize];
         if !bishop_attackers.is_empty() {
             swap = BISHOP_VALUE - swap;
@@ -94,7 +92,6 @@ pub fn see_ge(
             continue;
         }
 
-        // Rooks
         let rook_attackers = stm_attackers & pieces[stm as usize][Piece::Rook as usize];
         if !rook_attackers.is_empty() {
             swap = ROOK_VALUE - swap;
@@ -108,7 +105,6 @@ pub fn see_ge(
             continue;
         }
 
-        // Queens
         let queen_attackers = stm_attackers & pieces[stm as usize][Piece::Queen as usize];
         if !queen_attackers.is_empty() {
             swap = QUEEN_VALUE - swap;
@@ -120,7 +116,6 @@ pub fn see_ge(
             continue;
         }
 
-        // Only king left
         let opponent_attackers = attackers & get_color_pieces(stm.opponent(), pieces);
         return opponent_attackers.is_empty() != (result != 0);
     }
@@ -128,7 +123,6 @@ pub fn see_ge(
     result != 0
 }
 
-/// Returns the exact SEE value of a capture.
 #[inline]
 pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard; 6]; 2]) -> Score {
     let to = mv.to;
@@ -139,17 +133,23 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
         None => return 0,
     };
 
+    let (promotion_gain, attacker_value) = match mv.promotion {
+        Some(promo_piece) => {
+            let promo_value = PIECE_VALUES[promo_piece as usize];
+            (promo_value - PAWN_VALUE, promo_value)
+        }
+        None => (0, PIECE_VALUES[mv.piece as usize]),
+    };
+
     let mut gain: [Score; 32] = [0; 32];
     let mut depth = 0;
 
-    gain[0] = target_value;
+    gain[0] = target_value + promotion_gain;
 
-    // Remove both attacker and victim from occupied
     let mut occ = occupied ^ from.bitboard() ^ to.bitboard();
 
     let mut attackers = all_attackers_to_square(to, occ, pieces);
 
-    // Add X-ray attackers revealed by removing the initial piece
     if matches!(mv.piece, Piece::Pawn | Piece::Bishop | Piece::Queen) {
         attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
     }
@@ -158,7 +158,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     }
     attackers &= occ;
 
-    let mut current_piece_value = PIECE_VALUES[mv.piece as usize];
+    let mut current_piece_value = attacker_value;
     let mut stm = side.opponent();
 
     while let Some((attacker_sq, attacker_piece)) =

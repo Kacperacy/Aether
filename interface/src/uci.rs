@@ -298,8 +298,18 @@ impl InfoResponse {
         self
     }
 
+    pub fn with_seldepth(mut self, seldepth: u8) -> Self {
+        self.seldepth = Some(seldepth);
+        self
+    }
+
     pub fn with_score_cp(mut self, score: i32) -> Self {
         self.score_cp = Some(score);
+        self
+    }
+
+    pub fn with_score_mate(mut self, mate: i32) -> Self {
+        self.score_mate = Some(mate);
         self
     }
 

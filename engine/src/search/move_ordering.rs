@@ -75,7 +75,7 @@ impl MoveOrderer {
 
     #[inline]
     pub fn store_killer(&mut self, mv: Move, ply: usize) {
-        if ply >= MAX_PLY || mv.capture.is_some() {
+        if ply >= MAX_PLY || mv.capture.is_some() || mv.promotion.is_some() {
             return;
         }
 
@@ -85,6 +85,7 @@ impl MoveOrderer {
         }
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn is_killer(&self, mv: &Move, ply: usize) -> bool {
         if ply >= MAX_PLY {
@@ -93,6 +94,21 @@ impl MoveOrderer {
         self.killers[ply][0] == Some(*mv) || self.killers[ply][1] == Some(*mv)
     }
 
+    #[inline]
+    fn killer_score(&self, mv: &Move, ply: usize) -> Option<i32> {
+        if ply >= MAX_PLY {
+            return None;
+        }
+        if self.killers[ply][0] == Some(*mv) {
+            Some(8_500)
+        } else if self.killers[ply][1] == Some(*mv) {
+            Some(8_000)
+        } else {
+            None
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn order_moves(&self, moves: &mut [Move]) {
         moves.sort_unstable_by(|a, b| {
             let a_score = self.move_score(a);
@@ -130,30 +146,27 @@ impl MoveOrderer {
         }
 
         if let Some(captured) = mv.capture {
+            let promo_bonus = mv.promotion.map(|p| p.value()).unwrap_or(0);
             let mvv_lva = captured.value() - mv.piece.value();
 
-            // Only calculate SEE for potentially bad captures (when attacker >= victim)
-            // Good captures (pawn takes queen, etc.) don't need SEE verification
             if mvv_lva >= 0 {
-                // Clearly good capture - skip SEE
-                return GOOD_CAPTURE_SCORE + 10 * captured.value() - mv.piece.value();
+                return GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured.value() - mv.piece.value();
             }
 
-            // Potentially bad capture - calculate SEE to verify
             let see = see_value(mv, side, occupied, pieces);
-            if see >= 0 {
-                return GOOD_CAPTURE_SCORE + 10 * captured.value() - mv.piece.value();
+            return if see >= 0 {
+                GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured.value() - mv.piece.value()
             } else {
-                return BAD_CAPTURE_SCORE + see;
-            }
+                BAD_CAPTURE_SCORE + promo_bonus + see
+            };
         }
 
         if let Some(promo) = mv.promotion {
             return 9_000 + promo.value();
         }
 
-        if self.is_killer(mv, ply) {
-            return 8_000;
+        if let Some(killer_score) = self.killer_score(mv, ply) {
+            return killer_score;
         }
 
         if self.is_repetition_move(mv) {
@@ -163,6 +176,7 @@ impl MoveOrderer {
         self.history_score(mv)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     fn move_score(&self, mv: &Move) -> i32 {
         let mut score = 0;
