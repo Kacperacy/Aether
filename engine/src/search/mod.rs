@@ -1,15 +1,25 @@
 pub mod alpha_beta;
+pub mod mcts;
 mod move_ordering;
+pub mod mtdf;
+pub mod negascout;
 pub mod see;
+pub mod searcher;
 pub mod tt;
 
+pub use alpha_beta::{FullAlphaBetaSearcher, PureAlphaBetaSearcher};
+pub use mcts::{ClassicMctsSearcher, MctsSearcher};
+pub use mtdf::MtdfSearcher;
+pub use negascout::PureNegaScoutSearcher;
+pub use searcher::{Searcher, SearcherType};
 pub use tt::{NodeType, TTEntry, TranspositionTable};
 
+use crate::eval::SimpleEvaluator;
 use aether_core::{Move, Score};
 use std::time::Duration;
 
-const MAX_PLY: usize = 128;
-const MAX_PV_LENGTH: usize = MAX_PLY;
+pub(crate) const MAX_PLY: usize = 128;
+pub(crate) const MAX_PV_LENGTH: usize = MAX_PLY;
 
 #[derive(Debug, Clone)]
 pub struct SearchLimits {
@@ -23,7 +33,7 @@ pub struct SearchLimits {
 impl Default for SearchLimits {
     fn default() -> Self {
         Self {
-            depth: Some(3), // Default depth of 3
+            depth: Some(3),
             nodes: None,
             time: None,
             hard_time: None,
@@ -139,5 +149,19 @@ impl SearchResult {
             pv,
             info,
         }
+    }
+}
+
+/// Factory function to create a searcher based on the type
+pub fn create_searcher(searcher_type: SearcherType, tt_size_mb: usize) -> Box<dyn Searcher> {
+    let evaluator = SimpleEvaluator::new();
+
+    match searcher_type {
+        SearcherType::PureAlphaBeta => Box::new(PureAlphaBetaSearcher::new(evaluator)),
+        SearcherType::FullAlphaBeta => Box::new(FullAlphaBetaSearcher::new(evaluator, tt_size_mb)),
+        SearcherType::Mtdf => Box::new(MtdfSearcher::new(evaluator, tt_size_mb)),
+        SearcherType::NegaScout => Box::new(PureNegaScoutSearcher::new(evaluator)),
+        SearcherType::Mcts => Box::new(MctsSearcher::new(evaluator)),
+        SearcherType::ClassicMcts => Box::new(ClassicMctsSearcher::new()),
     }
 }

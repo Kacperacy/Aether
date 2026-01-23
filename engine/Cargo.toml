@@ -7,3 +7,4 @@ edition = "2024"
 board = { workspace = true }
 aether-core = { workspace = true }
 movegen = { workspace = true }
+rand = { workspace = true }

@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "aether-core",
  "board",
+ "engine",
  "interface",
  "movegen",
 ]
@@ -62,6 +63,7 @@ dependencies = [
  "aether-core",
  "board",
  "movegen",
+ "rand",
 ]
 
 [[package]]

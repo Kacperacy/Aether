@@ -6,6 +6,7 @@ use crate::uci::{
 };
 use aether_core::{Color, Move, Piece, score_to_mate_moves};
 use board::Board;
+use engine::search::SearcherType;
 use engine::Engine;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -20,6 +21,8 @@ pub struct EngineOptions {
     pub threads: usize,
     /// Whether to show debug output
     pub debug: bool,
+    /// Search algorithm
+    pub algorithm: SearcherType,
 }
 
 impl Default for EngineOptions {
@@ -28,6 +31,7 @@ impl Default for EngineOptions {
             hash_size: 16,
             threads: 1,
             debug: false,
+            algorithm: SearcherType::default(),
         }
     }
 }
@@ -47,16 +51,24 @@ pub struct UciHandler {
 }
 
 impl UciHandler {
-    /// Create a new UCI handler
+    /// Create a new UCI handler with default settings
     pub fn new() -> Self {
-        let engine = Engine::new(16);
+        Self::with_engine(Engine::new(16))
+    }
+
+    /// Create a new UCI handler with a custom engine
+    pub fn with_engine(engine: Engine) -> Self {
         let stop_flag = engine.stop_flag();
+        let algorithm = engine.searcher_type();
 
         Self {
             info: EngineInfo::default(),
             board: Board::starting_position().expect("Failed to create starting position"),
             engine,
-            options: EngineOptions::default(),
+            options: EngineOptions {
+                algorithm,
+                ..EngineOptions::default()
+            },
             stop_flag,
         }
     }
@@ -93,6 +105,7 @@ impl UciHandler {
             UciCommand::Quit => {}      // Handled in main loop
             UciCommand::Display => self.cmd_display(),
             UciCommand::Perft(depth) => self.cmd_perft(depth),
+            UciCommand::Bench(depth) => self.cmd_bench(depth),
             UciCommand::Unknown(s) => {
                 if self.options.debug {
                     send_response(&UciResponse::Info(
@@ -128,6 +141,20 @@ impl UciHandler {
             },
         }));
 
+        send_response(&UciResponse::Option(OptionInfo {
+            name: "Algorithm".to_string(),
+            option_type: OptionType::Combo {
+                default: "FullAlphaBeta".to_string(),
+                options: vec![
+                    "PureAlphaBeta".to_string(),
+                    "FullAlphaBeta".to_string(),
+                    "Mtdf".to_string(),
+                    "NegaScout".to_string(),
+                    "MCTS".to_string(),
+                ],
+            },
+        }));
+
         send_response(&UciResponse::UciOk);
     }
 
@@ -153,6 +180,14 @@ impl UciHandler {
                 if let Some(v) = value {
                     if let Ok(t) = v.parse::<usize>() {
                         self.options.threads = t.clamp(1, 1);
+                    }
+                }
+            }
+            "algorithm" => {
+                if let Some(v) = value {
+                    if let Ok(algo) = v.parse::<SearcherType>() {
+                        self.options.algorithm = algo;
+                        self.engine.set_searcher_type(algo);
                     }
                 }
             }
@@ -327,6 +362,97 @@ impl UciHandler {
         println!("Nodes: {}", total);
         println!("Time: {:?}", elapsed);
         println!("NPS: {}", nps);
+    }
+
+    fn cmd_bench(&mut self, depth: Option<u8>) {
+        use std::time::{Duration, Instant};
+
+        // Standard benchmark positions (16 positions)
+        const BENCH_POSITIONS: &[&str] = &[
+            // Starting position
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            // Kiwipete - complex tactical position
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            // Endgame position
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+            // Complex position with promotions
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+            // Another promotion test
+            "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+            // Position from a real game
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+            // Middlegame with tension
+            "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+            // Rook endgame
+            "8/8/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/4k3 w - - 0 1",
+            // Queen vs pieces
+            "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9",
+            // Closed position
+            "r1bq1rk1/pp3ppp/2nbpn2/3p4/3P4/1PN1PN2/PBP2PPP/R2QKB1R w KQ - 0 8",
+            // Open position
+            "r1bqr1k1/pp1n1pbp/2p2np1/3p4/3P4/2N1PN2/PP2BPPP/R1BQ1RK1 w - - 0 10",
+            // Tactical position - pins
+            "r2qk2r/pb1nbppp/1pp1pn2/3p4/2PP4/1PN1PN2/PB2BPPP/R2QK2R w KQkq - 0 9",
+            // Knight outpost
+            "r1bq1rk1/ppp2ppp/2np1n2/4p1B1/1bB1P3/2NP1N2/PPP2PPP/R2QK2R w KQ - 0 7",
+            // Pawn structure
+            "r2qkb1r/pp2pppp/2n2n2/3p4/3P4/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 6",
+            // Complex tactics
+            "r1b1k2r/ppppnppp/2n2q2/2b5/3NP3/2P1B3/PP3PPP/RN1QKB1R w KQkq - 0 7",
+            // Endgame with passed pawn
+            "8/5pk1/5p2/3P4/1p5p/1P3P1P/5KP1/8 w - - 0 1",
+        ];
+
+        let depth = depth.unwrap_or(12);
+        let mut total_nodes = 0u64;
+        let mut total_time = Duration::ZERO;
+        let start = Instant::now();
+
+        println!("Running benchmark at depth {}...", depth);
+        println!();
+
+        for (i, fen) in BENCH_POSITIONS.iter().enumerate() {
+            let mut board: Board = fen.parse().expect("Invalid benchmark FEN");
+            self.engine.new_game();
+
+            let pos_start = Instant::now();
+            let result = self.engine.search(
+                &mut board,
+                Some(depth),
+                None,
+                None,
+                None,
+                false,
+                |_, _, _| {},
+            );
+
+            let pos_time = pos_start.elapsed();
+            total_nodes += result.info.nodes;
+            total_time += pos_time;
+
+            let best_move = result
+                .best_move
+                .map(|m| Self::move_to_uci(&m))
+                .unwrap_or_else(|| "none".to_string());
+
+            println!(
+                "Position {:2}: {} nodes, {:?}, best: {}",
+                i + 1,
+                result.info.nodes,
+                pos_time,
+                best_move
+            );
+        }
+
+        let elapsed = start.elapsed();
+        let nps = if elapsed.as_millis() > 0 {
+            total_nodes * 1000 / elapsed.as_millis() as u64
+        } else {
+            0
+        };
+
+        println!();
+        println!("{} nodes {:.3}s nps {}", total_nodes, elapsed.as_secs_f64(), nps);
     }
 }
 

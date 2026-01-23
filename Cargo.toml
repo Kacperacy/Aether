@@ -9,7 +9,32 @@ edition = "2024"
 aether-core = { workspace = true }
 board = { workspace = true }
 movegen = { workspace = true }
+engine = { workspace = true }
 interface = { workspace = true }
+
+[[bin]]
+name = "aether"
+path = "src/main.rs"
+
+[[bin]]
+name = "aether-pure"
+path = "src/bin/pure.rs"
+
+[[bin]]
+name = "aether-mtdf"
+path = "src/bin/mtdf.rs"
+
+[[bin]]
+name = "aether-negascout"
+path = "src/bin/negascout.rs"
+
+[[bin]]
+name = "aether-mcts"
+path = "src/bin/mcts.rs"
+
+[[bin]]
+name = "aether-classic-mcts"
+path = "src/bin/classic_mcts.rs"
 
 [workspace]
 members = [

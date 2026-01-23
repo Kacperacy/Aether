@@ -1,26 +1,56 @@
 mod eval;
 pub mod search;
 
-use crate::eval::SimpleEvaluator;
-use crate::search::alpha_beta::AlphaBetaSearcher;
-use crate::search::{SearchInfo, SearchLimits, SearchResult};
+use crate::search::{SearchInfo, SearchLimits, SearchResult, Searcher, SearcherType, create_searcher};
 use aether_core::{Move, Score};
 use board::Board;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
+pub use search::SearcherType as AlgorithmType;
+
 pub struct Engine {
-    searcher: AlphaBetaSearcher<SimpleEvaluator>,
+    searcher: Box<dyn Searcher>,
+    current_type: SearcherType,
+    tt_size_mb: usize,
 }
 
 impl Engine {
     #[must_use]
     pub fn new(hash_size_mb: usize) -> Self {
-        let evaluator = SimpleEvaluator::new();
-        let searcher = AlphaBetaSearcher::new(evaluator, hash_size_mb);
+        Self::with_searcher_type(SearcherType::default(), hash_size_mb)
+    }
 
-        Self { searcher }
+    #[must_use]
+    pub fn with_searcher_type(searcher_type: SearcherType, hash_size_mb: usize) -> Self {
+        let searcher = create_searcher(searcher_type, hash_size_mb);
+
+        Self {
+            searcher,
+            current_type: searcher_type,
+            tt_size_mb: hash_size_mb,
+        }
+    }
+
+    /// Change the search algorithm
+    pub fn set_searcher_type(&mut self, searcher_type: SearcherType) {
+        if self.current_type != searcher_type {
+            self.searcher = create_searcher(searcher_type, self.tt_size_mb);
+            self.current_type = searcher_type;
+        }
+    }
+
+    /// Get the current search algorithm type
+    #[must_use]
+    pub fn searcher_type(&self) -> SearcherType {
+        self.current_type
+    }
+
+    /// Get the algorithm name
+    #[must_use]
+    pub fn algorithm_name(&self) -> &'static str {
+        self.searcher.algorithm_name()
     }
 
     #[must_use]
@@ -33,11 +63,11 @@ impl Engine {
     }
 
     pub fn new_game(&mut self) {
-        self.searcher.clear_tt();
-        self.searcher.clear_move_ordering();
+        self.searcher.new_game();
     }
 
     pub fn resize_tt(&mut self, size_mb: usize) {
+        self.tt_size_mb = size_mb;
         self.searcher.resize_tt(size_mb);
     }
 
@@ -61,10 +91,10 @@ impl Engine {
         hard_limit: Option<Duration>,
         nodes: Option<u64>,
         infinite: bool,
-        on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
+        mut on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
         let limits = self.create_search_limits(depth, time_limit, hard_limit, nodes, infinite);
-        self.searcher.search(board, &limits, on_info)
+        self.searcher.search(board, &limits, &mut on_info)
     }
 
     fn create_search_limits(
@@ -154,6 +184,24 @@ mod tests {
     fn test_engine_creation() {
         let engine = Engine::new(16);
         assert_eq!(engine.hashfull(), 0);
+        assert_eq!(engine.searcher_type(), SearcherType::FullAlphaBeta);
+    }
+
+    #[test]
+    fn test_engine_with_searcher_type() {
+        let engine = Engine::with_searcher_type(SearcherType::PureAlphaBeta, 16);
+        assert_eq!(engine.searcher_type(), SearcherType::PureAlphaBeta);
+        assert_eq!(engine.algorithm_name(), "Pure Alpha-Beta");
+    }
+
+    #[test]
+    fn test_change_searcher_type() {
+        let mut engine = Engine::new(16);
+        assert_eq!(engine.searcher_type(), SearcherType::FullAlphaBeta);
+
+        engine.set_searcher_type(SearcherType::NegaScout);
+        assert_eq!(engine.searcher_type(), SearcherType::NegaScout);
+        assert_eq!(engine.algorithm_name(), "NegaScout");
     }
 
     #[test]
@@ -174,6 +222,40 @@ mod tests {
         assert!(result.best_move.is_some());
         assert!(!result.pv.is_empty());
         assert!(result.info.nodes > 0);
+    }
+
+    #[test]
+    fn test_search_with_different_algorithms() {
+        let mut board = Board::starting_position().unwrap();
+
+        for searcher_type in SearcherType::all() {
+            let mut engine = Engine::with_searcher_type(*searcher_type, 16);
+
+            let limits = if *searcher_type == SearcherType::Mcts
+                || *searcher_type == SearcherType::ClassicMcts
+            {
+                // MCTS variants use nodes instead of depth
+                (None, Some(1000u64))
+            } else {
+                (Some(2u8), None)
+            };
+
+            let result = engine.search(
+                &mut board,
+                limits.0,
+                None,
+                None,
+                limits.1,
+                false,
+                |_, _, _| {},
+            );
+
+            assert!(
+                result.best_move.is_some(),
+                "Algorithm {:?} should find a move",
+                searcher_type
+            );
+        }
     }
 
     #[test]

@@ -105,6 +105,7 @@ pub enum UciCommand {
     Quit,
     Display,
     Perft(u8),
+    Bench(Option<u8>),
     Unknown(String),
 }
 
@@ -131,6 +132,10 @@ pub fn parse_command(input: &str) -> UciCommand {
         Some("perft") => {
             let depth = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
             UciCommand::Perft(depth)
+        }
+        Some("bench") => {
+            let depth = parts.next().and_then(|s| s.parse().ok());
+            UciCommand::Bench(depth)
         }
         _ => UciCommand::Unknown(input.to_string()),
     }
