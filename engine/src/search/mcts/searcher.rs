@@ -14,6 +14,9 @@ const EXPLORATION_CONSTANT: f64 = 1.414;
 /// Nodes to search before checking time
 const NODES_PER_TIME_CHECK: u64 = 1024;
 
+/// Time buffer to stop early and account for overhead (in milliseconds)
+const TIME_BUFFER_MS: u64 = 15;
+
 /// Monte Carlo Tree Search implementation
 pub struct MctsSearcher<E: Evaluator> {
     evaluator: E,
@@ -41,6 +44,12 @@ impl<E: Evaluator> MctsSearcher<E> {
     /// Run one iteration of MCTS using recursive selection
     fn run_iteration(&mut self, node: &mut MctsNode, board: &mut Board) -> f64 {
         self.info.nodes += 1;
+
+        // Check time at every node and signal stop
+        if self.should_stop() {
+            self.stop_flag.store(true, Ordering::Release);
+            return 0.0;
+        }
 
         // Progressive widening: limit children based on visits
         let is_root = node.mv.is_none();
@@ -145,8 +154,14 @@ impl<E: Evaluator> MctsSearcher<E> {
         }
 
         if let Some(start) = self.start_time {
+            let elapsed = start.elapsed();
             if let Some(limit) = self.hard_limit {
-                if start.elapsed() >= limit {
+                if elapsed >= limit {
+                    return true;
+                }
+            }
+            if let Some(limit) = self.soft_limit {
+                if elapsed >= limit {
                     return true;
                 }
             }
@@ -297,7 +312,10 @@ impl<E: Evaluator + Send> Searcher for MctsSearcher<E> {
         self.stop_flag.store(false, Ordering::Release);
         self.info = SearchInfo::new();
         self.start_time = Some(Instant::now());
-        self.soft_limit = limits.time;
+        // Subtract time buffer to stop early and account for overhead
+        self.soft_limit = limits.time.map(|t| {
+            t.saturating_sub(Duration::from_millis(TIME_BUFFER_MS))
+        });
         self.hard_limit = limits.hard_time;
         self.nodes_limit = limits.nodes;
 
@@ -346,20 +364,12 @@ impl<E: Evaluator + Send> Searcher for MctsSearcher<E> {
         let mut iteration = 0u64;
 
         // Minimum iterations before checking time limits
-        const MIN_ITERATIONS: u64 = 10;
+        const MIN_ITERATIONS: u64 = 1;
 
         loop {
-            // Only check stop conditions after minimum iterations
-            if iteration >= MIN_ITERATIONS {
-                if self.should_stop() {
-                    break;
-                }
-
-                if let Some(limit) = self.soft_limit {
-                    if start_time.elapsed() >= limit {
-                        break;
-                    }
-                }
+            // Check stop conditions
+            if iteration >= MIN_ITERATIONS && self.should_stop() {
+                break;
             }
 
             let mut search_board = board.clone();

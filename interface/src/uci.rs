@@ -106,6 +106,19 @@ pub enum UciCommand {
     Display,
     Perft(u8),
     Bench(Option<u8>),
+    BenchFile {
+        path: String,
+        depth: Option<u8>,
+        limit: Option<usize>,
+    },
+    BenchCompare {
+        time_ms: Option<u64>,
+    },
+    BenchExport {
+        input_path: String,
+        output_path: String,
+        time_ms: Option<u64>,
+    },
     Unknown(String),
 }
 
@@ -136,6 +149,26 @@ pub fn parse_command(input: &str) -> UciCommand {
         Some("bench") => {
             let depth = parts.next().and_then(|s| s.parse().ok());
             UciCommand::Bench(depth)
+        }
+        Some("benchfile") => {
+            let path = parts.next().map(String::from).unwrap_or_default();
+            let depth = parts.next().and_then(|s| s.parse().ok());
+            let limit = parts.next().and_then(|s| s.parse().ok());
+            UciCommand::BenchFile { path, depth, limit }
+        }
+        Some("benchcompare") => {
+            let time_ms = parts.next().and_then(|s| s.parse().ok());
+            UciCommand::BenchCompare { time_ms }
+        }
+        Some("benchexport") => {
+            let input_path = parts.next().map(String::from).unwrap_or_default();
+            let output_path = parts.next().map(String::from).unwrap_or_default();
+            let time_ms = parts.next().and_then(|s| s.parse().ok());
+            UciCommand::BenchExport {
+                input_path,
+                output_path,
+                time_ms,
+            }
         }
         _ => UciCommand::Unknown(input.to_string()),
     }

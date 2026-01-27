@@ -272,6 +272,11 @@ impl<E: Evaluator> PureNegaScoutSearcher<E> {
                     return true;
                 }
             }
+            if let Some(limit) = self.soft_limit {
+                if start.elapsed() >= limit {
+                    return true;
+                }
+            }
         }
 
         if let Some(limit) = self.nodes_limit {

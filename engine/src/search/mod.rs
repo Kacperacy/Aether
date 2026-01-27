@@ -152,6 +152,63 @@ impl SearchResult {
     }
 }
 
+/// Extended benchmark metrics for algorithm comparison
+#[derive(Debug, Clone, Default)]
+pub struct BenchmarkMetrics {
+    /// Time to find the first move
+    pub time_to_first_move: Duration,
+    /// Time spent at each depth
+    pub time_per_depth: Vec<Duration>,
+    /// Nodes searched at each depth
+    pub nodes_per_depth: Vec<u64>,
+    /// Average branching factor
+    pub branching_factor: f64,
+    /// Number of times the best move changed during search
+    pub score_stability: u32,
+    /// Best move found at each depth
+    pub best_move_per_depth: Vec<Option<Move>>,
+}
+
+impl BenchmarkMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Calculate the average branching factor from nodes per depth
+    pub fn calculate_branching_factor(&mut self) {
+        if self.nodes_per_depth.len() >= 2 {
+            let mut sum = 0.0;
+            let mut count = 0;
+            for i in 1..self.nodes_per_depth.len() {
+                if self.nodes_per_depth[i - 1] > 0 {
+                    sum += self.nodes_per_depth[i] as f64 / self.nodes_per_depth[i - 1] as f64;
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                self.branching_factor = sum / count as f64;
+            }
+        }
+    }
+
+    /// Calculate score stability (how many times the best move changed)
+    pub fn calculate_stability(&mut self) {
+        let mut changes = 0u32;
+        let mut last_move: Option<Move> = None;
+        for mv in &self.best_move_per_depth {
+            if let Some(current) = mv {
+                if let Some(prev) = last_move {
+                    if prev != *current {
+                        changes += 1;
+                    }
+                }
+                last_move = Some(*current);
+            }
+        }
+        self.score_stability = changes;
+    }
+}
+
 /// Factory function to create a searcher based on the type
 pub fn create_searcher(searcher_type: SearcherType, tt_size_mb: usize) -> Box<dyn Searcher> {
     let evaluator = SimpleEvaluator::new();

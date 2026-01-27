@@ -51,6 +51,11 @@ impl ClassicMctsSearcher {
     fn run_iteration(&mut self, node: &mut MctsNode, board: &mut Board) -> f64 {
         self.info.nodes += 1;
 
+        // Check time every 64 nodes
+        if self.info.nodes % 64 == 0 && self.should_stop() {
+            return 0.0;
+        }
+
         // If node has untried moves, expand
         if !node.untried_moves.is_empty() {
             // Select random untried move
@@ -105,7 +110,12 @@ impl ClassicMctsSearcher {
         let original_side = playout_board.side_to_move();
         let mut moves_played = 0;
 
-        for _ in 0..MAX_PLAYOUT_MOVES {
+        for i in 0..MAX_PLAYOUT_MOVES {
+            // Check time every 16 moves in playout
+            if i % 16 == 0 && self.should_stop() {
+                return 0.0;
+            }
+
             let mut moves = Vec::new();
             movegen::legal(&playout_board, &mut moves);
 
@@ -149,8 +159,14 @@ impl ClassicMctsSearcher {
         }
 
         if let Some(start) = self.start_time {
+            let elapsed = start.elapsed();
             if let Some(limit) = self.hard_limit {
-                if start.elapsed() >= limit {
+                if elapsed >= limit {
+                    return true;
+                }
+            }
+            if let Some(limit) = self.soft_limit {
+                if elapsed >= limit {
                     return true;
                 }
             }

@@ -1,16 +1,22 @@
 //! UCI Handler - Main loop that connects UCI protocol with the chess engine
 
+use crate::benchmark::{
+    format_comparison_table, export_to_csv, format_summary,
+    AlgorithmBenchResult, GamePhase, PositionComparison,
+};
+use crate::epd::load_epd_file;
 use crate::uci::{
     EngineInfo, InfoResponse, OptionInfo, OptionType, SearchParams, UciCommand, UciInput,
     UciResponse, send_response, send_responses,
 };
 use aether_core::{Color, Move, Piece, score_to_mate_moves};
 use board::Board;
-use engine::search::SearcherType;
+use engine::search::{BenchmarkMetrics, SearchLimits, SearcherType, create_searcher};
 use engine::Engine;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Instant;
 
 /// Engine options
 #[derive(Debug, Clone)]
@@ -106,6 +112,13 @@ impl UciHandler {
             UciCommand::Display => self.cmd_display(),
             UciCommand::Perft(depth) => self.cmd_perft(depth),
             UciCommand::Bench(depth) => self.cmd_bench(depth),
+            UciCommand::BenchFile { path, depth, limit } => self.cmd_benchfile(&path, depth, limit),
+            UciCommand::BenchCompare { time_ms } => self.cmd_benchcompare(time_ms),
+            UciCommand::BenchExport {
+                input_path,
+                output_path,
+                time_ms,
+            } => self.cmd_benchexport(&input_path, &output_path, time_ms),
             UciCommand::Unknown(s) => {
                 if self.options.debug {
                     send_response(&UciResponse::Info(
@@ -453,6 +466,409 @@ impl UciHandler {
 
         println!();
         println!("{} nodes {:.3}s nps {}", total_nodes, elapsed.as_secs_f64(), nps);
+    }
+
+    fn cmd_benchfile(&mut self, path: &str, depth: Option<u8>, limit: Option<usize>) {
+        use std::time::{Duration, Instant};
+
+        if path.is_empty() {
+            println!("Usage: benchfile <path> [depth] [limit]");
+            println!("  path  - Path to EPD or FEN file");
+            println!("  depth - Search depth (default: 10)");
+            println!("  limit - Max positions to test (default: all)");
+            return;
+        }
+
+        let positions = match load_epd_file(path, limit) {
+            Ok(pos) => pos,
+            Err(e) => {
+                println!("Error loading file: {}", e);
+                return;
+            }
+        };
+
+        if positions.is_empty() {
+            println!("No positions found in file");
+            return;
+        }
+
+        let depth = depth.unwrap_or(10);
+
+        println!(
+            "Running benchmark on {} positions at depth {}...",
+            positions.len(),
+            depth
+        );
+        println!();
+
+        // Stats grouped by game phase
+        struct PhaseStats {
+            positions: usize,
+            nodes: u64,
+            time: Duration,
+            correct_bm: usize, // Positions where we found the best move
+            total_bm: usize,   // Positions that had a best move defined
+        }
+
+        impl PhaseStats {
+            fn new() -> Self {
+                Self {
+                    positions: 0,
+                    nodes: 0,
+                    time: Duration::ZERO,
+                    correct_bm: 0,
+                    total_bm: 0,
+                }
+            }
+
+            fn nps(&self) -> u64 {
+                if self.time.as_millis() > 0 {
+                    self.nodes * 1000 / self.time.as_millis() as u64
+                } else {
+                    0
+                }
+            }
+        }
+
+        let mut opening = PhaseStats::new();
+        let mut middlegame = PhaseStats::new();
+        let mut endgame = PhaseStats::new();
+
+        let start = Instant::now();
+
+        for (i, epd) in positions.iter().enumerate() {
+            let board: Board = match epd.fen.parse() {
+                Ok(b) => b,
+                Err(e) => {
+                    println!("Position {}: Invalid FEN - {}", i + 1, e);
+                    continue;
+                }
+            };
+
+            let phase = board.game_phase();
+            let phase_name = if phase > 200 {
+                "opening"
+            } else if phase > 80 {
+                "middle"
+            } else {
+                "endgame"
+            };
+
+            self.engine.new_game();
+
+            let pos_start = Instant::now();
+            let result = self.engine.search(
+                &mut board.clone(),
+                Some(depth),
+                None,
+                None,
+                None,
+                false,
+                |_, _, _| {},
+            );
+            let pos_time = pos_start.elapsed();
+
+            let best_move = result
+                .best_move
+                .map(|m| Self::move_to_uci(&m))
+                .unwrap_or_else(|| "none".to_string());
+
+            // Check if we found the expected best move
+            let bm_correct = if let Some(ref expected_bm) = epd.best_move {
+                // Convert expected move to compare (might be in different format)
+                let found = best_move == *expected_bm
+                    || best_move.starts_with(expected_bm)
+                    || expected_bm.contains(&best_move);
+                if found {
+                    "✓"
+                } else {
+                    "✗"
+                }
+            } else {
+                "-"
+            };
+
+            let pos_id = epd.id.as_deref().unwrap_or("-");
+
+            // Update stats based on phase
+            let stats = if phase > 200 {
+                &mut opening
+            } else if phase > 80 {
+                &mut middlegame
+            } else {
+                &mut endgame
+            };
+
+            stats.positions += 1;
+            stats.nodes += result.info.nodes;
+            stats.time += pos_time;
+
+            if let Some(ref expected_bm) = epd.best_move {
+                stats.total_bm += 1;
+                if best_move == *expected_bm
+                    || best_move.starts_with(expected_bm)
+                    || expected_bm.contains(&best_move)
+                {
+                    stats.correct_bm += 1;
+                }
+            }
+
+            println!(
+                "{:4} [{}] {:>7} nodes {:>6.2}s {} -> {} {}",
+                i + 1,
+                phase_name,
+                result.info.nodes,
+                pos_time.as_secs_f64(),
+                pos_id,
+                best_move,
+                bm_correct
+            );
+        }
+
+        let total_elapsed = start.elapsed();
+        let total_nodes = opening.nodes + middlegame.nodes + endgame.nodes;
+        let total_nps = if total_elapsed.as_millis() > 0 {
+            total_nodes * 1000 / total_elapsed.as_millis() as u64
+        } else {
+            0
+        };
+
+        println!();
+        println!("=== Results by Game Phase ===");
+        println!();
+
+        if opening.positions > 0 {
+            println!(
+                "Opening:    {:>4} positions, {:>10} nodes, {:>8.2}s, {:>10} nps{}",
+                opening.positions,
+                opening.nodes,
+                opening.time.as_secs_f64(),
+                opening.nps(),
+                if opening.total_bm > 0 {
+                    format!(", {}/{} bm correct", opening.correct_bm, opening.total_bm)
+                } else {
+                    String::new()
+                }
+            );
+        }
+
+        if middlegame.positions > 0 {
+            println!(
+                "Middlegame: {:>4} positions, {:>10} nodes, {:>8.2}s, {:>10} nps{}",
+                middlegame.positions,
+                middlegame.nodes,
+                middlegame.time.as_secs_f64(),
+                middlegame.nps(),
+                if middlegame.total_bm > 0 {
+                    format!(
+                        ", {}/{} bm correct",
+                        middlegame.correct_bm, middlegame.total_bm
+                    )
+                } else {
+                    String::new()
+                }
+            );
+        }
+
+        if endgame.positions > 0 {
+            println!(
+                "Endgame:    {:>4} positions, {:>10} nodes, {:>8.2}s, {:>10} nps{}",
+                endgame.positions,
+                endgame.nodes,
+                endgame.time.as_secs_f64(),
+                endgame.nps(),
+                if endgame.total_bm > 0 {
+                    format!(", {}/{} bm correct", endgame.correct_bm, endgame.total_bm)
+                } else {
+                    String::new()
+                }
+            );
+        }
+
+        println!();
+        println!(
+            "Total:      {:>4} positions, {:>10} nodes, {:>8.2}s, {:>10} nps",
+            positions.len(),
+            total_nodes,
+            total_elapsed.as_secs_f64(),
+            total_nps
+        );
+    }
+
+    fn cmd_benchcompare(&mut self, time_ms: Option<u64>) {
+        let time_ms = time_ms.unwrap_or(1000);
+        let phase = Self::determine_game_phase(&self.board);
+
+        println!(
+            "Comparing all algorithms on current position with {}ms time limit...",
+            time_ms
+        );
+        println!("Position: {}", self.board);
+        println!("Phase: {}", phase);
+        println!();
+
+        let mut results = Vec::new();
+
+        for algo in SearcherType::all() {
+            let result = self.benchmark_algorithm(*algo, &self.board, time_ms);
+            results.push(result);
+        }
+
+        // Print comparison table
+        println!("{}", format_comparison_table(&results));
+    }
+
+    fn cmd_benchexport(&mut self, input_path: &str, output_path: &str, time_ms: Option<u64>) {
+        if input_path.is_empty() || output_path.is_empty() {
+            println!("Usage: benchexport <input.epd> <output.csv> [time_ms]");
+            println!("  input.epd  - Path to EPD file with positions");
+            println!("  output.csv - Path to output CSV file");
+            println!("  time_ms    - Time limit per algorithm in ms (default: 1000)");
+            return;
+        }
+
+        let positions = match load_epd_file(input_path, None) {
+            Ok(pos) => pos,
+            Err(e) => {
+                println!("Error loading file: {}", e);
+                return;
+            }
+        };
+
+        if positions.is_empty() {
+            println!("No positions found in file");
+            return;
+        }
+
+        let time_ms = time_ms.unwrap_or(1000);
+        let total_positions = positions.len();
+        let total_algorithms = SearcherType::all().len();
+
+        println!(
+            "Benchmarking {} positions x {} algorithms with {}ms time limit...",
+            total_positions, total_algorithms, time_ms
+        );
+        println!();
+
+        let mut comparisons = Vec::new();
+
+        for (i, epd) in positions.iter().enumerate() {
+            let board: Board = match epd.fen.parse() {
+                Ok(b) => b,
+                Err(e) => {
+                    println!("Position {}: Invalid FEN - {}", i + 1, e);
+                    continue;
+                }
+            };
+
+            let phase = Self::determine_game_phase(&board);
+            let position_id = epd
+                .id
+                .clone()
+                .unwrap_or_else(|| format!("pos_{}", i + 1));
+
+            print!(
+                "\r[{}/{}] {} ({})",
+                i + 1,
+                total_positions,
+                position_id,
+                phase
+            );
+            std::io::Write::flush(&mut std::io::stdout()).ok();
+
+            let mut comparison = PositionComparison::new(position_id, phase);
+
+            for algo in SearcherType::all() {
+                let result = self.benchmark_algorithm(*algo, &board, time_ms);
+                comparison.add_result(result);
+            }
+
+            comparisons.push(comparison);
+        }
+
+        println!("\n");
+
+        // Export to CSV
+        match export_to_csv(output_path, &comparisons) {
+            Ok(()) => {
+                println!("Results exported to: {}", output_path);
+                println!("{}", format_summary(&comparisons));
+            }
+            Err(e) => {
+                println!("Error writing CSV: {}", e);
+            }
+        }
+    }
+
+    /// Benchmark a single algorithm on a position with a time limit
+    fn benchmark_algorithm(
+        &self,
+        algo: SearcherType,
+        board: &Board,
+        time_ms: u64,
+    ) -> AlgorithmBenchResult {
+        use std::time::Duration;
+
+        let mut result = AlgorithmBenchResult::new(algo);
+        let mut metrics = BenchmarkMetrics::new();
+
+        // Create a fresh searcher for this algorithm
+        let mut searcher = create_searcher(algo, self.options.hash_size);
+        searcher.new_game();
+
+        // All algorithms use the same time limit for fair comparison
+        let limits = SearchLimits::time(Duration::from_millis(time_ms));
+        let mut board_clone = board.clone();
+
+        let start = Instant::now();
+        let mut first_move_time: Option<Instant> = None;
+        let mut last_nodes = 0u64;
+
+        let search_result = searcher.search(&mut board_clone, &limits, &mut |info, mv, _score| {
+            // Track time to first move
+            if first_move_time.is_none() && mv.is_some() {
+                first_move_time = Some(Instant::now());
+            }
+
+            // Track metrics per depth
+            if info.depth as usize > metrics.time_per_depth.len() {
+                metrics.time_per_depth.push(info.time_elapsed);
+                let nodes_at_depth = info.nodes.saturating_sub(last_nodes);
+                metrics.nodes_per_depth.push(nodes_at_depth);
+                last_nodes = info.nodes;
+                metrics.best_move_per_depth.push(mv);
+            }
+        });
+
+        let total_time = start.elapsed();
+
+        // Populate result
+        result.depth = search_result.info.depth;
+        result.nodes = search_result.info.nodes;
+        result.time = total_time;
+        result.nps = if total_time.as_millis() > 0 {
+            (result.nodes as u128 * 1000 / total_time.as_millis()) as u64
+        } else {
+            0
+        };
+        result.time_to_first_move = first_move_time
+            .map(|t| t.duration_since(start))
+            .unwrap_or(total_time);
+        result.best_move = search_result.best_move;
+        result.score = search_result.score;
+
+        // Calculate additional metrics
+        metrics.time_to_first_move = result.time_to_first_move;
+        metrics.calculate_branching_factor();
+        metrics.calculate_stability();
+        result.metrics = metrics;
+
+        result
+    }
+
+    /// Determine the game phase from a board position
+    fn determine_game_phase(board: &Board) -> GamePhase {
+        GamePhase::from_phase_value(board.game_phase())
     }
 }
 
