@@ -118,6 +118,8 @@ pub enum UciCommand {
         input_path: String,
         output_path: String,
         time_ms: Option<u64>,
+        limit: Option<usize>,
+        threads: Option<usize>,
     },
     Unknown(String),
 }
@@ -164,10 +166,14 @@ pub fn parse_command(input: &str) -> UciCommand {
             let input_path = parts.next().map(String::from).unwrap_or_default();
             let output_path = parts.next().map(String::from).unwrap_or_default();
             let time_ms = parts.next().and_then(|s| s.parse().ok());
+            let limit = parts.next().and_then(|s| s.parse().ok());
+            let threads = parts.next().and_then(|s| s.parse().ok());
             UciCommand::BenchExport {
                 input_path,
                 output_path,
                 time_ms,
+                limit,
+                threads,
             }
         }
         _ => UciCommand::Unknown(input.to_string()),

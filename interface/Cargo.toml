@@ -7,6 +7,7 @@ edition = "2024"
 aether-core = { workspace = true }
 board = { workspace = true }
 engine = { workspace = true }
+rayon = "1.10"
 
 [lints]
 workspace = true

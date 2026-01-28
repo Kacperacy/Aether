@@ -1,0 +1,88 @@
+======================================================================
+ANALIZA PORÓWNAWCZA ALGORYTMÓW PRZESZUKIWANIA
+Silnik szachowy Aether - wyniki benchmarków
+======================================================================
+
+Liczba pozycji testowych: 1000
+Testowane algorytmy: 6
+Fazy gry: opening, endgame, middlegame
+Limity czasu: 500ms, 2000ms, 5000ms
+
+----------------------------------------------------------------------
+RANKING ALGORYTMÓW (wg średniego NPS)
+----------------------------------------------------------------------
+  1. NegaScout                
+     NPS:    4,818,207  |  Głębokość:    7.3  |  Węzły:   12,509,787  |  TTFM:     0.05ms
+  2. Alpha-Beta (czysty)      
+     NPS:    4,647,775  |  Głębokość:    7.0  |  Węzły:   11,947,714  |  TTFM:     0.04ms
+  3. MTD(f)                   
+     NPS:    2,790,671  |  Głębokość:    7.5  |  Węzły:    7,287,992  |  TTFM:     0.29ms
+  4. Alpha-Beta (pełny)       
+     NPS:    2,576,515  |  Głębokość:   15.2  |  Węzły:    6,626,036  |  TTFM:     0.07ms
+  5. MCTS                     
+     NPS:    1,343,968  |  Głębokość:   18.9  |  Węzły:    3,796,737  |  TTFM:   828.78ms
+  6. MCTS (klasyczny)         
+     NPS:       33,996  |  Głębokość:   14.7  |  Węzły:       92,825  |  TTFM:   848.49ms
+
+----------------------------------------------------------------------
+ANALIZA WG FAZ GRY
+----------------------------------------------------------------------
+
+  KOŃCÓWKA:
+    NegaScout                 NPS:  6,087,557  Głębokość:   8.2
+    Alpha-Beta (czysty)       NPS:  5,983,942  Głębokość:   8.0
+    MTD(f)                    NPS:  3,874,306  Głębokość:   9.1
+    Alpha-Beta (pełny)        NPS:  3,081,231  Głębokość:  16.3
+    MCTS                      NPS:  1,606,187  Głębokość:  18.9
+    MCTS (klasyczny)          NPS:     50,775  Głębokość:  14.9
+
+  ŚRODEK GRY:
+    NegaScout                 NPS:  5,888,803  Głębokość:   8.0
+    Alpha-Beta (czysty)       NPS:  5,765,568  Głębokość:   7.8
+    MTD(f)                    NPS:  3,998,872  Głębokość:   9.4
+    Alpha-Beta (pełny)        NPS:  2,909,890  Głębokość:  14.7
+    MCTS                      NPS:  1,629,942  Głębokość:  18.8
+    MCTS (klasyczny)          NPS:     60,836  Głębokość:  15.0
+
+  OTWARCIE:
+    NegaScout                 NPS:  4,504,745  Głębokość:   7.1
+    Alpha-Beta (czysty)       NPS:  4,317,991  Głębokość:   6.8
+    MTD(f)                    NPS:  2,517,333  Głębokość:   7.1
+    Alpha-Beta (pełny)        NPS:  2,453,677  Głębokość:  14.9
+    MCTS                      NPS:  1,277,951  Głębokość:  18.9
+    MCTS (klasyczny)          NPS:     29,605  Głębokość:  14.6
+
+----------------------------------------------------------------------
+ANALIZA WG LIMITU CZASU
+----------------------------------------------------------------------
+
+  LIMIT: 500ms
+    MCTS                      Głębokość:  17.5  NPS:  1,356,432
+    Alpha-Beta (pełny)        Głębokość:  13.1  NPS:  2,478,559
+    MCTS (klasyczny)          Głębokość:  13.0  NPS:     29,563
+    NegaScout                 Głębokość:   6.6  NPS:  4,613,204
+    MTD(f)                    Głębokość:   6.5  NPS:  2,617,513
+    Alpha-Beta (czysty)       Głębokość:   6.4  NPS:  4,489,823
+
+  LIMIT: 2000ms
+    MCTS                      Głębokość:  19.0  NPS:  1,345,561
+    Alpha-Beta (pełny)        Głębokość:  15.4  NPS:  2,539,829
+    MCTS (klasyczny)          Głębokość:  15.0  NPS:     33,521
+    MTD(f)                    Głębokość:   7.6  NPS:  2,740,229
+    NegaScout                 Głębokość:   7.4  NPS:  4,662,097
+    Alpha-Beta (czysty)       Głębokość:   7.1  NPS:  4,557,106
+
+  LIMIT: 5000ms
+    MCTS                      Głębokość:  20.1  NPS:  1,329,913
+    Alpha-Beta (pełny)        Głębokość:  17.0  NPS:  2,711,157
+    MCTS (klasyczny)          Głębokość:  16.2  NPS:     38,904
+    MTD(f)                    Głębokość:   8.4  NPS:  3,014,270
+    NegaScout                 Głębokość:   7.9  NPS:  5,179,321
+    Alpha-Beta (czysty)       Głębokość:   7.6  NPS:  4,896,396
+
+----------------------------------------------------------------------
+WNIOSKI
+----------------------------------------------------------------------
+  Najwyższa przepustowość (NPS): NegaScout
+  Najgłębsze przeszukiwanie:    MCTS
+  Najlepsza responsywność:      Alpha-Beta (czysty)

@@ -1,8 +1,8 @@
 //! UCI Handler - Main loop that connects UCI protocol with the chess engine
 
 use crate::benchmark::{
-    format_comparison_table, export_to_csv, format_summary,
-    AlgorithmBenchResult, GamePhase, PositionComparison,
+    AlgorithmBenchResult, GamePhase, PositionComparison, export_to_csv, format_comparison_table,
+    format_summary,
 };
 use crate::epd::load_epd_file;
 use crate::uci::{
@@ -11,11 +11,12 @@ use crate::uci::{
 };
 use aether_core::{Color, Move, Piece, score_to_mate_moves};
 use board::Board;
-use engine::search::{BenchmarkMetrics, SearchLimits, SearcherType, create_searcher};
 use engine::Engine;
+use engine::search::{BenchmarkMetrics, SearchLimits, SearcherType, create_searcher};
+use rayon::prelude::*;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
 /// Engine options
@@ -118,7 +119,9 @@ impl UciHandler {
                 input_path,
                 output_path,
                 time_ms,
-            } => self.cmd_benchexport(&input_path, &output_path, time_ms),
+                limit,
+                threads,
+            } => self.cmd_benchexport(&input_path, &output_path, time_ms, limit, threads),
             UciCommand::Unknown(s) => {
                 if self.options.debug {
                     send_response(&UciResponse::Info(
@@ -164,6 +167,7 @@ impl UciHandler {
                     "Mtdf".to_string(),
                     "NegaScout".to_string(),
                     "MCTS".to_string(),
+                    "ClassicMCTS".to_string(),
                 ],
             },
         }));
@@ -465,7 +469,12 @@ impl UciHandler {
         };
 
         println!();
-        println!("{} nodes {:.3}s nps {}", total_nodes, elapsed.as_secs_f64(), nps);
+        println!(
+            "{} nodes {:.3}s nps {}",
+            total_nodes,
+            elapsed.as_secs_f64(),
+            nps
+        );
     }
 
     fn cmd_benchfile(&mut self, path: &str, depth: Option<u8>, limit: Option<usize>) {
@@ -579,11 +588,7 @@ impl UciHandler {
                 let found = best_move == *expected_bm
                     || best_move.starts_with(expected_bm)
                     || expected_bm.contains(&best_move);
-                if found {
-                    "✓"
-                } else {
-                    "✗"
-                }
+                if found { "✓" } else { "✗" }
             } else {
                 "-"
             };
@@ -718,16 +723,25 @@ impl UciHandler {
         println!("{}", format_comparison_table(&results));
     }
 
-    fn cmd_benchexport(&mut self, input_path: &str, output_path: &str, time_ms: Option<u64>) {
+    fn cmd_benchexport(
+        &mut self,
+        input_path: &str,
+        output_path: &str,
+        time_ms: Option<u64>,
+        limit: Option<usize>,
+        threads: Option<usize>,
+    ) {
         if input_path.is_empty() || output_path.is_empty() {
-            println!("Usage: benchexport <input.epd> <output.csv> [time_ms]");
+            println!("Usage: benchexport <input.epd> <output.csv> [time_ms] [limit] [threads]");
             println!("  input.epd  - Path to EPD file with positions");
             println!("  output.csv - Path to output CSV file");
             println!("  time_ms    - Time limit per algorithm in ms (default: 1000)");
+            println!("  limit      - Max positions to process (default: all)");
+            println!("  threads    - Number of parallel threads (default: num CPUs)");
             return;
         }
 
-        let positions = match load_epd_file(input_path, None) {
+        let positions = match load_epd_file(input_path, limit) {
             Ok(pos) => pos,
             Err(e) => {
                 println!("Error loading file: {}", e);
@@ -741,50 +755,52 @@ impl UciHandler {
         }
 
         let time_ms = time_ms.unwrap_or(1000);
+        let num_threads = threads.unwrap_or_else(|| rayon::current_num_threads());
         let total_positions = positions.len();
         let total_algorithms = SearcherType::all().len();
+        let hash_size = self.options.hash_size;
+
+        // Configure rayon thread pool
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build_global()
+            .ok(); // Ignore error if already initialized
 
         println!(
-            "Benchmarking {} positions x {} algorithms with {}ms time limit...",
-            total_positions, total_algorithms, time_ms
+            "Benchmarking {} positions x {} algorithms with {}ms time limit using {} threads...",
+            total_positions, total_algorithms, time_ms, num_threads
         );
         println!();
 
-        let mut comparisons = Vec::new();
+        let progress = AtomicUsize::new(0);
 
-        for (i, epd) in positions.iter().enumerate() {
-            let board: Board = match epd.fen.parse() {
-                Ok(b) => b,
-                Err(e) => {
-                    println!("Position {}: Invalid FEN - {}", i + 1, e);
-                    continue;
+        // Process positions in parallel
+        let comparisons: Vec<PositionComparison> = positions
+            .par_iter()
+            .enumerate()
+            .filter_map(|(i, epd)| {
+                let board: Board = match epd.fen.parse() {
+                    Ok(b) => b,
+                    Err(_) => return None,
+                };
+
+                let phase = Self::determine_game_phase(&board);
+                let position_id = epd.id.clone().unwrap_or_else(|| format!("pos_{}", i + 1));
+
+                let mut comparison = PositionComparison::new(position_id.clone(), phase);
+
+                for algo in SearcherType::all() {
+                    let result = benchmark_algorithm_standalone(*algo, &board, time_ms, hash_size);
+                    comparison.add_result(result);
                 }
-            };
 
-            let phase = Self::determine_game_phase(&board);
-            let position_id = epd
-                .id
-                .clone()
-                .unwrap_or_else(|| format!("pos_{}", i + 1));
+                let done = progress.fetch_add(1, Ordering::Relaxed) + 1;
+                print!("\r[{}/{}] {}", done, total_positions, position_id);
+                std::io::Write::flush(&mut std::io::stdout()).ok();
 
-            print!(
-                "\r[{}/{}] {} ({})",
-                i + 1,
-                total_positions,
-                position_id,
-                phase
-            );
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-
-            let mut comparison = PositionComparison::new(position_id, phase);
-
-            for algo in SearcherType::all() {
-                let result = self.benchmark_algorithm(*algo, &board, time_ms);
-                comparison.add_result(result);
-            }
-
-            comparisons.push(comparison);
-        }
+                Some(comparison)
+            })
+            .collect();
 
         println!("\n");
 
@@ -876,6 +892,72 @@ impl Default for UciHandler {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Standalone benchmark function for parallel execution
+fn benchmark_algorithm_standalone(
+    algo: SearcherType,
+    board: &Board,
+    time_ms: u64,
+    hash_size: usize,
+) -> AlgorithmBenchResult {
+    use std::time::Duration;
+
+    let mut result = AlgorithmBenchResult::new(algo);
+    let mut metrics = BenchmarkMetrics::new();
+
+    // Create a fresh searcher for this algorithm
+    let mut searcher = create_searcher(algo, hash_size);
+    searcher.new_game();
+
+    // All algorithms use the same time limit for fair comparison
+    let limits = SearchLimits::time(Duration::from_millis(time_ms));
+    let mut board_clone = board.clone();
+
+    let start = Instant::now();
+    let mut first_move_time: Option<Instant> = None;
+    let mut last_nodes = 0u64;
+
+    let search_result = searcher.search(&mut board_clone, &limits, &mut |info, mv, _score| {
+        // Track time to first move
+        if first_move_time.is_none() && mv.is_some() {
+            first_move_time = Some(Instant::now());
+        }
+
+        // Track metrics per depth
+        if info.depth as usize > metrics.time_per_depth.len() {
+            metrics.time_per_depth.push(info.time_elapsed);
+            let nodes_at_depth = info.nodes.saturating_sub(last_nodes);
+            metrics.nodes_per_depth.push(nodes_at_depth);
+            last_nodes = info.nodes;
+            metrics.best_move_per_depth.push(mv);
+        }
+    });
+
+    let total_time = start.elapsed();
+
+    // Populate result
+    result.depth = search_result.info.depth;
+    result.nodes = search_result.info.nodes;
+    result.time = total_time;
+    result.nps = if total_time.as_millis() > 0 {
+        (result.nodes as u128 * 1000 / total_time.as_millis()) as u64
+    } else {
+        0
+    };
+    result.time_to_first_move = first_move_time
+        .map(|t| t.duration_since(start))
+        .unwrap_or(total_time);
+    result.best_move = search_result.best_move;
+    result.score = search_result.score;
+
+    // Calculate additional metrics
+    metrics.time_to_first_move = result.time_to_first_move;
+    metrics.calculate_branching_factor();
+    metrics.calculate_stability();
+    result.metrics = metrics;
+
+    result
 }
 
 #[cfg(test)]

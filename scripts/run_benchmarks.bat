@@ -2,14 +2,15 @@
 setlocal enabledelayedexpansion
 
 REM === Konfiguracja ===
-set TIME_MS=1000
-set LIMIT=500
+set TIME_MS=5000
+set LIMIT=1000
+set THREADS=14
 
 REM === Sciezki ===
-set SCRIPT_DIR=%~dp0
-set PROJECT_DIR=%SCRIPT_DIR%..
-set RESULTS_DIR=%PROJECT_DIR%\results
-set POSITIONS_DIR=%PROJECT_DIR%\positions
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.."
+set "PROJECT_DIR=%CD%"
+popd
 
 echo ==================================
 echo Aether Benchmark Comparison Suite
@@ -17,7 +18,8 @@ echo ==================================
 echo.
 echo Settings:
 echo   Time limit: %TIME_MS%ms
-if defined LIMIT (echo   Limit: %LIMIT% positions) else (echo   Limit: All positions)
+echo   Limit: %LIMIT% positions per file
+echo   Threads: %THREADS%
 echo.
 
 REM === Kompilacja ===
@@ -32,22 +34,49 @@ echo Build successful!
 echo.
 
 REM === Katalog wynikow ===
-if not exist "%RESULTS_DIR%" mkdir "%RESULTS_DIR%"
+if not exist "results" mkdir "results"
 
 REM === Timestamp ===
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
-set TIMESTAMP=%datetime:~0,8%_%datetime:~8,6%
-set COMBINED_CSV=%RESULTS_DIR%\comparison_%TIMESTAMP%.csv
+for /f %%i in ('powershell -command "Get-Date -Format yyyyMMdd_HHmmss"') do set TIMESTAMP=%%i
+set "COMBINED_CSV=results\comparison_%TIMESTAMP%.csv"
+
+REM === Sprawdz katalog pozycji ===
+if not exist "positions" (
+    echo Positions directory not found
+    echo Run .\scripts\download_positions.bat first
+    exit /b 1
+)
 
 REM === Pliki EPD ===
 set FIRST_FILE=1
-for /r "%POSITIONS_DIR%" %%F in (*.epd) do (
-    set "EPD_FILE=%%F"
+set EPD_COUNT=0
+for /r "positions" %%F in (*.epd) do set /a EPD_COUNT+=1
+if %EPD_COUNT%==0 (
+    echo No EPD files found in positions
+    exit /b 1
+)
+
+REM === Plik tymczasowy na komendy ===
+set "CMD_FILE=%TEMP%\aether_cmd_%TIMESTAMP%.txt"
+
+for /r "positions" %%F in (*.epd) do (
+    set "EPD_FULL=%%F"
     set "BASENAME=%%~nF"
-    set "OUTPUT_CSV=%RESULTS_DIR%\!BASENAME!_%TIMESTAMP%.csv"
+    set "OUTPUT_CSV=results\!BASENAME!_%TIMESTAMP%.csv"
+
+    REM Konwertuj sciezke absolutna na wzgledna
+    set "EPD_REL=!EPD_FULL:%PROJECT_DIR%\=!"
 
     echo Processing: !BASENAME!
-    echo benchexport "!EPD_FILE!" "!OUTPUT_CSV!" %TIME_MS% %LIMIT% | "%PROJECT_DIR%\target\release\aether.exe"
+    echo   Input:  !EPD_REL!
+    echo   Output: !OUTPUT_CSV!
+
+    REM Zapisz komendy do pliku
+    echo benchexport !EPD_REL! !OUTPUT_CSV! %TIME_MS% %LIMIT% %THREADS%> "!CMD_FILE!"
+    echo quit>> "!CMD_FILE!"
+
+    REM Uruchom silnik z pliku komend
+    "target\release\aether.exe" < "!CMD_FILE!"
 
     if exist "!OUTPUT_CSV!" (
         echo Results saved to: !OUTPUT_CSV!
@@ -63,6 +92,9 @@ for /r "%POSITIONS_DIR%" %%F in (*.epd) do (
     )
     echo.
 )
+
+REM Usun plik tymczasowy
+if exist "%CMD_FILE%" del "%CMD_FILE%"
 
 echo ==================================
 echo Combined results: %COMBINED_CSV%
