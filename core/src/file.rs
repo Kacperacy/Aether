@@ -3,57 +3,92 @@ use crate::{BitBoard, CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
-pub const FILE_MASKS: [u64; 8] = [
-    0x0101010101010101,
-    0x0202020202020202,
-    0x0404040404040404,
-    0x0808080808080808,
-    0x1010101010101010,
-    0x2020202020202020,
-    0x4040404040404040,
-    0x8080808080808080,
-];
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(u8)]
-pub enum File {
-    A = 0,
-    B = 1,
-    C = 2,
-    D = 3,
-    E = 4,
-    F = 5,
-    G = 6,
-    H = 7,
-}
+pub struct File(u8);
 
-pub const ALL_FILES: [File; 8] = [
-    File::A,
-    File::B,
-    File::C,
-    File::D,
-    File::E,
-    File::F,
-    File::G,
-    File::H,
-];
+impl File {
+    pub const NUM: usize = 8;
+
+    pub const A: File = File(0);
+    pub const B: File = File(1);
+    pub const C: File = File(2);
+    pub const D: File = File(3);
+    pub const E: File = File(4);
+    pub const F: File = File(5);
+    pub const G: File = File(6);
+    pub const H: File = File(7);
+
+    pub const ALL: [Self; 8] = [
+        Self::A,
+        Self::B,
+        Self::C,
+        Self::D,
+        Self::E,
+        Self::F,
+        Self::G,
+        Self::H,
+    ];
+
+    #[inline(always)]
+    pub const fn from_index(index: i8) -> Self {
+        debug_assert!(index >= 0 && index < 8, "File index out of bounds");
+        Self(index as u8)
+    }
+
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self.0
+    }
+
+    #[inline(always)]
+    pub const fn as_char(self) -> char {
+        (b'a' + self.0) as char
+    }
+
+    pub const fn offset(self, offset: i8) -> Option<Self> {
+        let new_file = self.0 as i8 + offset;
+        if new_file < 0 || new_file > 7 {
+            None
+        } else {
+            Some(Self(new_file as u8))
+        }
+    }
+
+    #[inline(always)]
+    pub const fn flip(self) -> Self {
+        Self(7 - self.0)
+    }
+
+    #[inline(always)]
+    pub const fn bitboard(self) -> BitBoard {
+        BitBoard::new(0x0101010101010101_u64 << self.0)
+    }
+
+    #[inline(always)]
+    pub const fn adjacent(self) -> BitBoard {
+        let bb = self.bitboard().value();
+        let mut adj = 0;
+        if self.0 > 0 {
+            adj |= bb >> 1;
+        }
+        if self.0 < 7 {
+            adj |= bb << 1;
+        }
+        BitBoard::new(adj)
+    }
+}
 
 impl FromStr for File {
     type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "a" => Ok(Self::A),
-            "b" => Ok(Self::B),
-            "c" => Ok(Self::C),
-            "d" => Ok(Self::D),
-            "e" => Ok(Self::E),
-            "f" => Ok(Self::F),
-            "g" => Ok(Self::G),
-            "h" => Ok(Self::H),
-            _ => Err(InvalidFile {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() == 1 && chars[0] >= 'a' && chars[0] <= 'h' {
+            Ok(Self((chars[0] as u8) - b'a'))
+        } else {
+            Err(InvalidFile {
                 file: s.to_string(),
-            }),
+            })
         }
     }
 }
@@ -64,79 +99,71 @@ impl Display for File {
     }
 }
 
-impl File {
-    pub const NUM: usize = 8;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-    #[inline(always)]
-    pub const fn from_index(file: i8) -> Self {
-        debug_assert!(file >= 0 && file < 8, "File index out of bounds");
-        // SAFETY: File is #[repr(u8)] with variants 0..=7, and we assert file is in 0..8.
-        unsafe { std::mem::transmute(file as u8) }
+    #[test]
+    fn test_file_creation_and_index() {
+        assert_eq!(File::A.to_index(), 0);
+        assert_eq!(File::H.to_index(), 7);
+        assert_eq!(File::from_index(3), File::D);
+        assert_eq!(File::from_index(7), File::H);
     }
 
-    pub const fn as_char(self) -> char {
-        match self {
-            Self::A => 'a',
-            Self::B => 'b',
-            Self::C => 'c',
-            Self::D => 'd',
-            Self::E => 'e',
-            Self::F => 'f',
-            Self::G => 'g',
-            Self::H => 'h',
-        }
+    #[test]
+    fn test_as_char_and_display() {
+        assert_eq!(File::A.as_char(), 'a');
+        assert_eq!(File::E.as_char(), 'e');
+        assert_eq!(File::H.as_char(), 'h');
+
+        assert_eq!(format!("{}", File::C), "c");
     }
 
-    pub const fn offset(self, offset: i8) -> Option<Self> {
-        let new_file = self as i8 + offset;
-        if new_file < 0 || new_file > 7 {
-            None
-        } else {
-            Some(Self::from_index(new_file))
-        }
+    #[test]
+    fn test_from_str() {
+        assert_eq!(File::from_str("a").unwrap(), File::A);
+        assert_eq!(File::from_str("h").unwrap(), File::H);
+
+        assert!(File::from_str("i").is_err());
+        assert!(File::from_str("A").is_err());
+        assert!(File::from_str("ab").is_err());
     }
 
-    pub const fn flip(self) -> Self {
-        match self {
-            Self::A => Self::H,
-            Self::B => Self::G,
-            Self::C => Self::F,
-            Self::D => Self::E,
-            Self::E => Self::D,
-            Self::F => Self::C,
-            Self::G => Self::B,
-            Self::H => Self::A,
-        }
+    #[test]
+    fn test_offset() {
+        assert_eq!(File::D.offset(1), Some(File::E));
+        assert_eq!(File::D.offset(-1), Some(File::C));
+        assert_eq!(File::D.offset(4), Some(File::H));
+
+        assert_eq!(File::A.offset(-1), None);
+        assert_eq!(File::A.offset(-5), None);
+        assert_eq!(File::H.offset(1), None);
+        assert_eq!(File::H.offset(5), None);
     }
 
-    pub const fn bitboard(self) -> BitBoard {
-        match self {
-            Self::A => BitBoard(0x0101010101010101),
-            Self::B => BitBoard(0x0202020202020202),
-            Self::C => BitBoard(0x0404040404040404),
-            Self::D => BitBoard(0x0808080808080808),
-            Self::E => BitBoard(0x1010101010101010),
-            Self::F => BitBoard(0x2020202020202020),
-            Self::G => BitBoard(0x4040404040404040),
-            Self::H => BitBoard(0x8080808080808080),
-        }
+    #[test]
+    fn test_flip() {
+        assert_eq!(File::A.flip(), File::H);
+        assert_eq!(File::B.flip(), File::G);
+        assert_eq!(File::C.flip(), File::F);
+        assert_eq!(File::D.flip(), File::E);
     }
 
-    pub const fn adjacent(self) -> BitBoard {
-        match self {
-            Self::A => BitBoard(0x202020202020202),
-            Self::B => BitBoard(0x505050505050505),
-            Self::C => BitBoard(0xa0a0a0a0a0a0a0a),
-            Self::D => BitBoard(0x1414141414141414),
-            Self::E => BitBoard(0x2828282828282828),
-            Self::F => BitBoard(0x5050505050505050),
-            Self::G => BitBoard(0xa0a0a0a0a0a0a0a0),
-            Self::H => BitBoard(0x4040404040404040),
-        }
+    #[test]
+    fn test_bitboard() {
+        assert_eq!(File::A.bitboard().value(), 0x0101010101010101);
+        assert_eq!(File::B.bitboard().value(), 0x0202020202020202);
+        assert_eq!(File::H.bitboard().value(), 0x0808080808080808);
     }
 
-    #[inline(always)]
-    pub const fn to_index(self) -> u8 {
-        self as u8
+    #[test]
+    fn test_adjacent() {
+        assert_eq!(File::A.adjacent().value(), File::B.bitboard().value());
+
+        let expected_b_adj = (File::A.bitboard() | File::C.bitboard()).value();
+        assert_eq!(File::B.adjacent().value(), expected_b_adj);
+
+        assert_eq!(File::H.adjacent().value(), File::G.bitboard().value());
     }
 }

@@ -203,7 +203,7 @@ mod tests {
 
         let attackers = attackers_to_square(Square::E4, Color::White, BitBoard::EMPTY, &pieces);
 
-        assert!(attackers.has(Square::E1));
+        assert!(attackers.contains(Square::E1));
         assert_eq!(attackers.count(), 1);
     }
 
@@ -211,8 +211,8 @@ mod tests {
     fn test_pawn_attacks_from_white() {
         let attacks = pawn_attacks_from(Square::E4, Color::White);
         // White pawns attack e4 from d3 and f3
-        assert!(attacks.has(Square::D3));
-        assert!(attacks.has(Square::F3));
+        assert!(attacks.contains(Square::D3));
+        assert!(attacks.contains(Square::F3));
         assert_eq!(attacks.count(), 2);
     }
 
@@ -224,9 +224,9 @@ mod tests {
         let attacks = rook_attacks(Square::E4, occupied);
 
         // Should attack e5, e6 (blocker) but not e7, e8
-        assert!(attacks.has(Square::E5));
-        assert!(attacks.has(Square::E6));
-        assert!(!attacks.has(Square::E7));
-        assert!(!attacks.has(Square::E8));
+        assert!(attacks.contains(Square::E5));
+        assert!(attacks.contains(Square::E6));
+        assert!(!attacks.contains(Square::E7));
+        assert!(!attacks.contains(Square::E8));
     }
 }

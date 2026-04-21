@@ -1,5 +1,5 @@
 use crate::eval::Evaluator;
-use aether_core::{Color, FILE_MASKS, Piece};
+use aether_core::{Color, File, Piece};
 use board::Board;
 
 const BISHOP_PAIR_MG: i32 = 30;
@@ -26,12 +26,12 @@ const fn compute_white_passed_masks() -> [u64; 64] {
         let rank = sq / 8;
 
         if rank >= 1 && rank <= 6 {
-            let mut blocking_files = FILE_MASKS[file as usize];
+            let mut blocking_files = File::from_index(file).bitboard().value();
             if file > 0 {
-                blocking_files |= FILE_MASKS[(file - 1) as usize];
+                blocking_files |= File::from_index(file - 1).bitboard().value();
             }
             if file < 7 {
-                blocking_files |= FILE_MASKS[(file + 1) as usize];
+                blocking_files |= File::from_index(file + 1).bitboard().value();
             }
 
             let ahead_mask = !((1u64 << (8 * (rank + 1))) - 1);
@@ -52,12 +52,12 @@ const fn compute_black_passed_masks() -> [u64; 64] {
         let rank = sq / 8;
 
         if rank >= 1 && rank <= 6 {
-            let mut blocking_files = FILE_MASKS[file as usize];
+            let mut blocking_files = File::from_index(file).bitboard().value();
             if file > 0 {
-                blocking_files |= FILE_MASKS[(file - 1) as usize];
+                blocking_files |= File::from_index(file - 1).bitboard().value();
             }
             if file < 7 {
-                blocking_files |= FILE_MASKS[(file + 1) as usize];
+                blocking_files |= File::from_index(file + 1).bitboard().value();
             }
 
             let ahead_mask = (1u64 << (8 * rank)) - 1;

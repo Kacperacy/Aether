@@ -71,7 +71,7 @@ impl Square {
 
     #[inline(always)]
     pub const fn new(file: File, rank: Rank) -> Self {
-        let index = (rank as u8) * 8 + (file as u8);
+        let index = rank.to_index() * 8 + file.to_index();
         Self::from_index(index as i8)
     }
 
@@ -80,6 +80,13 @@ impl Square {
         debug_assert!(index >= 0 && index < 64, "Square index out of range");
         // SAFETY: Square is #[repr(u8)] with variants 0..=63, and we assert index is in 0..64.
         unsafe { std::mem::transmute(index as u8) }
+    }
+
+    #[inline(always)]
+    pub fn from_u8(index: u8) -> Self {
+        debug_assert!(index < 64, "Square index out of range");
+        // SAFETY: Square is #[repr(u8)] with variants 0..=63, and we assert index is in 0..64.
+        unsafe { std::mem::transmute(index) }
     }
 
     #[inline(always)]
@@ -103,8 +110,8 @@ impl Square {
     }
 
     pub const fn offset(self, file: i8, rank: i8) -> Option<Self> {
-        let file = self.file() as i8 + file;
-        let rank = self.rank() as i8 + rank;
+        let file = self.file().to_index() as i8 + file;
+        let rank = self.rank().to_index() as i8 + rank;
         if file < 0 || file >= 8 || rank < 0 || rank >= 8 {
             None
         } else {

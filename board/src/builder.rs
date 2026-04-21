@@ -103,12 +103,8 @@ impl BoardBuilder {
             }
         }
 
-        let white_king_sq = self.pieces[Color::White as usize][Piece::King as usize]
-            .to_square()
-            .expect("King validation passed but king not found");
-        let black_king_sq = self.pieces[Color::Black as usize][Piece::King as usize]
-            .to_square()
-            .expect("King validation passed but king not found");
+        let white_king_sq = self.pieces[Color::White as usize][Piece::King as usize].lsb();
+        let black_king_sq = self.pieces[Color::Black as usize][Piece::King as usize].lsb();
 
         let stm = self.side_to_move;
         let king_sq = if stm == Color::White {
@@ -213,7 +209,7 @@ impl BoardBuilder {
                 continue;
             }
             let king_square = Square::new(File::E, color.back_rank());
-            if !self.pieces[color as usize][Piece::King as usize].has(king_square) {
+            if !self.pieces[color as usize][Piece::King as usize].contains(king_square) {
                 return Err(InvalidCastlingRights {
                     reason: format!("{color} king not on starting square"),
                 });
@@ -243,7 +239,7 @@ impl BoardBuilder {
     fn is_square_occupied(&self, square: Square) -> bool {
         for color in ALL_COLORS {
             for &piece in &ALL_PIECES {
-                if self.pieces[color as usize][piece as usize].has(square) {
+                if self.pieces[color as usize][piece as usize].contains(square) {
                     return true;
                 }
             }

@@ -34,14 +34,14 @@ pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard 
     let push_dir = color.forward_direction();
 
     if let Some(single) = square.offset(0, push_dir) {
-        if !occupied.has(single) {
+        if !occupied.contains(single) {
             moves |= single.bitboard();
 
             let starting_rank = color.pawn_start_rank();
 
             if square.rank() == starting_rank {
                 if let Some(double) = square.offset(0, 2 * push_dir) {
-                    if !occupied.has(double) {
+                    if !occupied.contains(double) {
                         moves |= double.bitboard();
                     }
                 }
@@ -66,7 +66,7 @@ pub fn king_attacks(square: Square) -> BitBoard {
 
 #[inline(always)]
 pub const fn is_promotion_rank(square: Square, color: Color) -> bool {
-    square.rank() as u8 == color.pawn_promotion_rank() as u8
+    square.rank().to_index() == color.pawn_promotion_rank().to_index()
 }
 
 const fn init_pawn_attacks(color: Color) -> [BitBoard; 64] {
@@ -194,8 +194,8 @@ mod tests {
     fn test_pawn_attacks_white() {
         let attacks = pawn_attacks(Square::E4, Color::White);
         // White pawn on e4 attacks d5 and f5
-        assert!(attacks.has(Square::D5));
-        assert!(attacks.has(Square::F5));
+        assert!(attacks.contains(Square::D5));
+        assert!(attacks.contains(Square::F5));
         assert_eq!(attacks.count(), 2);
     }
 
@@ -203,8 +203,8 @@ mod tests {
     fn test_pawn_attacks_black() {
         let attacks = pawn_attacks(Square::E4, Color::Black);
         // Black pawn on e4 attacks d3 and f3
-        assert!(attacks.has(Square::D3));
-        assert!(attacks.has(Square::F3));
+        assert!(attacks.contains(Square::D3));
+        assert!(attacks.contains(Square::F3));
         assert_eq!(attacks.count(), 2);
     }
 
@@ -212,7 +212,7 @@ mod tests {
     fn test_pawn_attacks_edge() {
         let attacks = pawn_attacks(Square::A4, Color::White);
         // Pawn on a-file can only attack to the right
-        assert!(attacks.has(Square::B5));
+        assert!(attacks.contains(Square::B5));
         assert_eq!(attacks.count(), 1);
     }
 
@@ -222,21 +222,21 @@ mod tests {
         let attackers = pawn_attacks_from(square, Color::White);
 
         // White pawns that attack e4 are on d3 and f3
-        assert!(attackers.has(Square::D3));
-        assert!(attackers.has(Square::F3));
+        assert!(attackers.contains(Square::D3));
+        assert!(attackers.contains(Square::F3));
         assert_eq!(attackers.count(), 2);
 
         // Verify inverse relationship
-        assert!(pawn_attacks(Square::D3, Color::White).has(square));
-        assert!(pawn_attacks(Square::F3, Color::White).has(square));
+        assert!(pawn_attacks(Square::D3, Color::White).contains(square));
+        assert!(pawn_attacks(Square::F3, Color::White).contains(square));
     }
 
     #[test]
     fn test_pawn_moves_single_push() {
         let moves = pawn_moves(Square::E2, Color::White, BitBoard::EMPTY);
         // From e2, white pawn can move to e3 and e4
-        assert!(moves.has(Square::E3));
-        assert!(moves.has(Square::E4));
+        assert!(moves.contains(Square::E3));
+        assert!(moves.contains(Square::E4));
         assert_eq!(moves.count(), 2);
     }
 
@@ -257,8 +257,8 @@ mod tests {
 
         let moves = pawn_moves(Square::E2, Color::White, occupied);
         // Can push once but not twice
-        assert!(moves.has(Square::E3));
-        assert!(!moves.has(Square::E4));
+        assert!(moves.contains(Square::E3));
+        assert!(!moves.contains(Square::E4));
         assert_eq!(moves.count(), 1);
     }
 
@@ -269,14 +269,14 @@ mod tests {
         assert_eq!(attacks.count(), 8);
 
         // Check specific squares
-        assert!(attacks.has(Square::D6));
-        assert!(attacks.has(Square::F6));
-        assert!(attacks.has(Square::G5));
-        assert!(attacks.has(Square::G3));
-        assert!(attacks.has(Square::F2));
-        assert!(attacks.has(Square::D2));
-        assert!(attacks.has(Square::C3));
-        assert!(attacks.has(Square::C5));
+        assert!(attacks.contains(Square::D6));
+        assert!(attacks.contains(Square::F6));
+        assert!(attacks.contains(Square::G5));
+        assert!(attacks.contains(Square::G3));
+        assert!(attacks.contains(Square::F2));
+        assert!(attacks.contains(Square::D2));
+        assert!(attacks.contains(Square::C3));
+        assert!(attacks.contains(Square::C5));
     }
 
     #[test]
@@ -284,8 +284,8 @@ mod tests {
         let attacks = knight_attacks(Square::A1);
         // Knight in corner has only 2 moves
         assert_eq!(attacks.count(), 2);
-        assert!(attacks.has(Square::B3));
-        assert!(attacks.has(Square::C2));
+        assert!(attacks.contains(Square::B3));
+        assert!(attacks.contains(Square::C2));
     }
 
     #[test]
@@ -300,9 +300,9 @@ mod tests {
         let attacks = king_attacks(Square::A1);
         // King in corner has 3 moves
         assert_eq!(attacks.count(), 3);
-        assert!(attacks.has(Square::A2));
-        assert!(attacks.has(Square::B1));
-        assert!(attacks.has(Square::B2));
+        assert!(attacks.contains(Square::A2));
+        assert!(attacks.contains(Square::B1));
+        assert!(attacks.contains(Square::B2));
     }
 
     #[test]

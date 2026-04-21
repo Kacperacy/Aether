@@ -467,8 +467,8 @@ mod tests {
         let attackers = board.attackers_to_square(Square::E4, Color::White);
 
         assert_eq!(attackers.count(), 2);
-        assert!(attackers.has(Square::D2));
-        assert!(attackers.has(Square::B1));
+        assert!(attackers.contains(Square::D2));
+        assert!(attackers.contains(Square::B1));
     }
 
     #[test]

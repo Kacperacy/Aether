@@ -9,7 +9,7 @@ impl Board {
 
     #[inline(always)]
     pub fn is_square_occupied(&self, square: Square) -> bool {
-        self.cache.occupied.has(square)
+        self.cache.occupied.contains(square)
     }
 
     #[inline(always)]
@@ -171,18 +171,17 @@ impl Board {
         let white_bishop_bb = &self.pieces[Color::White as usize][Piece::Bishop as usize];
         let black_bishop_bb = &self.pieces[Color::Black as usize][Piece::Bishop as usize];
 
-        let Some(white_sq) = white_bishop_bb.to_square() else {
+        if white_bishop_bb.count() != 1 || black_bishop_bb.count() != 1 {
             return false;
-        };
+        }
 
-        let Some(black_sq) = black_bishop_bb.to_square() else {
-            return false;
-        };
+        let white_sq = white_bishop_bb.lsb();
+        let black_sq = black_bishop_bb.lsb();
 
         let white_square_parity =
-            (white_sq.file() as usize + white_sq.rank() as usize).is_multiple_of(2);
+            (white_sq.file().to_index() + white_sq.rank().to_index()).is_multiple_of(2);
         let black_square_parity =
-            (black_sq.file() as usize + black_sq.rank() as usize).is_multiple_of(2);
+            (black_sq.file().to_index() + black_sq.rank().to_index()).is_multiple_of(2);
 
         white_square_parity == black_square_parity
     }

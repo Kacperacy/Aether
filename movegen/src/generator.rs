@@ -48,7 +48,7 @@ fn generate_piece_moves(
     let flags = MoveFlags::default();
 
     for to in targets.iter() {
-        let capture = if occupied.has(to) {
+        let capture = if occupied.contains(to) {
             board.piece_at(to).map(|(p, _)| p)
         } else {
             None
@@ -113,7 +113,7 @@ fn generate_pawn_moves(
     }
 
     if let Some(ep_square) = board.en_passant_square() {
-        if pawn_attacks(from, side).has(ep_square) {
+        if pawn_attacks(from, side).contains(ep_square) {
             let ep_flags = MoveFlags {
                 is_en_passant: true,
                 ..MoveFlags::default()

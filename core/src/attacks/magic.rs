@@ -100,10 +100,10 @@ mod tests {
         assert_eq!(attacks.count(), 13);
 
         // Check some specific squares
-        assert!(attacks.has(Square::A1));
-        assert!(attacks.has(Square::G7));
-        assert!(attacks.has(Square::A7));
-        assert!(attacks.has(Square::G1));
+        assert!(attacks.contains(Square::A1));
+        assert!(attacks.contains(Square::G7));
+        assert!(attacks.contains(Square::A7));
+        assert!(attacks.contains(Square::G1));
     }
 
     #[test]
@@ -126,11 +126,11 @@ mod tests {
         let attacks = rook_attacks(Square::E1, occupied);
 
         // Should attack up to and including e6
-        assert!(attacks.has(Square::E2));
-        assert!(attacks.has(Square::E6));
+        assert!(attacks.contains(Square::E2));
+        assert!(attacks.contains(Square::E6));
         // But not beyond
-        assert!(!attacks.has(Square::E7));
-        assert!(!attacks.has(Square::E8));
+        assert!(!attacks.contains(Square::E7));
+        assert!(!attacks.contains(Square::E8));
     }
 
     #[test]
@@ -143,16 +143,16 @@ mod tests {
         let attacks = rook_attacks(Square::E4, occupied);
 
         // Should be blocked in all directions
-        assert!(attacks.has(Square::E5)); // can move up once
-        assert!(attacks.has(Square::E6)); // blocker included
-        assert!(!attacks.has(Square::E7)); // blocked
+        assert!(attacks.contains(Square::E5)); // can move up once
+        assert!(attacks.contains(Square::E6)); // blocker included
+        assert!(!attacks.contains(Square::E7)); // blocked
 
-        assert!(attacks.has(Square::D4)); // can move left once
-        assert!(attacks.has(Square::C4)); // blocker included
-        assert!(!attacks.has(Square::B4)); // blocked
+        assert!(attacks.contains(Square::D4)); // can move left once
+        assert!(attacks.contains(Square::C4)); // blocker included
+        assert!(!attacks.contains(Square::B4)); // blocked
 
-        assert!(attacks.has(Square::F4)); // can move right once
-        assert!(attacks.has(Square::G4)); // blocker included
-        assert!(!attacks.has(Square::H4)); // blocked
+        assert!(attacks.contains(Square::F4)); // can move right once
+        assert!(attacks.contains(Square::G4)); // blocker included
+        assert!(!attacks.contains(Square::H4)); // blocked
     }
 }

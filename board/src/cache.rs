@@ -66,11 +66,11 @@ mod tests {
         let sq = Square::E4;
 
         cache.add_piece(sq, Color::White);
-        assert!(cache.occupied.has(sq));
-        assert!(cache.color_combined[Color::White as usize].has(sq));
-        assert!(!cache.color_combined[Color::Black as usize].has(sq));
+        assert!(cache.occupied.contains(sq));
+        assert!(cache.color_combined[Color::White as usize].contains(sq));
+        assert!(!cache.color_combined[Color::Black as usize].contains(sq));
 
         cache.remove_piece(sq, Color::White);
-        assert!(!cache.occupied.has(sq));
+        assert!(!cache.occupied.contains(sq));
     }
 }

@@ -1,4 +1,4 @@
-use crate::{ALL_SQUARES, BitBoard, File, Rank, Square};
+use crate::{ALL_SQUARES, BitBoard, Square};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::Write;
@@ -15,23 +15,24 @@ struct MagicEntry {
 
 fn rook_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
-    let rank = sq.rank() as i8;
-    let file = sq.file() as i8;
+
+    let rank = sq.rank().to_index();
+    let file = sq.file().to_index();
 
     for r in (rank + 1)..7 {
-        mask |= Square::new(File::from_index(file), Rank::from_index(r)).bitboard();
+        mask.set(Square::from_u8(r * 8 + file));
     }
 
-    for r in (1..rank).rev() {
-        mask |= Square::new(File::from_index(file), Rank::from_index(r)).bitboard();
+    for r in 1..rank {
+        mask.set(Square::from_u8(r * 8 + file));
     }
 
     for f in (file + 1)..7 {
-        mask |= Square::new(File::from_index(f), Rank::from_index(rank)).bitboard();
+        mask.set(Square::from_u8(rank * 8 + f));
     }
 
-    for f in (1..file).rev() {
-        mask |= Square::new(File::from_index(f), Rank::from_index(rank)).bitboard();
+    for f in 1..file {
+        mask.set(Square::from_u8(rank * 8 + f));
     }
 
     mask
@@ -39,24 +40,25 @@ fn rook_mask(sq: Square) -> BitBoard {
 
 fn bishop_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
-    let rank = sq.rank() as i8;
-    let file = sq.file() as i8;
+
+    let rank = sq.rank().to_index();
+    let file = sq.file().to_index();
 
     for i in 1..7 {
         if rank + i < 7 && file + i < 7 {
-            mask |= Square::new(File::from_index(file + i), Rank::from_index(rank + i)).bitboard();
+            mask.set(Square::from_u8((rank + i) * 8 + file + i));
         }
 
         if rank + i < 7 && file - i > 0 {
-            mask |= Square::new(File::from_index(file - i), Rank::from_index(rank + i)).bitboard();
+            mask.set(Square::from_u8((rank + i) * 8 + file - i));
         }
 
         if rank - i > 0 && file + i < 7 {
-            mask |= Square::new(File::from_index(file + i), Rank::from_index(rank - i)).bitboard();
+            mask.set(Square::from_u8((rank - i) * 8 + file + i));
         }
 
         if rank - i > 0 && file - i > 0 {
-            mask |= Square::new(File::from_index(file - i), Rank::from_index(rank - i)).bitboard();
+            mask.set(Square::from_u8((rank - i) * 8 + file - i));
         }
     }
 
@@ -64,18 +66,20 @@ fn bishop_mask(sq: Square) -> BitBoard {
 }
 
 fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
-    let bits: Vec<Square> = mask.iter().collect();
-    let count = 1 << bits.len();
+    let count = 1 << mask.count();
     let mut blockers = Vec::with_capacity(count);
 
-    for i in 0..count {
-        let mut bb = BitBoard::EMPTY;
-        for (j, &sq) in bits.iter().enumerate() {
-            if (i & (1 << j)) != 0 {
-                bb |= sq.bitboard();
-            }
+    let m = mask.value();
+    let mut subset = 0u64;
+
+    loop {
+        blockers.push(BitBoard::new(subset));
+
+        subset = subset.wrapping_sub(m) & m;
+
+        if subset == 0 {
+            break;
         }
-        blockers.push(bb);
     }
 
     blockers
@@ -83,37 +87,38 @@ fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
 
 fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
-    let rank = sq.rank() as i8;
-    let file = sq.file() as i8;
+
+    let rank = sq.rank().to_index();
+    let file = sq.file().to_index();
 
     for r in (rank + 1)..=7 {
-        let target = Square::new(File::from_index(file), Rank::from_index(r));
-        attacks |= target.bitboard();
-        if blockers.has(target) {
+        let target = Square::from_u8(r * 8 + file);
+        attacks.set(target);
+        if blockers.contains(target) {
             break;
         }
     }
 
     for r in (0..rank).rev() {
-        let target = Square::new(File::from_index(file), Rank::from_index(r));
-        attacks |= target.bitboard();
-        if blockers.has(target) {
+        let target = Square::from_u8(r * 8 + file);
+        attacks.set(target);
+        if blockers.contains(target) {
             break;
         }
     }
 
     for f in (file + 1)..=7 {
-        let target = Square::new(File::from_index(f), Rank::from_index(rank));
-        attacks |= target.bitboard();
-        if blockers.has(target) {
+        let target = Square::from_u8(rank * 8 + f);
+        attacks.set(target);
+        if blockers.contains(target) {
             break;
         }
     }
 
     for f in (0..file).rev() {
-        let target = Square::new(File::from_index(f), Rank::from_index(rank));
-        attacks |= target.bitboard();
-        if blockers.has(target) {
+        let target = Square::from_u8(rank * 8 + f);
+        attacks.set(target);
+        if blockers.contains(target) {
             break;
         }
     }
@@ -123,15 +128,15 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
 fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
-    let rank = sq.rank() as i8;
-    let file = sq.file() as i8;
+    let rank = sq.rank().to_index();
+    let file = sq.file().to_index();
 
     // Up-Right diagonal
     for i in 1..=7 {
         if rank + i <= 7 && file + i <= 7 {
-            let target = Square::new(File::from_index(file + i), Rank::from_index(rank + i));
-            attacks |= target.bitboard();
-            if blockers.has(target) {
+            let target = Square::from_u8((rank + i) * 8 + file + i);
+            attacks.set(target);
+            if blockers.contains(target) {
                 break;
             }
         } else {
@@ -141,10 +146,10 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     // Up-Left diagonal
     for i in 1..=7 {
-        if rank + i <= 7 && file - i >= 0 {
-            let target = Square::new(File::from_index(file - i), Rank::from_index(rank + i));
-            attacks |= target.bitboard();
-            if blockers.has(target) {
+        if rank + i <= 7 && file >= i {
+            let target = Square::from_u8((rank + i) * 8 + file - i);
+            attacks.set(target);
+            if blockers.contains(target) {
                 break;
             }
         } else {
@@ -154,10 +159,10 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     // Down-Right diagonal
     for i in 1..=7 {
-        if rank - i >= 0 && file + i <= 7 {
-            let target = Square::new(File::from_index(file + i), Rank::from_index(rank - i));
-            attacks |= target.bitboard();
-            if blockers.has(target) {
+        if rank >= i && file + i <= 7 {
+            let target = Square::from_u8((rank - i) * 8 + file + i);
+            attacks.set(target);
+            if blockers.contains(target) {
                 break;
             }
         } else {
@@ -167,10 +172,10 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
     // Down-Left diagonal
     for i in 1..=7 {
-        if rank - i >= 0 && file - i >= 0 {
-            let target = Square::new(File::from_index(file - i), Rank::from_index(rank - i));
-            attacks |= target.bitboard();
-            if blockers.has(target) {
+        if rank >= i && file >= i {
+            let target = Square::from_u8((rank - i) * 8 + file - i);
+            attacks.set(target);
+            if blockers.contains(target) {
                 break;
             }
         } else {
@@ -367,16 +372,16 @@ mod tests {
     fn test_rook_mask() {
         let mask = rook_mask(Square::E4);
         // Should not include edges
-        assert!(!mask.has(Square::E1));
-        assert!(!mask.has(Square::E8));
-        assert!(!mask.has(Square::A4));
-        assert!(!mask.has(Square::H4));
+        assert!(!mask.contains(Square::E1));
+        assert!(!mask.contains(Square::E8));
+        assert!(!mask.contains(Square::A4));
+        assert!(!mask.contains(Square::H4));
 
         // Should include inner squares
-        assert!(mask.has(Square::E2));
-        assert!(mask.has(Square::E7));
-        assert!(mask.has(Square::B4));
-        assert!(mask.has(Square::G4));
+        assert!(mask.contains(Square::E2));
+        assert!(mask.contains(Square::E7));
+        assert!(mask.contains(Square::B4));
+        assert!(mask.contains(Square::G4));
     }
 
     #[test]

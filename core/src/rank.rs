@@ -4,45 +4,85 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(u8)]
-pub enum Rank {
-    One = 0,
-    Two = 1,
-    Three = 2,
-    Four = 3,
-    Five = 4,
-    Six = 5,
-    Seven = 6,
-    Eight = 7,
-}
+pub struct Rank(u8);
 
-pub const ALL_RANKS: [Rank; 8] = [
-    Rank::One,
-    Rank::Two,
-    Rank::Three,
-    Rank::Four,
-    Rank::Five,
-    Rank::Six,
-    Rank::Seven,
-    Rank::Eight,
-];
+impl Rank {
+    pub const NUM: usize = 8;
+
+    pub const ONE: Rank = Rank(0);
+    pub const TWO: Rank = Rank(1);
+    pub const THREE: Rank = Rank(2);
+    pub const FOUR: Rank = Rank(3);
+    pub const FIVE: Rank = Rank(4);
+    pub const SIX: Rank = Rank(5);
+    pub const SEVEN: Rank = Rank(6);
+    pub const EIGHT: Rank = Rank(7);
+
+    pub const ALL: [Self; 8] = [
+        Self::ONE,
+        Self::TWO,
+        Self::THREE,
+        Self::FOUR,
+        Self::FIVE,
+        Self::SIX,
+        Self::SEVEN,
+        Self::EIGHT,
+    ];
+
+    #[inline(always)]
+    pub const fn from_index(index: i8) -> Self {
+        debug_assert!(index >= 0 && index < 8, "Rank index out of bounds");
+        Self(index as u8)
+    }
+
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self.0
+    }
+
+    #[inline(always)]
+    pub const fn as_char(self) -> char {
+        (b'1' + self.0) as char
+    }
+
+    pub const fn offset(self, offset: i8) -> Option<Self> {
+        let new_rank = self.0 as i8 + offset;
+        if new_rank < 0 || new_rank > 7 {
+            None
+        } else {
+            Some(Self(new_rank as u8))
+        }
+    }
+
+    #[inline(always)]
+    pub const fn flip(self) -> Self {
+        Self(7 - self.0)
+    }
+
+    #[inline(always)]
+    pub const fn bitboard(self) -> BitBoard {
+        BitBoard::new(0xFF_u64 << (self.0 * 8))
+    }
+
+    pub const fn relative_to(self, color: Color) -> Self {
+        match color {
+            Color::White => self,
+            Color::Black => self.flip(),
+        }
+    }
+}
 
 impl FromStr for Rank {
     type Err = CoreError;
 
     fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "1" => Ok(Self::One),
-            "2" => Ok(Self::Two),
-            "3" => Ok(Self::Three),
-            "4" => Ok(Self::Four),
-            "5" => Ok(Self::Five),
-            "6" => Ok(Self::Six),
-            "7" => Ok(Self::Seven),
-            "8" => Ok(Self::Eight),
-            _ => Err(InvalidRank {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() == 1 && chars[0] >= '1' && chars[0] <= '8' {
+            Ok(Self((chars[0] as u8) - b'1'))
+        } else {
+            Err(InvalidRank {
                 rank: s.to_string(),
-            }),
+            })
         }
     }
 }
@@ -53,73 +93,69 @@ impl Display for Rank {
     }
 }
 
-impl Rank {
-    pub const NUM: usize = 8;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Color;
 
-    #[inline(always)]
-    pub const fn from_index(rank: i8) -> Self {
-        debug_assert!(rank >= 0 && rank < 8, "Rank index out of bounds");
-        // SAFETY: Rank is #[repr(u8)] with variants 0..=7, and we assert rank is in 0..8.
-        unsafe { std::mem::transmute(rank as u8) }
+    #[test]
+    fn test_rank_creation_and_index() {
+        assert_eq!(Rank::ONE.to_index(), 0);
+        assert_eq!(Rank::EIGHT.to_index(), 7);
+        assert_eq!(Rank::from_index(3), Rank::FOUR);
     }
 
-    #[inline(always)]
-    pub const fn to_index(self) -> u8 {
-        self as u8
+    #[test]
+    fn test_as_char_and_display() {
+        assert_eq!(Rank::ONE.as_char(), '1');
+        assert_eq!(Rank::EIGHT.as_char(), '8');
+        assert_eq!(format!("{}", Rank::FIVE), "5");
     }
 
-    pub const fn as_char(self) -> char {
-        match self {
-            Self::One => '1',
-            Self::Two => '2',
-            Self::Three => '3',
-            Self::Four => '4',
-            Self::Five => '5',
-            Self::Six => '6',
-            Self::Seven => '7',
-            Self::Eight => '8',
-        }
+    #[test]
+    fn test_from_str() {
+        assert_eq!(Rank::from_str("1").unwrap(), Rank::ONE);
+        assert_eq!(Rank::from_str("8").unwrap(), Rank::EIGHT);
+
+        assert!(Rank::from_str("9").is_err());
+        assert!(Rank::from_str("0").is_err());
+        assert!(Rank::from_str("12").is_err());
+        assert!(Rank::from_str("a").is_err());
     }
 
-    pub const fn offset(self, offset: i8) -> Option<Self> {
-        let new_rank = self as i8 + offset;
-        if new_rank < 0 || new_rank > 7 {
-            None
-        } else {
-            Some(Self::from_index(new_rank))
-        }
+    #[test]
+    fn test_offset() {
+        assert_eq!(Rank::FOUR.offset(1), Some(Rank::FIVE));
+        assert_eq!(Rank::FOUR.offset(-1), Some(Rank::THREE));
+        assert_eq!(Rank::FOUR.offset(4), Some(Rank::EIGHT));
+
+        assert_eq!(Rank::ONE.offset(-1), None);
+        assert_eq!(Rank::ONE.offset(-5), None);
+        assert_eq!(Rank::EIGHT.offset(1), None);
+        assert_eq!(Rank::EIGHT.offset(5), None);
     }
 
-    pub const fn flip(self) -> Self {
-        match self {
-            Self::One => Self::Eight,
-            Self::Two => Self::Seven,
-            Self::Three => Self::Six,
-            Self::Four => Self::Five,
-            Self::Five => Self::Four,
-            Self::Six => Self::Three,
-            Self::Seven => Self::Two,
-            Self::Eight => Self::One,
-        }
+    #[test]
+    fn test_flip() {
+        assert_eq!(Rank::ONE.flip(), Rank::EIGHT);
+        assert_eq!(Rank::TWO.flip(), Rank::SEVEN);
+        assert_eq!(Rank::THREE.flip(), Rank::SIX);
+        assert_eq!(Rank::FOUR.flip(), Rank::FIVE);
     }
 
-    pub const fn bitboard(self) -> BitBoard {
-        match self {
-            Self::One => BitBoard(0x00000000000000ff),
-            Self::Two => BitBoard(0x000000000000ff00),
-            Self::Three => BitBoard(0x0000000000ff0000),
-            Self::Four => BitBoard(0x00000000ff000000),
-            Self::Five => BitBoard(0x000000ff00000000),
-            Self::Six => BitBoard(0x0000ff0000000000),
-            Self::Seven => BitBoard(0x00ff000000000000),
-            Self::Eight => BitBoard(0xff00000000000000),
-        }
+    #[test]
+    fn test_bitboard() {
+        assert_eq!(Rank::ONE.bitboard().value(), 0x00000000000000FF);
+        assert_eq!(Rank::TWO.bitboard().value(), 0x000000000000FF00);
+        assert_eq!(Rank::EIGHT.bitboard().value(), 0xFF00000000000000);
     }
 
-    pub const fn relative_to(self, color: Color) -> Self {
-        match color {
-            Color::White => self,
-            Color::Black => self.flip(),
-        }
+    #[test]
+    fn test_relative_to() {
+        assert_eq!(Rank::TWO.relative_to(Color::White), Rank::TWO);
+
+        assert_eq!(Rank::TWO.relative_to(Color::Black), Rank::SEVEN);
+
+        assert_eq!(Rank::EIGHT.relative_to(Color::Black), Rank::ONE);
     }
 }

@@ -115,8 +115,8 @@ fn test_make_unmake_promotion() {
 fn test_halfmove_clock() {
     let mut board = Board::starting_position().unwrap();
 
-    let e2 = Square::new(File::E, Rank::Two);
-    let e4 = Square::new(File::E, Rank::Four);
+    let e2 = Square::new(File::E, Rank::TWO);
+    let e4 = Square::new(File::E, Rank::FOUR);
     let mv = Move::new(e2, e4, aether_core::Piece::Pawn).with_flags(aether_core::MoveFlags {
         is_double_pawn_push: true,
         ..Default::default()

@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::ops::Not;
 
+use crate::Rank;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Color {
@@ -51,17 +53,17 @@ impl Color {
         }
     }
 
-    pub const fn pawn_start_rank(self) -> crate::Rank {
+    pub const fn pawn_start_rank(self) -> Rank {
         match self {
-            Self::White => crate::Rank::Two,
-            Self::Black => crate::Rank::Seven,
+            Self::White => Rank::TWO,
+            Self::Black => Rank::SEVEN,
         }
     }
 
-    pub const fn pawn_promotion_rank(self) -> crate::Rank {
+    pub const fn pawn_promotion_rank(self) -> Rank {
         match self {
-            Self::White => crate::Rank::Eight,
-            Self::Black => crate::Rank::One,
+            Self::White => Rank::EIGHT,
+            Self::Black => Rank::ONE,
         }
     }
 
@@ -72,17 +74,17 @@ impl Color {
         }
     }
 
-    pub const fn back_rank(self) -> crate::Rank {
+    pub const fn back_rank(self) -> Rank {
         match self {
-            Self::White => crate::Rank::One,
-            Self::Black => crate::Rank::Eight,
+            Self::White => Rank::ONE,
+            Self::Black => Rank::EIGHT,
         }
     }
 
-    pub const fn en_passant_rank(self) -> crate::Rank {
+    pub const fn en_passant_rank(self) -> Rank {
         match self {
-            Self::White => crate::Rank::Six,
-            Self::Black => crate::Rank::Three,
+            Self::White => Rank::SIX,
+            Self::Black => Rank::THREE,
         }
     }
 }
