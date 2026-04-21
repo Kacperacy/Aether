@@ -154,7 +154,7 @@ mod test {
     fn test_bitboard() {
         assert_eq!(File::A.bitboard().value(), 0x0101010101010101);
         assert_eq!(File::B.bitboard().value(), 0x0202020202020202);
-        assert_eq!(File::H.bitboard().value(), 0x0808080808080808);
+        assert_eq!(File::H.bitboard().value(), 0x8080808080808080);
     }
 
     #[test]

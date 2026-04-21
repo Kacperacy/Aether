@@ -212,7 +212,8 @@ mod test {
 
         let bb2 = BitBoard::new(0b101);
         assert!(!bb2.is_empty());
-        assert_eq!(bb.count(), 2);
+        println!("{}", bb2);
+        assert_eq!(bb2.count(), 2);
     }
 
     #[test]
