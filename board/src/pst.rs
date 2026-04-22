@@ -165,7 +165,7 @@ const PST_EG: [[i32; 64]; 6] = [
 #[inline(always)]
 fn pst_index(square: Square, color: Color) -> usize {
     match color {
-        Color::White => square.flip_rank().to_index() as usize,
+        Color::White => square.flip().to_index() as usize,
         Color::Black => square.to_index() as usize,
     }
 }

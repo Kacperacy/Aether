@@ -1,4 +1,4 @@
-use crate::{ALL_SQUARES, BitBoard, Square};
+use crate::{BitBoard, Square};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::Write;
@@ -16,23 +16,23 @@ struct MagicEntry {
 fn rook_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
 
-    let rank = sq.rank().to_index();
-    let file = sq.file().to_index();
+    let rank = sq.rank().to_index() as i8;
+    let file = sq.file().to_index() as i8;
 
     for r in (rank + 1)..7 {
-        mask.set(Square::from_u8(r * 8 + file));
+        mask.set(Square::from_index(r * 8 + file));
     }
 
     for r in 1..rank {
-        mask.set(Square::from_u8(r * 8 + file));
+        mask.set(Square::from_index(r * 8 + file));
     }
 
     for f in (file + 1)..7 {
-        mask.set(Square::from_u8(rank * 8 + f));
+        mask.set(Square::from_index(rank * 8 + f));
     }
 
     for f in 1..file {
-        mask.set(Square::from_u8(rank * 8 + f));
+        mask.set(Square::from_index(rank * 8 + f));
     }
 
     mask
@@ -41,24 +41,24 @@ fn rook_mask(sq: Square) -> BitBoard {
 fn bishop_mask(sq: Square) -> BitBoard {
     let mut mask = BitBoard::EMPTY;
 
-    let rank = sq.rank().to_index();
-    let file = sq.file().to_index();
+    let rank = sq.rank().to_index() as i8;
+    let file = sq.file().to_index() as i8;
 
     for i in 1..7 {
         if rank + i < 7 && file + i < 7 {
-            mask.set(Square::from_u8((rank + i) * 8 + file + i));
+            mask.set(Square::from_index((rank + i) * 8 + file + i));
         }
 
         if rank + i < 7 && file - i > 0 {
-            mask.set(Square::from_u8((rank + i) * 8 + file - i));
+            mask.set(Square::from_index((rank + i) * 8 + file - i));
         }
 
         if rank - i > 0 && file + i < 7 {
-            mask.set(Square::from_u8((rank - i) * 8 + file + i));
+            mask.set(Square::from_index((rank - i) * 8 + file + i));
         }
 
         if rank - i > 0 && file - i > 0 {
-            mask.set(Square::from_u8((rank - i) * 8 + file - i));
+            mask.set(Square::from_index((rank - i) * 8 + file - i));
         }
     }
 
@@ -88,11 +88,11 @@ fn generate_blockers(mask: BitBoard) -> Vec<BitBoard> {
 fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
 
-    let rank = sq.rank().to_index();
-    let file = sq.file().to_index();
+    let rank = sq.rank().to_index() as i8;
+    let file = sq.file().to_index() as i8;
 
     for r in (rank + 1)..=7 {
-        let target = Square::from_u8(r * 8 + file);
+        let target = Square::from_index(r * 8 + file);
         attacks.set(target);
         if blockers.contains(target) {
             break;
@@ -100,7 +100,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     }
 
     for r in (0..rank).rev() {
-        let target = Square::from_u8(r * 8 + file);
+        let target = Square::from_index(r * 8 + file);
         attacks.set(target);
         if blockers.contains(target) {
             break;
@@ -108,7 +108,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     }
 
     for f in (file + 1)..=7 {
-        let target = Square::from_u8(rank * 8 + f);
+        let target = Square::from_index(rank * 8 + f);
         attacks.set(target);
         if blockers.contains(target) {
             break;
@@ -116,7 +116,7 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     }
 
     for f in (0..file).rev() {
-        let target = Square::from_u8(rank * 8 + f);
+        let target = Square::from_index(rank * 8 + f);
         attacks.set(target);
         if blockers.contains(target) {
             break;
@@ -128,13 +128,13 @@ fn rook_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
 
 fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     let mut attacks = BitBoard::EMPTY;
-    let rank = sq.rank().to_index();
-    let file = sq.file().to_index();
+    let rank = sq.rank().to_index() as i8;
+    let file = sq.file().to_index() as i8;
 
     // Up-Right diagonal
     for i in 1..=7 {
         if rank + i <= 7 && file + i <= 7 {
-            let target = Square::from_u8((rank + i) * 8 + file + i);
+            let target = Square::from_index((rank + i) * 8 + file + i);
             attacks.set(target);
             if blockers.contains(target) {
                 break;
@@ -147,7 +147,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     // Up-Left diagonal
     for i in 1..=7 {
         if rank + i <= 7 && file >= i {
-            let target = Square::from_u8((rank + i) * 8 + file - i);
+            let target = Square::from_index((rank + i) * 8 + file - i);
             attacks.set(target);
             if blockers.contains(target) {
                 break;
@@ -160,7 +160,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     // Down-Right diagonal
     for i in 1..=7 {
         if rank >= i && file + i <= 7 {
-            let target = Square::from_u8((rank - i) * 8 + file + i);
+            let target = Square::from_index((rank - i) * 8 + file + i);
             attacks.set(target);
             if blockers.contains(target) {
                 break;
@@ -173,7 +173,7 @@ fn bishop_attacks(sq: Square, blockers: BitBoard) -> BitBoard {
     // Down-Left diagonal
     for i in 1..=7 {
         if rank >= i && file >= i {
-            let target = Square::from_u8((rank - i) * 8 + file - i);
+            let target = Square::from_index((rank - i) * 8 + file - i);
             attacks.set(target);
             if blockers.contains(target) {
                 break;
@@ -261,7 +261,7 @@ fn generate_all_magics() -> (Vec<MagicEntry>, Vec<MagicEntry>) {
     let mut rook_magics = Vec::with_capacity(64);
     let mut bishop_magics = Vec::with_capacity(64);
 
-    for (i, &sq) in ALL_SQUARES.iter().enumerate() {
+    for (i, &sq) in Square::ALL.iter().enumerate() {
         print!("\rProgress: {}/64", i + 1);
         std::io::stdout().flush().unwrap();
 

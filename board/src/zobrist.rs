@@ -1,13 +1,13 @@
 use crate::Board;
 use aether_core::zobrist_keys::zobrist_keys;
-use aether_core::{ALL_SQUARES, CastlingRights, Color, File, Piece, Square};
+use aether_core::{CastlingRights, Color, File, Piece, Square};
 
 impl Board {
     pub fn calculate_zobrist_hash(&self) -> u64 {
         let keys = zobrist_keys();
         let mut hash = 0u64;
 
-        for &square in &ALL_SQUARES {
+        for &square in &Square::ALL {
             if let Some((piece, color)) = self.piece_at(square) {
                 hash ^= keys.piece_key(square, piece, color);
             }
