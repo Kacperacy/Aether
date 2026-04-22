@@ -18,7 +18,7 @@ impl File {
     pub const G: File = File(6);
     pub const H: File = File(7);
 
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; Self::NUM] = [
         Self::A,
         Self::B,
         Self::C,
@@ -40,7 +40,7 @@ impl File {
         self.0
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn as_char(self) -> char {
         (b'a' + self.0) as char
     }

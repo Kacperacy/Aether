@@ -1,4 +1,4 @@
-use aether_core::{ALL_COLORS, BitBoard, Color, Square};
+use aether_core::{BitBoard, Color, Square};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoardCache {
@@ -16,7 +16,7 @@ impl BoardCache {
     }
 
     pub fn refresh(&mut self, pieces: &[[BitBoard; 6]; 2]) {
-        for color in ALL_COLORS {
+        for color in Color::ALL {
             self.color_combined[color as usize] = pieces[color as usize][0]
                 | pieces[color as usize][1]
                 | pieces[color as usize][2]

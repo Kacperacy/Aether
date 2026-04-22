@@ -1,16 +1,117 @@
+use crate::CoreError::InvalidColor;
+use crate::{CoreError, Rank, Result};
 use std::fmt::Display;
 use std::ops::Not;
+use std::str::FromStr;
 
-use crate::Rank;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Color {
     White = 0,
     Black = 1,
 }
 
-pub const ALL_COLORS: [Color; Color::NUM] = [Color::White, Color::Black];
+impl Color {
+    pub const NUM: usize = 2;
+
+    pub const ALL: [Self; Self::NUM] = [Self::White, Self::Black];
+
+    #[inline(always)]
+    pub const fn from_index(index: u8) -> Self {
+        debug_assert!(index < 2, "Color index out of bounds");
+        match index {
+            0 => Self::White,
+            _ => Self::Black,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self as u8
+    }
+
+    #[inline]
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::White => 'w',
+            Self::Black => 'b',
+        }
+    }
+
+    #[inline]
+    pub const fn from_char(c: char) -> Option<Self> {
+        match c {
+            'w' => Some(Self::White),
+            'b' => Some(Self::Black),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn opponent(self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn pawn_start_rank(self) -> Rank {
+        match self {
+            Self::White => Rank::TWO,
+            Self::Black => Rank::SEVEN,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn pawn_promotion_rank(self) -> Rank {
+        match self {
+            Self::White => Rank::EIGHT,
+            Self::Black => Rank::ONE,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn forward_direction(self) -> i8 {
+        match self {
+            Self::White => 1,
+            Self::Black => -1,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn back_rank(self) -> Rank {
+        match self {
+            Self::White => Rank::ONE,
+            Self::Black => Rank::EIGHT,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn en_passant_rank(self) -> Rank {
+        match self {
+            Self::White => Rank::SIX,
+            Self::Black => Rank::THREE,
+        }
+    }
+}
+
+impl FromStr for Color {
+    type Err = CoreError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() == 1
+            && let Some(c) = Self::from_char(chars[0])
+        {
+            return Ok(c);
+        }
+
+        Err(InvalidColor {
+            color: s.to_string(),
+        })
+    }
+}
 
 impl Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -21,70 +122,58 @@ impl Display for Color {
 impl Not for Color {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn not(self) -> Self::Output {
         self.opponent()
     }
 }
 
-impl Color {
-    pub const NUM: usize = 2;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    pub const fn as_char(self) -> char {
-        match self {
-            Self::White => 'w',
-            Self::Black => 'b',
-        }
+    #[test]
+    fn test_color_creation_and_index() {
+        assert_eq!(Color::White.to_index(), 0);
+        assert_eq!(Color::Black.to_index(), 1);
+        assert_eq!(Color::from_index(0), Color::White);
+        assert_eq!(Color::from_index(1), Color::Black);
     }
 
-    pub const fn from_char(c: char) -> Option<Self> {
-        match c {
-            'w' => Some(Self::White),
-            'b' => Some(Self::Black),
-            _ => None,
-        }
+    #[test]
+    fn test_as_char_and_display() {
+        assert_eq!(Color::White.as_char(), 'w');
+        assert_eq!(Color::Black.as_char(), 'b');
+        assert_eq!(format!("{}", Color::White), "w");
     }
 
-    #[inline]
-    pub const fn opponent(self) -> Self {
-        match self {
-            Self::White => Self::Black,
-            Self::Black => Self::White,
-        }
+    #[test]
+    fn test_from_str() {
+        assert_eq!(Color::from_str("w").unwrap(), Color::White);
+        assert_eq!(Color::from_str("b").unwrap(), Color::Black);
+
+        assert!(Color::from_str("white").is_err());
+        assert!(Color::from_str("W").is_err());
+        assert!(Color::from_str("").is_err());
     }
 
-    pub const fn pawn_start_rank(self) -> Rank {
-        match self {
-            Self::White => Rank::TWO,
-            Self::Black => Rank::SEVEN,
-        }
+    #[test]
+    fn test_opponent_and_not() {
+        assert_eq!(Color::White.opponent(), Color::Black);
+        assert_eq!(Color::Black.opponent(), Color::White);
+        assert_eq!(!Color::White, Color::Black);
+        assert_eq!(Color::White.opponent(), Color::Black);
     }
 
-    pub const fn pawn_promotion_rank(self) -> Rank {
-        match self {
-            Self::White => Rank::EIGHT,
-            Self::Black => Rank::ONE,
-        }
-    }
+    #[test]
+    fn test_directions_and_ranks() {
+        assert_eq!(Color::White.forward_direction(), 1);
+        assert_eq!(Color::Black.forward_direction(), -1);
 
-    pub const fn forward_direction(self) -> i8 {
-        match self {
-            Self::White => 1,
-            Self::Black => -1,
-        }
-    }
+        assert_eq!(Color::White.pawn_start_rank(), Rank::TWO);
+        assert_eq!(Color::Black.pawn_start_rank(), Rank::SEVEN);
 
-    pub const fn back_rank(self) -> Rank {
-        match self {
-            Self::White => Rank::ONE,
-            Self::Black => Rank::EIGHT,
-        }
-    }
-
-    pub const fn en_passant_rank(self) -> Rank {
-        match self {
-            Self::White => Rank::SIX,
-            Self::Black => Rank::THREE,
-        }
+        assert_eq!(Color::White.back_rank(), Rank::ONE);
+        assert_eq!(Color::Black.back_rank(), Rank::EIGHT);
     }
 }

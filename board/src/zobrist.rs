@@ -1,6 +1,6 @@
 use crate::Board;
 use aether_core::zobrist_keys::zobrist_keys;
-use aether_core::{ALL_COLORS, ALL_SQUARES, CastlingRights, Color, File, Piece, Square};
+use aether_core::{ALL_SQUARES, CastlingRights, Color, File, Piece, Square};
 
 impl Board {
     pub fn calculate_zobrist_hash(&self) -> u64 {
@@ -17,7 +17,7 @@ impl Board {
             hash ^= keys.side_to_move;
         }
 
-        for color in ALL_COLORS {
+        for color in Color::ALL {
             if self.can_castle_short(color) {
                 hash ^= keys.castling_key(color, true);
             }
@@ -62,7 +62,7 @@ impl Board {
         old_rights: &[CastlingRights; 2],
         new_rights: &[CastlingRights; 2],
     ) {
-        for color in ALL_COLORS {
+        for color in Color::ALL {
             let old = &old_rights[color as usize];
             let new = &new_rights[color as usize];
 

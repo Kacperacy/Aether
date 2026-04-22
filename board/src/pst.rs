@@ -186,7 +186,7 @@ pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
 }
 
 pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32) {
-    use aether_core::{ALL_COLORS, ALL_PIECES};
+    use aether_core::ALL_PIECES;
 
     let mut mg = 0i32;
     let mut eg = 0i32;
@@ -194,7 +194,7 @@ pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32)
     for &piece in &ALL_PIECES {
         let piece_idx = piece as usize;
 
-        for color in ALL_COLORS {
+        for color in Color::ALL {
             for square in pieces[color as usize][piece_idx].iter() {
                 let (pmg, peg) = piece_value(piece, square, color);
                 mg += pmg;

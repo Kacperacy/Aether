@@ -25,4 +25,7 @@ pub enum CoreError {
 
     #[error("Invalid move: {mv:?} (expected UCI format like 'e2e4' or 'e7e8q')")]
     InvalidMove { mv: String },
+
+    #[error("Invalid color: {color:?} (expected 'w' or 'b'")]
+    InvalidColor { color: String },
 }

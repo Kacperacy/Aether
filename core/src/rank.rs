@@ -18,7 +18,7 @@ impl Rank {
     pub const SEVEN: Rank = Rank(6);
     pub const EIGHT: Rank = Rank(7);
 
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; Self::NUM] = [
         Self::ONE,
         Self::TWO,
         Self::THREE,
@@ -40,7 +40,7 @@ impl Rank {
         self.0
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn as_char(self) -> char {
         (b'1' + self.0) as char
     }
