@@ -19,29 +19,29 @@ impl BitBoard {
         self.0
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn count(self) -> usize {
         self.0.count_ones() as usize
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn set(&mut self, square: Square) {
-        self.0 |= 1 << square.to_index();
+        self.0 |= 1_u64 << square.to_index();
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn clear(&mut self, square: Square) {
-        self.0 &= !(1 << square.to_index());
+        self.0 &= !(1_u64 << square.to_index());
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn contains(self, square: Square) -> bool {
-        (self.0 & (1 << square.to_index())) != 0
+        (self.0 & (1_u64 << square.to_index())) != 0
     }
 
     #[inline(always)]
@@ -53,11 +53,11 @@ impl BitBoard {
     #[inline(always)]
     pub fn pop_lsb(&mut self) -> Square {
         let sq = self.lsb();
-        self.0 &= self.0 - 1;
+        self.0 &= self.0.wrapping_sub(1);
         sq
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn iter(self) -> BitBoardIter {
         BitBoardIter { bits: self.0 }
     }
