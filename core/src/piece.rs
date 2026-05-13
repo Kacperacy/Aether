@@ -14,59 +14,55 @@ pub enum Piece {
     King = 5,
 }
 
-pub const ALL_PIECES: [Piece; Piece::NUM] = [
-    Piece::Pawn,
-    Piece::Knight,
-    Piece::Bishop,
-    Piece::Rook,
-    Piece::Queen,
-    Piece::King,
-];
-
-pub const PROMOTION_PIECES: [Piece; 4] = [Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen];
-pub const PAWN_VALUE: Score = 100;
-pub const KNIGHT_VALUE: Score = 320;
-pub const BISHOP_VALUE: Score = 330;
-pub const ROOK_VALUE: Score = 500;
-pub const QUEEN_VALUE: Score = 900;
-pub const KING_VALUE: Score = 20000;
-
-pub const PIECE_VALUES: [Score; Piece::NUM] = [
-    PAWN_VALUE,
-    KNIGHT_VALUE,
-    BISHOP_VALUE,
-    ROOK_VALUE,
-    QUEEN_VALUE,
-    KING_VALUE,
-];
-
-impl Display for Piece {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_char())
-    }
-}
-
-impl FromStr for Piece {
-    type Err = CoreError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "p" => Ok(Self::Pawn),
-            "n" => Ok(Self::Knight),
-            "b" => Ok(Self::Bishop),
-            "r" => Ok(Self::Rook),
-            "q" => Ok(Self::Queen),
-            "k" => Ok(Self::King),
-            _ => Err(InvalidPiece {
-                piece: s.to_string(),
-            }),
-        }
-    }
-}
-
 impl Piece {
     pub const NUM: usize = 6;
 
+    pub const ALL: [Self; Self::NUM] = [
+        Self::Pawn,
+        Self::Knight,
+        Self::Bishop,
+        Self::Rook,
+        Self::Queen,
+        Self::King,
+    ];
+
+    pub const PROMOTIONS: [Self; 4] = [Self::Knight, Self::Bishop, Self::Rook, Self::Queen];
+
+    pub const PAWN_VALUE: Score = 100;
+    pub const KNIGHT_VALUE: Score = 320;
+    pub const BISHOP_VALUE: Score = 330;
+    pub const ROOK_VALUE: Score = 500;
+    pub const QUEEN_VALUE: Score = 900;
+    pub const KING_VALUE: Score = 20000;
+
+    pub const VALUES: [Score; Self::NUM] = [
+        Self::PAWN_VALUE,
+        Self::KNIGHT_VALUE,
+        Self::BISHOP_VALUE,
+        Self::ROOK_VALUE,
+        Self::QUEEN_VALUE,
+        Self::KING_VALUE,
+    ];
+
+    #[inline(always)]
+    pub const fn from_index(index: u8) -> Self {
+        debug_assert!(index < 6, "Piece index out of bounds");
+        match index {
+            0 => Self::Pawn,
+            1 => Self::Knight,
+            2 => Self::Bishop,
+            3 => Self::Rook,
+            4 => Self::Queen,
+            _ => Self::King,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn to_index(self) -> u8 {
+        self as u8
+    }
+
+    #[inline(always)]
     pub const fn as_char(self) -> char {
         match self {
             Self::Pawn => 'p',
@@ -78,6 +74,7 @@ impl Piece {
         }
     }
 
+    #[inline(always)]
     pub const fn from_char(c: char) -> Option<Self> {
         match c {
             'p' | 'P' => Some(Self::Pawn),
@@ -90,26 +87,105 @@ impl Piece {
         }
     }
 
+    #[inline(always)]
     pub const fn value(self) -> Score {
         match self {
-            Self::Pawn => PAWN_VALUE,
-            Self::Knight => KNIGHT_VALUE,
-            Self::Bishop => BISHOP_VALUE,
-            Self::Rook => ROOK_VALUE,
-            Self::Queen => QUEEN_VALUE,
-            Self::King => KING_VALUE,
+            Self::Pawn => Self::PAWN_VALUE,
+            Self::Knight => Self::KNIGHT_VALUE,
+            Self::Bishop => Self::BISHOP_VALUE,
+            Self::Rook => Self::ROOK_VALUE,
+            Self::Queen => Self::QUEEN_VALUE,
+            Self::King => Self::KING_VALUE,
         }
     }
 
+    #[inline(always)]
     pub const fn is_sliding(self) -> bool {
         matches!(self, Self::Bishop | Self::Rook | Self::Queen)
     }
 
+    #[inline(always)]
     pub const fn is_major(self) -> bool {
         matches!(self, Self::Rook | Self::Queen)
     }
 
+    #[inline(always)]
     pub const fn is_minor(self) -> bool {
         matches!(self, Self::Knight | Self::Bishop)
+    }
+}
+
+impl Display for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
+}
+
+impl FromStr for Piece {
+    type Err = CoreError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() == 1
+            && let Some(piece) = Self::from_char(chars[0])
+        {
+            return Ok(piece);
+        }
+
+        Err(InvalidPiece {
+            piece: s.to_string(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_piece_creation_and_index() {
+        assert_eq!(Piece::Pawn.to_index(), 0);
+        assert_eq!(Piece::King.to_index(), 5);
+
+        assert_eq!(Piece::from_index(1), Piece::Knight);
+        assert_eq!(Piece::from_index(4), Piece::Queen);
+    }
+
+    #[test]
+    fn test_as_char_and_from_char() {
+        assert_eq!(Piece::Knight.as_char(), 'n');
+        assert_eq!(Piece::King.as_char(), 'k');
+
+        assert_eq!(Piece::from_char('Q'), Some(Piece::Queen));
+        assert_eq!(Piece::from_char('p'), Some(Piece::Pawn));
+        assert_eq!(Piece::from_char('x'), None);
+    }
+
+    #[test]
+    fn test_from_str() {
+        assert_eq!(Piece::from_str("r").unwrap(), Piece::Rook);
+        assert_eq!(Piece::from_str("B").unwrap(), Piece::Bishop);
+
+        assert!(Piece::from_str("x").is_err());
+        assert!(Piece::from_str("Knight").is_err());
+        assert!(Piece::from_str("").is_err());
+    }
+
+    #[test]
+    fn test_piece_properties() {
+        assert!(Piece::Queen.is_sliding());
+        assert!(!Piece::Knight.is_sliding());
+
+        assert!(Piece::Rook.is_major());
+        assert!(!Piece::Pawn.is_major());
+
+        assert!(Piece::Bishop.is_minor());
+        assert!(!Piece::King.is_minor());
+    }
+
+    #[test]
+    fn test_piece_values() {
+        assert_eq!(Piece::Pawn.value(), 100);
+        assert_eq!(Piece::Queen.value(), 900);
     }
 }

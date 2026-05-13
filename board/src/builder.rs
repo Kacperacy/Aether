@@ -6,7 +6,7 @@ use crate::{
     MAX_GAME_PHASE, MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK,
     PHASE_TOTAL, Result, ZOBRIST_HISTORY_CAPACITY, cache::BoardCache, pst,
 };
-use aether_core::{ALL_PIECES, BitBoard, CastlingRights, Color, File, Piece, Square};
+use aether_core::{BitBoard, CastlingRights, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
     pieces: [[BitBoard; Piece::NUM]; Color::NUM],
@@ -96,7 +96,7 @@ impl BoardBuilder {
 
         let mut mailbox = [None; Square::NUM];
         for color in Color::ALL {
-            for &piece in &ALL_PIECES {
+            for &piece in &Piece::ALL {
                 for square in self.pieces[color as usize][piece as usize].iter() {
                     mailbox[square.to_index() as usize] = Some((piece, color));
                 }
@@ -238,7 +238,7 @@ impl BoardBuilder {
 
     fn is_square_occupied(&self, square: Square) -> bool {
         for color in Color::ALL {
-            for &piece in &ALL_PIECES {
+            for &piece in &Piece::ALL {
                 if self.pieces[color as usize][piece as usize].contains(square) {
                     return true;
                 }

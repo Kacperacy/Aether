@@ -1,4 +1,4 @@
-use aether_core::{Color, PIECE_VALUES, Piece, Square};
+use aether_core::{Color, Piece, Square};
 
 #[rustfmt::skip]
 const PAWN_PST_MG: [i32; 64] = [
@@ -174,7 +174,7 @@ fn pst_index(square: Square, color: Color) -> usize {
 pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
     let idx = pst_index(square, color);
     let piece_idx = piece as usize;
-    let material = PIECE_VALUES[piece_idx];
+    let material = Piece::ALL[piece_idx].value();
     let mg = material + PST_MG[piece_idx][idx];
     let eg = material + PST_EG[piece_idx][idx];
 
@@ -186,12 +186,10 @@ pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
 }
 
 pub fn compute_pst_score(pieces: &[[aether_core::BitBoard; 6]; 2]) -> (i32, i32) {
-    use aether_core::ALL_PIECES;
-
     let mut mg = 0i32;
     let mut eg = 0i32;
 
-    for &piece in &ALL_PIECES {
+    for &piece in &Piece::ALL {
         let piece_idx = piece as usize;
 
         for color in Color::ALL {

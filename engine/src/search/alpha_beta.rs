@@ -4,9 +4,7 @@ use crate::search::{
     MAX_PLY, MAX_PV_LENGTH, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry,
     TranspositionTable,
 };
-use aether_core::{
-    MATE_SCORE, Move, NEG_MATE_SCORE, PAWN_VALUE, Piece, QUEEN_VALUE, Score, mated_in,
-};
+use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, Score, mated_in};
 use board::Board;
 use std::mem;
 use std::sync::Arc;
@@ -15,7 +13,7 @@ use std::time::{Duration, Instant};
 
 const NODE_CHECK_MASK: u64 = 0xFFF;
 const DELTA_PRUNING_MARGIN: Score = 200;
-const DELTA_MAX_GAIN: Score = QUEEN_VALUE * 2 - PAWN_VALUE;
+const DELTA_MAX_GAIN: Score = Piece::QUEEN_VALUE * 2 - Piece::PAWN_VALUE;
 const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
 const LMR_FULL_DEPTH_MOVES: usize = 4;

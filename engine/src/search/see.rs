@@ -1,6 +1,5 @@
 use aether_core::{
-    BISHOP_VALUE, BitBoard, Color, KNIGHT_VALUE, Move, PAWN_VALUE, PIECE_VALUES, Piece,
-    QUEEN_VALUE, ROOK_VALUE, Score, Square, bishop_attacks, king_attacks, knight_attacks,
+    BitBoard, Color, Move, Piece, Score, Square, bishop_attacks, king_attacks, knight_attacks,
     pawn_attacks, rook_attacks,
 };
 
@@ -16,16 +15,16 @@ pub fn see_ge(
     let to = mv.to;
 
     let target_value = match mv.capture {
-        Some(piece) => PIECE_VALUES[piece as usize],
+        Some(piece) => Piece::ALL[piece as usize].value(),
         None => return threshold <= 0,
     };
 
     let (promotion_gain, attacker_value) = match mv.promotion {
         Some(promo_piece) => {
-            let promo_value = PIECE_VALUES[promo_piece as usize];
-            (promo_value - PAWN_VALUE, promo_value)
+            let promo_value = Piece::ALL[promo_piece as usize].value();
+            (promo_value - Piece::PAWN_VALUE, promo_value)
         }
-        None => (0, PIECE_VALUES[mv.piece as usize]),
+        None => (0, Piece::ALL[mv.piece as usize].value()),
     };
 
     let mut swap = target_value + promotion_gain - threshold;
@@ -56,7 +55,7 @@ pub fn see_ge(
 
         let pawn_attackers = stm_attackers & pieces[stm as usize][Piece::Pawn as usize];
         if !pawn_attackers.is_empty() {
-            swap = PAWN_VALUE - swap;
+            swap = Piece::PAWN_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -69,7 +68,7 @@ pub fn see_ge(
 
         let knight_attackers = stm_attackers & pieces[stm as usize][Piece::Knight as usize];
         if !knight_attackers.is_empty() {
-            swap = KNIGHT_VALUE - swap;
+            swap = Piece::KNIGHT_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -81,7 +80,7 @@ pub fn see_ge(
 
         let bishop_attackers = stm_attackers & pieces[stm as usize][Piece::Bishop as usize];
         if !bishop_attackers.is_empty() {
-            swap = BISHOP_VALUE - swap;
+            swap = Piece::BISHOP_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -94,7 +93,7 @@ pub fn see_ge(
 
         let rook_attackers = stm_attackers & pieces[stm as usize][Piece::Rook as usize];
         if !rook_attackers.is_empty() {
-            swap = ROOK_VALUE - swap;
+            swap = Piece::ROOK_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -107,7 +106,7 @@ pub fn see_ge(
 
         let queen_attackers = stm_attackers & pieces[stm as usize][Piece::Queen as usize];
         if !queen_attackers.is_empty() {
-            swap = QUEEN_VALUE - swap;
+            swap = Piece::QUEEN_VALUE - swap;
             occ ^= queen_attackers.lsb().bitboard();
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
             attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
@@ -129,16 +128,16 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     let from = mv.from;
 
     let target_value = match mv.capture {
-        Some(piece) => PIECE_VALUES[piece as usize],
+        Some(piece) => Piece::ALL[piece as usize].value(),
         None => return 0,
     };
 
     let (promotion_gain, attacker_value) = match mv.promotion {
         Some(promo_piece) => {
-            let promo_value = PIECE_VALUES[promo_piece as usize];
-            (promo_value - PAWN_VALUE, promo_value)
+            let promo_value = Piece::ALL[promo_piece as usize].value();
+            (promo_value - Piece::PAWN_VALUE, promo_value)
         }
-        None => (0, PIECE_VALUES[mv.piece as usize]),
+        None => (0, Piece::ALL[mv.piece as usize].value()),
     };
 
     let mut gain: [Score; 32] = [0; 32];
@@ -182,7 +181,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
         }
 
         attackers &= occ;
-        current_piece_value = PIECE_VALUES[attacker_piece as usize];
+        current_piece_value = Piece::ALL[attacker_piece as usize].value();
         stm = stm.opponent();
     }
 
@@ -311,15 +310,24 @@ mod tests {
         let occupied = get_occupied(&pieces);
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(&mv, Color::White, PAWN_VALUE, occupied, &pieces));
-        assert!(!see_ge(
+        assert!(see_ge(
             &mv,
             Color::White,
-            PAWN_VALUE + 1,
+            Piece::PAWN_VALUE,
             occupied,
             &pieces
         ));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), PAWN_VALUE);
+        assert!(!see_ge(
+            &mv,
+            Color::White,
+            Piece::PAWN_VALUE + 1,
+            occupied,
+            &pieces
+        ));
+        assert_eq!(
+            see_value(&mv, Color::White, occupied, &pieces),
+            Piece::PAWN_VALUE
+        );
     }
 
     #[test]
@@ -351,13 +359,13 @@ mod tests {
         assert!(see_ge(
             &mv,
             Color::White,
-            PAWN_VALUE - QUEEN_VALUE,
+            Piece::PAWN_VALUE - Piece::QUEEN_VALUE,
             occupied,
             &pieces
         ));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
-            PAWN_VALUE - QUEEN_VALUE
+            Piece::PAWN_VALUE - Piece::QUEEN_VALUE
         );
     }
 
@@ -371,7 +379,7 @@ mod tests {
         let mv = make_capture(Square::F3, Square::E5, Piece::Knight, Piece::Rook);
         let occupied = get_occupied(&pieces);
 
-        let expected = ROOK_VALUE - KNIGHT_VALUE;
+        let expected = Piece::ROOK_VALUE - Piece::KNIGHT_VALUE;
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert!(see_ge(&mv, Color::White, expected, occupied, &pieces));
         assert!(!see_ge(&mv, Color::White, expected + 1, occupied, &pieces));
@@ -389,8 +397,17 @@ mod tests {
         let occupied = get_occupied(&pieces);
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(&mv, Color::White, QUEEN_VALUE, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), QUEEN_VALUE);
+        assert!(see_ge(
+            &mv,
+            Color::White,
+            Piece::QUEEN_VALUE,
+            occupied,
+            &pieces
+        ));
+        assert_eq!(
+            see_value(&mv, Color::White, occupied, &pieces),
+            Piece::QUEEN_VALUE
+        );
     }
 
     #[test]
@@ -406,7 +423,7 @@ mod tests {
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
-            BISHOP_VALUE
+            Piece::BISHOP_VALUE
         );
     }
 
@@ -423,7 +440,7 @@ mod tests {
         assert!(!see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
-            PAWN_VALUE - QUEEN_VALUE
+            Piece::PAWN_VALUE - Piece::QUEEN_VALUE
         );
     }
 
@@ -441,7 +458,7 @@ mod tests {
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
-            BISHOP_VALUE - KNIGHT_VALUE
+            Piece::BISHOP_VALUE - Piece::KNIGHT_VALUE
         );
     }
 
@@ -455,10 +472,16 @@ mod tests {
         let occupied = get_occupied(&pieces);
 
         assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(&mv, Color::White, KNIGHT_VALUE, occupied, &pieces));
+        assert!(see_ge(
+            &mv,
+            Color::White,
+            Piece::KNIGHT_VALUE,
+            occupied,
+            &pieces
+        ));
         assert_eq!(
             see_value(&mv, Color::White, occupied, &pieces),
-            KNIGHT_VALUE
+            Piece::KNIGHT_VALUE
         );
     }
 

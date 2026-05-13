@@ -1,7 +1,6 @@
 use aether_core::{
-    BitBoard, Color, File, Move, MoveFlags, PROMOTION_PIECES, Piece, Square, bishop_attacks,
-    is_promotion_rank, king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks,
-    rook_attacks,
+    BitBoard, Color, File, Move, MoveFlags, Piece, Square, bishop_attacks, is_promotion_rank,
+    king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
 };
 use board::Board;
 
@@ -82,7 +81,7 @@ fn generate_pawn_moves(
         };
 
         if is_promotion {
-            for &promo_piece in &PROMOTION_PIECES {
+            for &promo_piece in &Piece::PROMOTIONS {
                 push_move(moves, from, to, Piece::Pawn, None, flags, Some(promo_piece));
             }
         } else {
@@ -96,7 +95,7 @@ fn generate_pawn_moves(
         let is_promotion = is_promotion_rank(to, side);
 
         if is_promotion {
-            for &promo_piece in &PROMOTION_PIECES {
+            for &promo_piece in &Piece::PROMOTIONS {
                 push_move(
                     moves,
                     from,
