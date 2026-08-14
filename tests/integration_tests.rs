@@ -62,7 +62,7 @@ fn test_make_unmake_castling() {
 
     let castle_move = moves
         .iter()
-        .find(|mv| mv.flags.is_castle)
+        .find(|mv| mv.is_castling())
         .expect("No castling move found");
 
     board.make_move(castle_move).unwrap();
@@ -83,7 +83,7 @@ fn test_make_unmake_en_passant() {
 
     let ep_move = moves
         .iter()
-        .find(|mv| mv.flags.is_en_passant)
+        .find(|mv| mv.is_en_passant())
         .expect("No en passant move found");
 
     board.make_move(ep_move).unwrap();
@@ -102,7 +102,7 @@ fn test_make_unmake_promotion() {
 
     let promo_move = moves
         .iter()
-        .find(|mv| mv.promotion.is_some())
+        .find(|mv| mv.is_promotion())
         .expect("No promotion move found");
 
     board.make_move(promo_move).unwrap();
@@ -117,10 +117,7 @@ fn test_halfmove_clock() {
 
     let e2 = Square::new(File::E, Rank::TWO);
     let e4 = Square::new(File::E, Rank::FOUR);
-    let mv = Move::new(e2, e4, aether_core::Piece::Pawn).with_flags(aether_core::MoveFlags {
-        is_double_pawn_push: true,
-        ..Default::default()
-    });
+    let mv = Move::new(e2, e4, Move::DOUBLE_PUSH);
 
     board.make_move(&mv).unwrap();
     assert_eq!(

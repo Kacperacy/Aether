@@ -57,24 +57,18 @@ impl Board {
         self.state.zobrist_hash ^= keys.en_passant_key(file);
     }
 
-    pub(crate) fn zobrist_update_castling(
-        &mut self,
-        old_rights: &[CastlingRights; 2],
-        new_rights: &[CastlingRights; 2],
-    ) {
-        for color in Color::ALL {
-            let old = &old_rights[color as usize];
-            let new = &new_rights[color as usize];
-
-            // Short castling changed
-            if old.short != new.short {
-                self.zobrist_toggle_castling(color, true);
-            }
-
-            // Long castling changed
-            if old.long != new.long {
-                self.zobrist_toggle_castling(color, false);
-            }
+    pub(crate) fn zobrist_update_castling(&mut self, old: CastlingRights, new: CastlingRights) {
+        if old.contains(CastlingRights::WK) != new.contains(CastlingRights::WK) {
+            self.zobrist_toggle_castling(Color::White, true);
+        }
+        if old.contains(CastlingRights::WQ) != new.contains(CastlingRights::WQ) {
+            self.zobrist_toggle_castling(Color::White, false);
+        }
+        if old.contains(CastlingRights::BK) != new.contains(CastlingRights::BK) {
+            self.zobrist_toggle_castling(Color::Black, true);
+        }
+        if old.contains(CastlingRights::BQ) != new.contains(CastlingRights::BQ) {
+            self.zobrist_toggle_castling(Color::Black, false);
         }
     }
 }
@@ -138,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_incremental_vs_full_hash() {
-        use aether_core::{Move, MoveFlags};
+        use aether_core::Move;
 
         let mut board: Board = "rn2k2r/pppppppp/8/8/8/8/PPPPPPPP/RN2K2R w KQkq - 0 1"
             .parse()
@@ -152,29 +146,17 @@ mod tests {
 
         let moves = [
             // 1. e4
-            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            }),
+            Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH),
             // 1... e5
-            Move::new(Square::E7, Square::E5, Piece::Pawn).with_flags(MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            }),
+            Move::new(Square::E7, Square::E5, Move::DOUBLE_PUSH),
             // 2. Nc3
-            Move::new(Square::B1, Square::C3, Piece::Knight),
+            Move::new(Square::B1, Square::C3, Move::QUIET),
             // 2... Nc6
-            Move::new(Square::B8, Square::C6, Piece::Knight),
+            Move::new(Square::B8, Square::C6, Move::QUIET),
             // 3. O-O (kingside castling)
-            Move::new(Square::E1, Square::G1, Piece::King).with_flags(MoveFlags {
-                is_castle: true,
-                ..Default::default()
-            }),
+            Move::new(Square::E1, Square::G1, Move::CASTLE_KS),
             // 3... O-O-O (queenside castling)
-            Move::new(Square::E8, Square::C8, Piece::King).with_flags(MoveFlags {
-                is_castle: true,
-                ..Default::default()
-            }),
+            Move::new(Square::E8, Square::C8, Move::CASTLE_QS),
         ];
 
         for (i, mv) in moves.iter().enumerate() {
@@ -202,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_incremental_hash_with_captures_and_promotion() {
-        use aether_core::{Move, MoveFlags};
+        use aether_core::Move;
 
         let mut board: Board = "r3k2r/pPpppppp/8/3Pp3/8/8/P1PPPPPP/R3K2R w KQkq e6 0 1"
             .parse()
@@ -216,18 +198,11 @@ mod tests {
 
         let moves = [
             // 1. dxe6 (en passant capture)
-            Move::new(Square::D5, Square::E6, Piece::Pawn)
-                .with_capture(Piece::Pawn)
-                .with_flags(MoveFlags {
-                    is_en_passant: true,
-                    ..Default::default()
-                }),
+            Move::new(Square::D5, Square::E6, Move::EN_PASSANT),
             // 1... d6
-            Move::new(Square::D7, Square::D6, Piece::Pawn),
+            Move::new(Square::D7, Square::D6, Move::QUIET),
             // 2. bxa8=Q (promotion with capture)
-            Move::new(Square::B7, Square::A8, Piece::Pawn)
-                .with_capture(Piece::Rook)
-                .with_promotion(Piece::Queen),
+            Move::new(Square::B7, Square::A8, Move::PROMO_CAP_Q),
         ];
 
         for (i, mv) in moves.iter().enumerate() {

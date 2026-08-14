@@ -1,11 +1,11 @@
-use aether_core::{BitBoard, CastlingRights, Color, Piece, Square};
+use aether_core::{BitBoard, CastlingRights, Piece, Square};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StateInfo {
-    pub castling_rights: [CastlingRights; 2],
+    pub castling_rights: CastlingRights,
     pub en_passant_square: Option<Square>,
     pub halfmove_clock: u16,
-    pub captured_piece: Option<(Piece, Color)>,
+    pub captured_piece: Option<Piece>,
 
     pub zobrist_hash: u64,
     pub game_phase: i16,
@@ -21,7 +21,7 @@ pub struct StateInfo {
 impl StateInfo {
     pub const fn new() -> Self {
         Self {
-            castling_rights: [CastlingRights::EMPTY; 2],
+            castling_rights: CastlingRights::NONE,
             en_passant_square: None,
             halfmove_clock: 0,
             captured_piece: None,
@@ -54,7 +54,6 @@ mod tests {
         assert_eq!(state.halfmove_clock, 0);
         assert!(state.captured_piece.is_none());
         assert_eq!(state.zobrist_hash, 0);
-        assert!(state.castling_rights[Color::White as usize].is_empty());
-        assert!(state.castling_rights[Color::Black as usize].is_empty());
+        assert!(state.castling_rights.is_empty());
     }
 }

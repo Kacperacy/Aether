@@ -56,10 +56,8 @@ impl<'a> FenParser<'a> {
         let side_to_move = self.parse_side_to_move()?;
         builder.set_side_to_move(side_to_move);
 
-        let (white_castling, black_castling) = self.parse_castling_rights()?;
-        builder
-            .set_castling_rights(Color::White, white_castling)
-            .set_castling_rights(Color::Black, black_castling);
+        let castling_rights = self.parse_castling_rights()?;
+        builder.set_castling_rights(castling_rights);
 
         let en_passant = self.parse_en_passant(side_to_move)?;
         builder.set_en_passant(en_passant)?;
@@ -134,27 +132,13 @@ impl<'a> FenParser<'a> {
         }
     }
 
-    fn parse_castling_rights(&self) -> Result<(CastlingRights, CastlingRights)> {
+    fn parse_castling_rights(&self) -> Result<CastlingRights> {
         let castling_str = self.fields[2];
-
-        if castling_str == "-" {
-            return Ok((CastlingRights::EMPTY, CastlingRights::EMPTY));
-        }
-
-        let mut white_rights = CastlingRights::EMPTY;
-        let mut black_rights = CastlingRights::EMPTY;
-
-        for ch in castling_str.chars() {
-            match ch {
-                'K' => white_rights.short = Some(File::H),
-                'Q' => white_rights.long = Some(File::A),
-                'k' => black_rights.short = Some(File::H),
-                'q' => black_rights.long = Some(File::A),
-                _ => return Err(FenParsingError(FenError::InvalidCastlingRights { ch })),
-            }
-        }
-
-        Ok((white_rights, black_rights))
+        CastlingRights::from_str(castling_str).map_err(|_| {
+            FenParsingError(FenError::InvalidCastlingRights {
+                rights: castling_str.to_string(),
+            })
+        })
     }
 
     fn parse_en_passant(&self, side_to_move: Color) -> Result<Option<Square>> {
@@ -286,29 +270,7 @@ impl<'a> FenGenerator<'a> {
     }
 
     fn generate_castling_rights(&self) -> String {
-        let white_rights = self.board.castling_rights(Color::White);
-        let black_rights = self.board.castling_rights(Color::Black);
-
-        let mut castling = String::with_capacity(4);
-
-        if white_rights.short.is_some() {
-            castling.push('K');
-        }
-        if white_rights.long.is_some() {
-            castling.push('Q');
-        }
-        if black_rights.short.is_some() {
-            castling.push('k');
-        }
-        if black_rights.long.is_some() {
-            castling.push('q');
-        }
-
-        if castling.is_empty() {
-            castling.push('-');
-        }
-
-        castling
+        self.board.castling_rights().to_string()
     }
 
     fn generate_en_passant(&self) -> String {

@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_core::{BitBoard, Color, Piece, Square};
+use aether_core::{BitBoard, CastlingRights, Color, Piece, Square};
 
 impl Board {
     #[inline(always)]
@@ -49,12 +49,16 @@ impl Board {
 
     #[inline]
     pub fn can_castle_short(&self, color: Color) -> bool {
-        self.state.castling_rights[color as usize].short.is_some()
+        self.state
+            .castling_rights
+            .contains(CastlingRights::kingside(color))
     }
 
     #[inline]
     pub fn can_castle_long(&self, color: Color) -> bool {
-        self.state.castling_rights[color as usize].long.is_some()
+        self.state
+            .castling_rights
+            .contains(CastlingRights::queenside(color))
     }
 
     #[inline(always)]
@@ -163,8 +167,8 @@ impl Board {
     }
 
     #[inline]
-    pub fn castling_rights(&self, color: Color) -> &aether_core::CastlingRights {
-        &self.state.castling_rights[color as usize]
+    pub fn castling_rights(&self) -> CastlingRights {
+        self.state.castling_rights
     }
 
     fn are_bishops_on_same_color(&self) -> bool {

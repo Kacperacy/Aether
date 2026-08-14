@@ -1,6 +1,6 @@
 use aether_core::{
-    BitBoard, Color, File, Move, MoveFlags, Piece, Square, bishop_attacks, is_promotion_rank,
-    king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
+    BitBoard, Color, File, Move, Piece, Square, bishop_attacks, is_promotion_rank, king_attacks,
+    knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
 };
 use board::Board;
 
@@ -13,46 +13,25 @@ fn occupancies(board: &Board, side: Color) -> (BitBoard, BitBoard, BitBoard) {
 }
 
 #[inline(always)]
-fn push_move(
-    moves: &mut Vec<Move>,
-    from: Square,
-    to: Square,
-    piece: Piece,
-    capture: Option<Piece>,
-    flags: MoveFlags,
-    promotion: Option<Piece>,
-) {
-    let mut chess_move = Move::new(from, to, piece).with_flags(flags);
-
-    if let Some(captured_piece) = capture {
-        chess_move = chess_move.with_capture(captured_piece);
-    }
-
-    if let Some(promotion_piece) = promotion {
-        chess_move = chess_move.with_promotion(promotion_piece);
-    }
-
-    moves.push(chess_move);
+fn promo_flag(piece: Piece, is_capture: bool) -> u16 {
+    let idx = piece.to_index() as u16 - 1; // Knight=1..Queen=4 -> 0..3
+    Move::PROMO_N + idx + if is_capture { 4 } else { 0 }
 }
 
 #[inline]
 fn generate_piece_moves(
-    board: &Board,
     from: Square,
-    piece: Piece,
     targets: BitBoard,
     occupied: BitBoard,
     moves: &mut Vec<Move>,
 ) {
-    let flags = MoveFlags::default();
-
     for to in targets.iter() {
-        let capture = if occupied.contains(to) {
-            board.piece_at(to).map(|(p, _)| p)
+        let flags = if occupied.contains(to) {
+            Move::CAPTURE
         } else {
-            None
+            Move::QUIET
         };
-        push_move(moves, from, to, piece, capture, flags, None);
+        moves.push(Move::new(from, to, flags));
     }
 }
 
@@ -64,85 +43,56 @@ fn generate_pawn_moves(
     opponent_pieces: BitBoard,
     moves: &mut Vec<Move>,
 ) {
-    let normal_flags = MoveFlags::default();
-    let double_push_flags = MoveFlags {
-        is_double_pawn_push: true,
-        ..MoveFlags::default()
-    };
-
     let push_targets = pawn_moves(from, side, occupied);
     for to in push_targets.iter() {
         let is_promotion = is_promotion_rank(to, side);
         let is_double_push = to.rank().to_index().abs_diff(from.rank().to_index()) == 2;
-        let flags = if is_double_push {
-            double_push_flags
-        } else {
-            normal_flags
-        };
 
         if is_promotion {
             for &promo_piece in &Piece::PROMOTIONS {
-                push_move(moves, from, to, Piece::Pawn, None, flags, Some(promo_piece));
+                moves.push(Move::new(from, to, promo_flag(promo_piece, false)));
             }
         } else {
-            push_move(moves, from, to, Piece::Pawn, None, flags, None);
+            let flags = if is_double_push {
+                Move::DOUBLE_PUSH
+            } else {
+                Move::QUIET
+            };
+            moves.push(Move::new(from, to, flags));
         }
     }
 
     let capture_targets = pawn_attacks(from, side) & opponent_pieces;
     for to in capture_targets.iter() {
-        let captured = board.piece_at(to).map(|(p, _)| p);
         let is_promotion = is_promotion_rank(to, side);
 
         if is_promotion {
             for &promo_piece in &Piece::PROMOTIONS {
-                push_move(
-                    moves,
-                    from,
-                    to,
-                    Piece::Pawn,
-                    captured,
-                    normal_flags,
-                    Some(promo_piece),
-                );
+                moves.push(Move::new(from, to, promo_flag(promo_piece, true)));
             }
-        } else if captured.is_some() {
-            push_move(moves, from, to, Piece::Pawn, captured, normal_flags, None);
+        } else {
+            moves.push(Move::new(from, to, Move::CAPTURE));
         }
     }
 
     if let Some(ep_square) = board.en_passant_square() {
         if pawn_attacks(from, side).contains(ep_square) {
-            let ep_flags = MoveFlags {
-                is_en_passant: true,
-                ..MoveFlags::default()
-            };
-            push_move(
-                moves,
-                from,
-                ep_square,
-                Piece::Pawn,
-                Some(Piece::Pawn),
-                ep_flags,
-                None,
-            );
+            moves.push(Move::new(from, ep_square, Move::EN_PASSANT));
         }
     }
 }
 
 fn generate_knight_moves(
-    board: &Board,
     from: Square,
     occupied: BitBoard,
     own_pieces: BitBoard,
     moves: &mut Vec<Move>,
 ) {
     let targets = knight_attacks(from) & !own_pieces;
-    generate_piece_moves(board, from, Piece::Knight, targets, occupied, moves);
+    generate_piece_moves(from, targets, occupied, moves);
 }
 
 fn generate_slider_moves(
-    board: &Board,
     from: Square,
     piece: Piece,
     occupied: BitBoard,
@@ -156,7 +106,7 @@ fn generate_slider_moves(
         _ => return,
     };
     let targets = attacks & !own_pieces;
-    generate_piece_moves(board, from, piece, targets, occupied, moves);
+    generate_piece_moves(from, targets, occupied, moves);
 }
 
 fn generate_king_moves(
@@ -167,7 +117,7 @@ fn generate_king_moves(
     moves: &mut Vec<Move>,
 ) {
     let targets = king_attacks(from) & !own_pieces;
-    generate_piece_moves(board, from, Piece::King, targets, occupied, moves);
+    generate_piece_moves(from, targets, occupied, moves);
 
     if let Some((_, side)) = board.piece_at(from) {
         generate_castling_moves(board, from, side, moves);
@@ -176,10 +126,6 @@ fn generate_king_moves(
 
 fn generate_castling_moves(board: &Board, king_square: Square, side: Color, moves: &mut Vec<Move>) {
     let opponent = side.opponent();
-    let castle_flags = MoveFlags {
-        is_castle: true,
-        ..MoveFlags::default()
-    };
 
     if board.can_castle_short(side) {
         let back = side.back_rank();
@@ -193,15 +139,7 @@ fn generate_castling_moves(board: &Board, king_square: Square, side: Color, move
             && !board.is_square_attacked(g_square, opponent);
 
         if king_square == king_start && path_clear && path_safe {
-            push_move(
-                moves,
-                king_start,
-                g_square,
-                Piece::King,
-                None,
-                castle_flags,
-                None,
-            );
+            moves.push(Move::new(king_start, g_square, Move::CASTLE_KS));
         }
     }
 
@@ -220,15 +158,7 @@ fn generate_castling_moves(board: &Board, king_square: Square, side: Color, move
             && !board.is_square_attacked(c_square, opponent);
 
         if king_square == king_start && path_clear && path_safe {
-            push_move(
-                moves,
-                king_start,
-                c_square,
-                Piece::King,
-                None,
-                castle_flags,
-                None,
-            );
+            moves.push(Move::new(king_start, c_square, Move::CASTLE_QS));
         }
     }
 }
@@ -246,9 +176,9 @@ pub fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
                 Piece::Pawn => {
                     generate_pawn_moves(board, square, side, occupied, opponent_pieces, moves)
                 }
-                Piece::Knight => generate_knight_moves(board, square, occupied, own_pieces, moves),
+                Piece::Knight => generate_knight_moves(square, occupied, own_pieces, moves),
                 Piece::Bishop | Piece::Rook | Piece::Queen => {
-                    generate_slider_moves(board, square, piece, occupied, own_pieces, moves)
+                    generate_slider_moves(square, piece, occupied, own_pieces, moves)
                 }
                 Piece::King => generate_king_moves(board, square, occupied, own_pieces, moves),
             }
@@ -263,12 +193,12 @@ pub fn legal(board: &Board, moves: &mut Vec<Move>) {
 
 pub fn captures(board: &Board, moves: &mut Vec<Move>) {
     pseudo_legal(board, moves);
-    moves.retain(|m| m.is_capture() || m.flags.is_en_passant);
+    moves.retain(|m| m.is_capture() || m.is_en_passant());
 }
 
 pub fn quiet_moves(board: &Board, moves: &mut Vec<Move>) {
     pseudo_legal(board, moves);
-    moves.retain(|m| !m.is_capture() && !m.flags.is_en_passant && !m.flags.is_castle);
+    moves.retain(|m| !m.is_capture() && !m.is_en_passant() && !m.is_castling());
 }
 
 pub fn checks(board: &Board, moves: &mut Vec<Move>) {
@@ -284,13 +214,11 @@ pub fn checks(board: &Board, moves: &mut Vec<Move>) {
     let bishop_check_sqs = bishop_attacks(king_sq, all_occ);
     let rook_check_sqs = rook_attacks(king_sq, all_occ);
 
-    let flags = MoveFlags::default();
-
     let knights = board.piece_bb(Piece::Knight, side);
     for from in knights.iter() {
         let targets = knight_attacks(from) & knight_check_sqs & !all_occ;
         for to in targets.iter() {
-            push_move(moves, from, to, Piece::Knight, None, flags, None);
+            moves.push(Move::new(from, to, Move::QUIET));
         }
     }
 
@@ -298,7 +226,7 @@ pub fn checks(board: &Board, moves: &mut Vec<Move>) {
     for from in bishops.iter() {
         let targets = bishop_attacks(from, all_occ) & bishop_check_sqs & !all_occ;
         for to in targets.iter() {
-            push_move(moves, from, to, Piece::Bishop, None, flags, None);
+            moves.push(Move::new(from, to, Move::QUIET));
         }
     }
 
@@ -306,7 +234,7 @@ pub fn checks(board: &Board, moves: &mut Vec<Move>) {
     for from in rooks.iter() {
         let targets = rook_attacks(from, all_occ) & rook_check_sqs & !all_occ;
         for to in targets.iter() {
-            push_move(moves, from, to, Piece::Rook, None, flags, None);
+            moves.push(Move::new(from, to, Move::QUIET));
         }
     }
 
@@ -315,7 +243,7 @@ pub fn checks(board: &Board, moves: &mut Vec<Move>) {
     for from in queens.iter() {
         let targets = queen_attacks(from, all_occ) & queen_check_sqs & !all_occ;
         for to in targets.iter() {
-            push_move(moves, from, to, Piece::Queen, None, flags, None);
+            moves.push(Move::new(from, to, Move::QUIET));
         }
     }
 }

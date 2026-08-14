@@ -59,7 +59,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             soft_limit: None,
             hard_limit: None,
             nodes_limit: None,
-            pv_table: [[Move::default(); MAX_PV_LENGTH]; MAX_PV_LENGTH],
+            pv_table: [[Move::NULL; MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
             move_lists,
         }
@@ -175,7 +175,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 let mut alpha = (prev_score - delta).max(NEG_MATE_SCORE);
                 let mut beta = (prev_score + delta).min(MATE_SCORE);
                 let mut best_pv_len = 0;
-                let mut best_pv_backup = [Move::default(); MAX_PV_LENGTH];
+                let mut best_pv_backup = [Move::NULL; MAX_PV_LENGTH];
 
                 loop {
                     let result = self.alpha_beta(board, depth, 0, alpha, beta, true);
@@ -403,10 +403,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 continue;
             }
 
-            let dominated = can_futility_prune
-                && moves_searched > 0
-                && mv.capture.is_none()
-                && mv.promotion.is_none();
+            let dominated =
+                can_futility_prune && moves_searched > 0 && !mv.is_capture() && !mv.is_promotion();
 
             let gives_check = board.is_in_check(board.side_to_move());
 
@@ -442,8 +440,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             } else {
                 let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
                     && depth >= LMR_MIN_DEPTH
-                    && mv.capture.is_none()
-                    && mv.promotion.is_none()
+                    && !mv.is_capture()
+                    && !mv.is_promotion()
                     && !in_check
                     && !gives_check;
 
@@ -501,9 +499,11 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
 
             if score >= beta {
-                if mv.capture.is_none() && mv.promotion.is_none() {
+                if !mv.is_capture() && !mv.is_promotion() {
                     self.move_orderer.store_killer(*mv, ply);
-                    self.move_orderer.update_history(*mv, depth as usize);
+                    if let Some((piece, _)) = board.piece_at(mv.from_sq()) {
+                        self.move_orderer.update_history(*mv, piece, depth as usize);
+                    }
                 }
 
                 let tt_score = TTEntry::score_to_tt(best_score, ply);
@@ -708,7 +708,7 @@ mod tests {
 
         assert!(result.best_move.is_some());
         let best = result.best_move.unwrap();
-        assert_eq!(best.to.to_string(), "a8");
+        assert_eq!(best.to_sq().to_string(), "a8");
     }
 
     #[test]

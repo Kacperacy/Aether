@@ -12,7 +12,7 @@ pub struct BoardBuilder {
     pieces: [[BitBoard; Piece::NUM]; Color::NUM],
     side_to_move: Color,
     fullmove_number: u16,
-    castling_rights: [CastlingRights; 2],
+    castling_rights: CastlingRights,
     en_passant_square: Option<Square>,
     halfmove_clock: u16,
 }
@@ -23,7 +23,7 @@ impl BoardBuilder {
             pieces: [[BitBoard::EMPTY; Piece::NUM]; Color::NUM],
             side_to_move: Color::White,
             fullmove_number: 1,
-            castling_rights: [CastlingRights::EMPTY; 2],
+            castling_rights: CastlingRights::NONE,
             en_passant_square: None,
             halfmove_clock: 0,
         }
@@ -31,16 +31,7 @@ impl BoardBuilder {
 
     pub fn starting_position() -> Self {
         let mut builder = Self::new();
-        builder.castling_rights = [
-            CastlingRights {
-                short: Some(File::H),
-                long: Some(File::A),
-            },
-            CastlingRights {
-                short: Some(File::H),
-                long: Some(File::A),
-            },
-        ];
+        builder.castling_rights = CastlingRights::ALL;
         builder.setup_starting_pieces();
         builder
     }
@@ -59,8 +50,8 @@ impl BoardBuilder {
         self
     }
 
-    pub fn set_castling_rights(&mut self, color: Color, rights: CastlingRights) -> &mut Self {
-        self.castling_rights[color as usize] = rights;
+    pub fn set_castling_rights(&mut self, rights: CastlingRights) -> &mut Self {
+        self.castling_rights = rights;
         self
     }
 
@@ -204,8 +195,7 @@ impl BoardBuilder {
 
     fn validate_castling_rights(&self) -> Result<()> {
         for color in Color::ALL {
-            let rights = &self.castling_rights[color as usize];
-            if rights.is_empty() {
+            if !self.castling_rights.any(CastlingRights::for_color(color)) {
                 continue;
             }
             let king_square = Square::new(File::E, color.back_rank());

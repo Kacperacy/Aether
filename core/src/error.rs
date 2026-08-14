@@ -28,4 +28,7 @@ pub enum CoreError {
 
     #[error("Invalid color: {color:?} (expected 'w' or 'b'")]
     InvalidColor { color: String },
+
+    #[error("Invalid castling rights format: {rights:?}")]
+    InvalidCastling { rights: String },
 }

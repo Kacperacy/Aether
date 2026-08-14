@@ -156,7 +156,7 @@ impl Default for Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aether_core::{Move, Piece, Square};
+    use aether_core::{Move, Square};
 
     #[test]
     fn test_repetition_count_no_repetition() {
@@ -164,10 +164,10 @@ mod tests {
 
         // Make moves that don't repeat: 1. Nf3 Nf6 2. Nc3 Nc6
         let moves = [
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::B1, Square::C3, Piece::Knight),
-            Move::new(Square::B8, Square::C6, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::B1, Square::C3, Move::QUIET),
+            Move::new(Square::B8, Square::C6, Move::QUIET),
         ];
 
         for mv in &moves {
@@ -186,10 +186,10 @@ mod tests {
         // Create twofold repetition with knight shuffle:
         // 1. Nf3 Nf6 2. Ng1 Ng8 - back to starting position (2nd occurrence)
         let moves = [
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::F3, Square::G1, Piece::Knight),
-            Move::new(Square::F6, Square::G8, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::F3, Square::G1, Move::QUIET),
+            Move::new(Square::F6, Square::G8, Move::QUIET),
         ];
 
         for mv in &moves {
@@ -210,15 +210,15 @@ mod tests {
         // 1. Nf3 Nf6 2. Ng1 Ng8 (2nd) 3. Nf3 Nf6 4. Ng1 Ng8 (3rd)
         let moves = [
             // First cycle
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::F3, Square::G1, Piece::Knight),
-            Move::new(Square::F6, Square::G8, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::F3, Square::G1, Move::QUIET),
+            Move::new(Square::F6, Square::G8, Move::QUIET),
             // Second cycle
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::F3, Square::G1, Piece::Knight),
-            Move::new(Square::F6, Square::G8, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::F3, Square::G1, Move::QUIET),
+            Move::new(Square::F6, Square::G8, Move::QUIET),
         ];
 
         for mv in &moves {
@@ -237,10 +237,10 @@ mod tests {
 
         // 1. Nf3 Nf6 2. Ng1 Ng8 (2nd occurrence of start)
         let moves_cycle1 = [
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::F3, Square::G1, Piece::Knight),
-            Move::new(Square::F6, Square::G8, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::F3, Square::G1, Move::QUIET),
+            Move::new(Square::F6, Square::G8, Move::QUIET),
         ];
 
         for mv in &moves_cycle1 {
@@ -250,12 +250,7 @@ mod tests {
         assert!(board.is_twofold_repetition());
 
         // Now make a pawn move which resets halfmove clock
-        let pawn_move =
-            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
-                is_double_pawn_push: true,
-                is_castle: false,
-                is_en_passant: false,
-            });
+        let pawn_move = Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH);
         board.make_move(&pawn_move).unwrap();
 
         // After pawn move, repetition count should be 0
@@ -268,15 +263,15 @@ mod tests {
         let mut board = Board::starting_position().unwrap();
 
         // 1. Nf3 - white moved, position changed
-        let mv1 = Move::new(Square::G1, Square::F3, Piece::Knight);
+        let mv1 = Move::new(Square::G1, Square::F3, Move::QUIET);
         board.make_move(&mv1).unwrap();
 
         // 1... Nf6 - black moved
-        let mv2 = Move::new(Square::G8, Square::F6, Piece::Knight);
+        let mv2 = Move::new(Square::G8, Square::F6, Move::QUIET);
         board.make_move(&mv2).unwrap();
 
         // 2. Ng1 - white moved back
-        let mv3 = Move::new(Square::F3, Square::G1, Piece::Knight);
+        let mv3 = Move::new(Square::F3, Square::G1, Move::QUIET);
         board.make_move(&mv3).unwrap();
 
         // Position after 1. Nf3 and after 2. Ng1 are different
@@ -285,7 +280,7 @@ mod tests {
         // positions with the same side to move
 
         // 2... Ng8 - back to starting position with white to move
-        let mv4 = Move::new(Square::F6, Square::G8, Piece::Knight);
+        let mv4 = Move::new(Square::F6, Square::G8, Move::QUIET);
         board.make_move(&mv4).unwrap();
 
         // Now it's white to move, same as starting position
@@ -357,15 +352,9 @@ mod tests {
         assert_eq!(board.ply(), 0);
 
         let moves = [
-            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            }),
-            Move::new(Square::E7, Square::E5, Piece::Pawn).with_flags(aether_core::MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            }),
-            Move::new(Square::G1, Square::F3, Piece::Knight),
+            Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH),
+            Move::new(Square::E7, Square::E5, Move::DOUBLE_PUSH),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
         ];
 
         for (i, mv) in moves.iter().enumerate() {
@@ -388,10 +377,10 @@ mod tests {
 
         // Make many moves to test circular buffer doesn't overflow
         let move_sequence = [
-            Move::new(Square::G1, Square::F3, Piece::Knight),
-            Move::new(Square::G8, Square::F6, Piece::Knight),
-            Move::new(Square::F3, Square::G1, Piece::Knight),
-            Move::new(Square::F6, Square::G8, Piece::Knight),
+            Move::new(Square::G1, Square::F3, Move::QUIET),
+            Move::new(Square::G8, Square::F6, Move::QUIET),
+            Move::new(Square::F3, Square::G1, Move::QUIET),
+            Move::new(Square::F6, Square::G8, Move::QUIET),
         ];
 
         // Make 200 moves (50 cycles) - more than MAX_SEARCH_DEPTH

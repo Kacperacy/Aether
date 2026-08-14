@@ -1,5 +1,5 @@
 use crate::search::MAX_PLY;
-use crate::search::see::see_value;
+use crate::search::see::{piece_on, see_value};
 use aether_core::{BitBoard, Color, Move, Piece, Square};
 
 const REPETITION_PENALTY: i32 = -5000;
@@ -33,26 +33,26 @@ impl MoveOrderer {
 
     #[inline]
     pub fn mark_repetition_move(&mut self, mv: &Move) {
-        let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
+        let idx = mv.from_sq().to_index() as usize * 64 + mv.to_sq().to_index() as usize;
         self.repetition_moves[idx] = true;
     }
 
     #[inline]
     fn is_repetition_move(&self, mv: &Move) -> bool {
-        let idx = mv.from.to_index() as usize * 64 + mv.to.to_index() as usize;
+        let idx = mv.from_sq().to_index() as usize * 64 + mv.to_sq().to_index() as usize;
         self.repetition_moves[idx]
     }
 
-    pub fn update_history(&mut self, mv: Move, depth: usize) {
-        if mv.capture.is_some() {
+    pub fn update_history(&mut self, mv: Move, piece: Piece, depth: usize) {
+        if mv.is_capture() {
             return;
         }
 
         let bonus = depth as i32 * depth as i32;
-        let idx = mv.to.to_index() as usize;
-        self.history[mv.piece as usize][idx] += bonus;
+        let idx = mv.to_sq().to_index() as usize;
+        self.history[piece as usize][idx] += bonus;
 
-        if self.history[mv.piece as usize][idx] > 8_000 {
+        if self.history[piece as usize][idx] > 8_000 {
             self.age_history();
         }
     }
@@ -66,16 +66,16 @@ impl MoveOrderer {
     }
 
     #[inline(always)]
-    fn history_score(&self, mv: &Move) -> i32 {
-        if mv.capture.is_some() {
+    fn history_score(&self, mv: &Move, piece: Piece) -> i32 {
+        if mv.is_capture() {
             return 0;
         }
-        self.history[mv.piece as usize][mv.to.to_index() as usize]
+        self.history[piece as usize][mv.to_sq().to_index() as usize]
     }
 
     #[inline]
     pub fn store_killer(&mut self, mv: Move, ply: usize) {
-        if ply >= MAX_PLY || mv.capture.is_some() || mv.promotion.is_some() {
+        if ply >= MAX_PLY || mv.is_capture() || mv.is_promotion() {
             return;
         }
 
@@ -109,10 +109,10 @@ impl MoveOrderer {
     }
 
     #[allow(dead_code)]
-    pub fn order_moves(&self, moves: &mut [Move]) {
+    pub fn order_moves(&self, moves: &mut [Move], side: Color, pieces: &[[BitBoard; 6]; 2]) {
         moves.sort_unstable_by(|a, b| {
-            let a_score = self.move_score(a);
-            let b_score = self.move_score(b);
+            let a_score = self.move_score(a, side, pieces);
+            let b_score = self.move_score(b, side, pieces);
             b_score.cmp(&a_score)
         });
     }
@@ -145,23 +145,33 @@ impl MoveOrderer {
             return 20_000;
         }
 
-        if let Some(captured) = mv.capture {
-            let promo_bonus = mv.promotion.map(|p| p.value()).unwrap_or(0);
-            let mvv_lva = captured.value() - mv.piece.value();
+        let moving_piece = piece_on(mv.from_sq(), &pieces[side as usize]);
+
+        if mv.is_capture() || mv.is_en_passant() {
+            let captured_value = if mv.is_en_passant() {
+                Piece::PAWN_VALUE
+            } else {
+                piece_on(mv.to_sq(), &pieces[side.opponent() as usize])
+                    .map(Piece::value)
+                    .unwrap_or(0)
+            };
+            let promo_bonus = mv.promotion_piece().map(|p| p.value()).unwrap_or(0);
+            let attacker_value = moving_piece.map(Piece::value).unwrap_or(0);
+            let mvv_lva = captured_value - attacker_value;
 
             if mvv_lva >= 0 {
-                return GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured.value() - mv.piece.value();
+                return GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured_value - attacker_value;
             }
 
             let see = see_value(mv, side, occupied, pieces);
             return if see >= 0 {
-                GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured.value() - mv.piece.value()
+                GOOD_CAPTURE_SCORE + promo_bonus + 10 * captured_value - attacker_value
             } else {
                 BAD_CAPTURE_SCORE + promo_bonus + see
             };
         }
 
-        if let Some(promo) = mv.promotion {
+        if let Some(promo) = mv.promotion_piece() {
             return 9_000 + promo.value();
         }
 
@@ -173,19 +183,30 @@ impl MoveOrderer {
             return REPETITION_PENALTY;
         }
 
-        self.history_score(mv)
+        moving_piece.map(|p| self.history_score(mv, p)).unwrap_or(0)
     }
 
     #[allow(dead_code)]
     #[inline(always)]
-    fn move_score(&self, mv: &Move) -> i32 {
+    fn move_score(&self, mv: &Move, side: Color, pieces: &[[BitBoard; 6]; 2]) -> i32 {
         let mut score = 0;
 
-        if let Some(captured) = mv.capture {
-            score += 10 * captured.value() - mv.piece.value();
+        let moving_value = piece_on(mv.from_sq(), &pieces[side as usize])
+            .map(Piece::value)
+            .unwrap_or(0);
+
+        if mv.is_capture() || mv.is_en_passant() {
+            let captured_value = if mv.is_en_passant() {
+                Piece::PAWN_VALUE
+            } else {
+                piece_on(mv.to_sq(), &pieces[side.opponent() as usize])
+                    .map(Piece::value)
+                    .unwrap_or(0)
+            };
+            score += 10 * captured_value - moving_value;
         }
 
-        if let Some(promo) = mv.promotion {
+        if let Some(promo) = mv.promotion_piece() {
             score += 100 + promo.value();
         }
 
@@ -202,32 +223,23 @@ impl Default for MoveOrderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aether_core::{Move, MoveFlags, Piece, Square};
+    use aether_core::{Move, Square};
 
     #[test]
     fn test_move_ordering_captures() {
         let orderer = MoveOrderer::new();
 
-        let pawn_takes_queen = Move {
-            from: Square::E4,
-            to: Square::D5,
-            piece: Piece::Pawn,
-            capture: Some(Piece::Queen),
-            promotion: None,
-            flags: MoveFlags::default(),
-        };
+        let mut pieces = [[BitBoard::EMPTY; 6]; 2];
+        pieces[Color::White as usize][Piece::Pawn as usize] = Square::E4.bitboard();
+        pieces[Color::Black as usize][Piece::Queen as usize] = Square::D5.bitboard();
+        pieces[Color::White as usize][Piece::Knight as usize] = Square::F3.bitboard();
+        pieces[Color::Black as usize][Piece::Pawn as usize] = Square::E5.bitboard();
 
-        let knight_takes_pawn = Move {
-            from: Square::F3,
-            to: Square::E5,
-            piece: Piece::Knight,
-            capture: Some(Piece::Pawn),
-            promotion: None,
-            flags: MoveFlags::default(),
-        };
+        let pawn_takes_queen = Move::new(Square::E4, Square::D5, Move::CAPTURE);
+        let knight_takes_pawn = Move::new(Square::F3, Square::E5, Move::CAPTURE);
 
-        let score1 = orderer.move_score(&pawn_takes_queen);
-        let score2 = orderer.move_score(&knight_takes_pawn);
+        let score1 = orderer.move_score(&pawn_takes_queen, Color::White, &pieces);
+        let score2 = orderer.move_score(&knight_takes_pawn, Color::White, &pieces);
 
         assert!(score1 > score2);
     }
@@ -236,28 +248,16 @@ mod tests {
     fn test_promotion_scores_high() {
         let orderer = MoveOrderer::new();
 
-        let promotion = Move {
-            from: Square::E7,
-            to: Square::E8,
-            piece: Piece::Pawn,
-            capture: None,
-            promotion: Some(Piece::Queen),
-            flags: MoveFlags::default(),
-        };
+        let mut pieces = [[BitBoard::EMPTY; 6]; 2];
+        pieces[Color::White as usize][Piece::Pawn as usize] =
+            Square::E7.bitboard() | Square::E2.bitboard();
 
-        let normal_move = Move {
-            from: Square::E2,
-            to: Square::E4,
-            piece: Piece::Pawn,
-            capture: None,
-            promotion: None,
-            flags: MoveFlags {
-                is_castle: false,
-                is_en_passant: false,
-                is_double_pawn_push: true,
-            },
-        };
+        let promotion = Move::new(Square::E7, Square::E8, Move::PROMO_Q);
+        let normal_move = Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH);
 
-        assert!(orderer.move_score(&promotion) > orderer.move_score(&normal_move));
+        assert!(
+            orderer.move_score(&promotion, Color::White, &pieces)
+                > orderer.move_score(&normal_move, Color::White, &pieces)
+        );
     }
 }

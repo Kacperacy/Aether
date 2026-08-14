@@ -4,7 +4,7 @@ use crate::uci::{
     EngineInfo, InfoResponse, OptionInfo, OptionType, SearchParams, UciCommand, UciInput,
     UciResponse, send_response, send_responses,
 };
-use aether_core::{Color, Move, Piece, score_to_mate_moves};
+use aether_core::{Color, Move, Piece, Square, score_to_mate_moves};
 use board::Board;
 use engine::Engine;
 use std::str::FromStr;
@@ -208,14 +208,23 @@ impl UciHandler {
     }
 
     fn parse_uci_move(&self, move_str: &str) -> Option<Move> {
-        let parsed = Move::from_str(move_str).ok()?;
+        if move_str.len() < 4 {
+            return None;
+        }
+        let from = Square::from_str(&move_str[0..2]).ok()?;
+        let to = Square::from_str(&move_str[2..4]).ok()?;
+        let promotion = if move_str.len() > 4 {
+            Piece::from_char(move_str.chars().nth(4)?)
+        } else {
+            None
+        };
 
         // Generate legal moves and find matching one
         let legal_moves = self.engine.legal_moves(&self.board);
 
         legal_moves
             .into_iter()
-            .find(|m| m.from == parsed.from && m.to == parsed.to && m.promotion == parsed.promotion)
+            .find(|m| m.from_sq() == from && m.to_sq() == to && m.promotion_piece() == promotion)
     }
 
     fn cmd_go(&mut self, params: SearchParams) {
@@ -269,17 +278,7 @@ impl UciHandler {
     }
 
     fn move_to_uci(mv: &Move) -> String {
-        let mut s = format!("{}{}", mv.from, mv.to);
-        if let Some(promo) = mv.promotion {
-            s.push(match promo {
-                Piece::Queen => 'q',
-                Piece::Rook => 'r',
-                Piece::Bishop => 'b',
-                Piece::Knight => 'n',
-                _ => 'q',
-            });
-        }
-        s
+        mv.to_string()
     }
 
     fn add_score_to_info(info: InfoResponse, score: i32) -> InfoResponse {
@@ -354,8 +353,8 @@ mod tests {
         let mv = handler.parse_uci_move("e2e4");
         assert!(mv.is_some());
         let mv = mv.unwrap();
-        assert_eq!(mv.from, Square::E2);
-        assert_eq!(mv.to, Square::E4);
+        assert_eq!(mv.from_sq(), Square::E2);
+        assert_eq!(mv.to_sq(), Square::E4);
     }
 
     #[test]

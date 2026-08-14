@@ -60,8 +60,8 @@ pub enum FenError {
     #[error("Invalid side to move: {side}")]
     InvalidSideToMove { side: String },
 
-    #[error("Invalid castling right: {ch}")]
-    InvalidCastlingRights { ch: char },
+    #[error("Invalid castling rights: {rights}")]
+    InvalidCastlingRights { rights: String },
 
     #[error("Invalid en_passant square: {en_passant_str}")]
     InvalidEnPassantSquare { en_passant_str: String },

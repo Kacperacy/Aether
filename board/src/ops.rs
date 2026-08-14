@@ -13,20 +13,33 @@ impl Board {
         let side = self.side_to_move;
         let opponent = side.opponent();
 
+        let moving_piece = self
+            .piece_at(mv.from_sq())
+            .map(|(p, _)| p)
+            .expect("make_move: no piece at from-square");
+
+        let captured_piece = if mv.is_en_passant() {
+            Some(Piece::Pawn)
+        } else if mv.is_capture() {
+            self.piece_at(mv.to_sq()).map(|(p, _)| p)
+        } else {
+            None
+        };
+
         self.zobrist_history.push(self.state.zobrist_hash);
 
         let buffer_idx = self.history_index % MAX_SEARCH_DEPTH;
         self.state_history[buffer_idx] = self.state;
-        self.state_history[buffer_idx].captured_piece = mv.capture.map(|p| (p, opponent));
+        self.state_history[buffer_idx].captured_piece = captured_piece;
         self.history_index += 1;
 
-        if let Some(captured) = mv.capture {
+        if let Some(captured) = captured_piece {
             let phase_delta = (Self::phase_weight(captured) as i32 * crate::MAX_GAME_PHASE
                 / crate::PHASE_TOTAL as i32) as i16;
             self.state.game_phase = (self.state.game_phase - phase_delta).max(0);
         }
 
-        if let Some(promo) = mv.promotion {
+        if let Some(promo) = mv.promotion_piece() {
             let phase_delta = (Self::phase_weight(promo) as i32 * crate::MAX_GAME_PHASE
                 / crate::PHASE_TOTAL as i32) as i16;
             self.state.game_phase =
@@ -37,38 +50,38 @@ impl Board {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        let (from_mg, from_eg) = pst::piece_value(mv.piece, mv.from, side);
+        let (from_mg, from_eg) = pst::piece_value(moving_piece, mv.from_sq(), side);
         self.state.pst_mg -= from_mg;
         self.state.pst_eg -= from_eg;
-        self.remove_piece_known(mv.from, mv.piece, side);
-        self.zobrist_toggle_piece(mv.from, mv.piece, side);
+        self.remove_piece_known(mv.from_sq(), moving_piece, side);
+        self.zobrist_toggle_piece(mv.from_sq(), moving_piece, side);
 
-        if let Some(captured) = mv.capture {
-            if mv.flags.is_en_passant {
-                let captured_sq = mv.to.down(side).expect("Invalid en passant square");
+        if let Some(captured) = captured_piece {
+            if mv.is_en_passant() {
+                let captured_sq = mv.to_sq().down(side).expect("Invalid en passant square");
                 let (cap_mg, cap_eg) = pst::piece_value(Piece::Pawn, captured_sq, opponent);
                 self.state.pst_mg -= cap_mg;
                 self.state.pst_eg -= cap_eg;
                 self.remove_piece_known(captured_sq, Piece::Pawn, opponent);
                 self.zobrist_toggle_piece(captured_sq, Piece::Pawn, opponent);
             } else {
-                let (cap_mg, cap_eg) = pst::piece_value(captured, mv.to, opponent);
+                let (cap_mg, cap_eg) = pst::piece_value(captured, mv.to_sq(), opponent);
                 self.state.pst_mg -= cap_mg;
                 self.state.pst_eg -= cap_eg;
-                self.remove_piece_known(mv.to, captured, opponent);
-                self.zobrist_toggle_piece(mv.to, captured, opponent);
+                self.remove_piece_known(mv.to_sq(), captured, opponent);
+                self.zobrist_toggle_piece(mv.to_sq(), captured, opponent);
             }
         }
 
-        let final_piece = mv.promotion.unwrap_or(mv.piece);
-        let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to, side);
+        let final_piece = mv.promotion_piece().unwrap_or(moving_piece);
+        let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to_sq(), side);
         self.state.pst_mg += to_mg;
         self.state.pst_eg += to_eg;
-        self.place_piece_internal(mv.to, final_piece, side);
-        self.zobrist_toggle_piece(mv.to, final_piece, side);
+        self.place_piece_internal(mv.to_sq(), final_piece, side);
+        self.zobrist_toggle_piece(mv.to_sq(), final_piece, side);
 
-        if mv.flags.is_castle {
-            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
+        if mv.is_castling() {
+            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to_sq(), side)?;
             let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, rook_from, side);
             let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, rook_to, side);
             self.state.pst_mg += rt_mg - rf_mg;
@@ -80,12 +93,17 @@ impl Board {
         }
 
         let old_castling = self.state.castling_rights;
-        self.update_castling_rights_after_move(mv);
+        self.update_castling_rights_after_move(
+            moving_piece,
+            captured_piece,
+            mv.from_sq(),
+            mv.to_sq(),
+        );
         let new_castling = self.state.castling_rights;
-        self.zobrist_update_castling(&old_castling, &new_castling);
+        self.zobrist_update_castling(old_castling, new_castling);
 
-        self.state.en_passant_square = if mv.flags.is_double_pawn_push {
-            mv.from.up(side)
+        self.state.en_passant_square = if mv.flags() == Move::DOUBLE_PUSH {
+            mv.from_sq().up(side)
         } else {
             None
         };
@@ -94,14 +112,14 @@ impl Board {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        if mv.piece == Piece::Pawn || mv.capture.is_some() {
+        if moving_piece == Piece::Pawn || captured_piece.is_some() {
             self.state.halfmove_clock = 0;
         } else {
             self.state.halfmove_clock += 1;
         }
 
-        if mv.piece == Piece::King {
-            self.state.king_square[side as usize] = mv.to;
+        if moving_piece == Piece::King {
+            self.state.king_square[side as usize] = mv.to_sq();
         }
 
         self.side_to_move = opponent;
@@ -137,21 +155,31 @@ impl Board {
             self.fullmove_number = self.fullmove_number.saturating_sub(1);
         }
 
-        let final_piece = mv.promotion.unwrap_or(mv.piece);
-        self.remove_piece_known(mv.to, final_piece, side);
-        self.place_piece_internal(mv.from, mv.piece, side);
+        let final_piece = self
+            .piece_at(mv.to_sq())
+            .map(|(p, _)| p)
+            .expect("unmake_move: no piece at to-square");
+        let restored_piece = if mv.is_promotion() {
+            Piece::Pawn
+        } else {
+            final_piece
+        };
 
-        if let Some((captured_piece, captured_color)) = saved_state.captured_piece {
-            if mv.flags.is_en_passant {
-                let captured_sq = mv.to.down(side).expect("Invalid en passant square");
+        self.remove_piece_known(mv.to_sq(), final_piece, side);
+        self.place_piece_internal(mv.from_sq(), restored_piece, side);
+
+        if let Some(captured_piece) = saved_state.captured_piece {
+            let captured_color = side.opponent();
+            if mv.is_en_passant() {
+                let captured_sq = mv.to_sq().down(side).expect("Invalid en passant square");
                 self.place_piece_internal(captured_sq, captured_piece, captured_color);
             } else {
-                self.place_piece_internal(mv.to, captured_piece, captured_color);
+                self.place_piece_internal(mv.to_sq(), captured_piece, captured_color);
             }
         }
 
-        if mv.flags.is_castle {
-            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to, side)?;
+        if mv.is_castling() {
+            let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to_sq(), side)?;
             self.remove_piece_known(rook_to, Piece::Rook, side);
             self.place_piece_internal(rook_from, Piece::Rook, side);
         }
@@ -245,11 +273,12 @@ impl Board {
         let side = self.side_to_move;
         let us = side as usize;
 
-        if mv.piece == Piece::King {
+        let moving_piece = self.piece_at(mv.from_sq()).map(|(p, _)| p);
+        if moving_piece == Some(Piece::King) {
             return self.king_move_is_illegal(mv, side);
         }
 
-        if mv.flags.is_en_passant {
+        if mv.is_en_passant() {
             return self.en_passant_is_illegal(mv, side);
         }
 
@@ -257,7 +286,7 @@ impl Board {
             return self.king_still_attacked_after(mv, side);
         }
 
-        let from_bb = mv.from.bitboard();
+        let from_bb = mv.from_sq().bitboard();
         let blockers = self.state.blockers_for_king[us];
 
         if (blockers & from_bb).is_empty() {
@@ -265,8 +294,8 @@ impl Board {
         }
 
         let king_sq = self.state.king_square[us];
-        let pin_line = line_through(king_sq, mv.from);
-        (pin_line & mv.to.bitboard()).is_empty()
+        let pin_line = line_through(king_sq, mv.from_sq());
+        (pin_line & mv.to_sq().bitboard()).is_empty()
     }
 
     #[inline]
@@ -277,12 +306,12 @@ impl Board {
         let king_sq = self.state.king_square[side as usize];
 
         let mut occupied = self.cache.occupied;
-        occupied &= !mv.from.bitboard();
-        occupied |= mv.to.bitboard();
+        occupied &= !mv.from_sq().bitboard();
+        occupied |= mv.to_sq().bitboard();
 
         let mut their_pieces = self.pieces[them];
-        if let Some(captured) = mv.capture {
-            their_pieces[captured as usize] &= !mv.to.bitboard();
+        if let Some((captured, _)) = self.piece_at(mv.to_sq()) {
+            their_pieces[captured as usize] &= !mv.to_sq().bitboard();
         }
 
         is_square_attacked(king_sq, opponent, occupied, &their_pieces)
@@ -293,21 +322,21 @@ impl Board {
         let opponent = side.opponent();
         let them = opponent as usize;
 
-        if mv.flags.is_castle {
-            let occupied = (self.cache.occupied & !mv.from.bitboard()) | mv.to.bitboard();
-            return is_square_attacked(mv.to, opponent, occupied, &self.pieces[them]);
+        if mv.is_castling() {
+            let occupied = (self.cache.occupied & !mv.from_sq().bitboard()) | mv.to_sq().bitboard();
+            return is_square_attacked(mv.to_sq(), opponent, occupied, &self.pieces[them]);
         }
 
         let mut occupied = self.cache.occupied;
-        occupied &= !mv.from.bitboard();
-        occupied |= mv.to.bitboard();
+        occupied &= !mv.from_sq().bitboard();
+        occupied |= mv.to_sq().bitboard();
 
         let mut their_pieces = self.pieces[them];
-        if let Some(captured) = mv.capture {
-            their_pieces[captured as usize] &= !mv.to.bitboard();
+        if let Some((captured, _)) = self.piece_at(mv.to_sq()) {
+            their_pieces[captured as usize] &= !mv.to_sq().bitboard();
         }
 
-        is_square_attacked(mv.to, opponent, occupied, &their_pieces)
+        is_square_attacked(mv.to_sq(), opponent, occupied, &their_pieces)
     }
 
     #[inline]
@@ -317,12 +346,12 @@ impl Board {
         let them = opponent as usize;
 
         let king_sq = self.state.king_square[us];
-        let captured_sq = mv.to.down(side).expect("Invalid en passant");
+        let captured_sq = mv.to_sq().down(side).expect("Invalid en passant");
 
         let mut occupied = self.cache.occupied;
-        occupied &= !mv.from.bitboard();
+        occupied &= !mv.from_sq().bitboard();
         occupied &= !captured_sq.bitboard();
-        occupied |= mv.to.bitboard();
+        occupied |= mv.to_sq().bitboard();
 
         let mut their_pieces = self.pieces[them];
         their_pieces[Piece::Pawn as usize] &= !captured_sq.bitboard();
@@ -360,29 +389,45 @@ impl Board {
         }
     }
 
-    fn update_castling_rights_after_move(&mut self, mv: &Move) {
+    fn update_castling_rights_after_move(
+        &mut self,
+        moving_piece: Piece,
+        captured_piece: Option<Piece>,
+        from: Square,
+        to: Square,
+    ) {
         let side = self.side_to_move;
         let opponent = side.opponent();
 
-        if mv.piece == Piece::King {
-            self.state.castling_rights[side as usize] = CastlingRights::EMPTY;
+        if moving_piece == Piece::King {
+            self.state
+                .castling_rights
+                .remove(CastlingRights::for_color(side));
         }
 
-        if mv.piece == Piece::Rook {
+        if moving_piece == Piece::Rook {
             let back_rank = side.back_rank();
-            if mv.from == Square::new(File::H, back_rank) {
-                self.state.castling_rights[side as usize].short = None;
-            } else if mv.from == Square::new(File::A, back_rank) {
-                self.state.castling_rights[side as usize].long = None;
+            if from == Square::new(File::H, back_rank) {
+                self.state
+                    .castling_rights
+                    .remove(CastlingRights::kingside(side));
+            } else if from == Square::new(File::A, back_rank) {
+                self.state
+                    .castling_rights
+                    .remove(CastlingRights::queenside(side));
             }
         }
 
-        if mv.capture == Some(Piece::Rook) {
+        if captured_piece == Some(Piece::Rook) {
             let opp_back_rank = opponent.back_rank();
-            if mv.to == Square::new(File::H, opp_back_rank) {
-                self.state.castling_rights[opponent as usize].short = None;
-            } else if mv.to == Square::new(File::A, opp_back_rank) {
-                self.state.castling_rights[opponent as usize].long = None;
+            if to == Square::new(File::H, opp_back_rank) {
+                self.state
+                    .castling_rights
+                    .remove(CastlingRights::kingside(opponent));
+            } else if to == Square::new(File::A, opp_back_rank) {
+                self.state
+                    .castling_rights
+                    .remove(CastlingRights::queenside(opponent));
             }
         }
     }
@@ -502,11 +547,7 @@ mod tests {
         let mut board: Board = STARTING_POSITION_FEN.parse().unwrap();
         let original_fen = board.to_string();
 
-        let mv =
-            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            });
+        let mv = Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH);
 
         board.make_move(&mv).unwrap();
 
@@ -528,7 +569,7 @@ mod tests {
             .unwrap();
         let original_fen = board.to_string();
 
-        let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
+        let mv = Move::new(Square::E4, Square::D5, Move::CAPTURE);
 
         board.make_move(&mv).unwrap();
         board.unmake_move(&mv).unwrap();
@@ -543,11 +584,7 @@ mod tests {
             .unwrap();
         let original_fen = board.to_string();
 
-        let mv =
-            Move::new(Square::E1, Square::G1, Piece::King).with_flags(aether_core::MoveFlags {
-                is_castle: true,
-                ..Default::default()
-            });
+        let mv = Move::new(Square::E1, Square::G1, Move::CASTLE_KS);
 
         board.make_move(&mv).unwrap();
 
@@ -569,12 +606,7 @@ mod tests {
             .unwrap();
         let original_fen = board.to_string();
 
-        let mv = Move::new(Square::D5, Square::E6, Piece::Pawn)
-            .with_capture(Piece::Pawn)
-            .with_flags(aether_core::MoveFlags {
-                is_en_passant: true,
-                ..Default::default()
-            });
+        let mv = Move::new(Square::D5, Square::E6, Move::EN_PASSANT);
 
         board.make_move(&mv).unwrap();
 
@@ -593,7 +625,7 @@ mod tests {
         let mut board: Board = "8/P7/8/8/8/8/8/4K2k w - - 0 1".parse().unwrap();
         let original_fen = board.to_string();
 
-        let mv = Move::new(Square::A7, Square::A8, Piece::Pawn).with_promotion(Piece::Queen);
+        let mv = Move::new(Square::A7, Square::A8, Move::PROMO_Q);
 
         board.make_move(&mv).unwrap();
 
@@ -612,11 +644,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv =
-            Move::new(Square::E2, Square::E4, Piece::Pawn).with_flags(aether_core::MoveFlags {
-                is_double_pawn_push: true,
-                ..Default::default()
-            });
+        let mv = Move::new(Square::E2, Square::E4, Move::DOUBLE_PUSH);
 
         board.make_move(&mv).unwrap();
 
@@ -629,7 +657,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv = Move::new(Square::E4, Square::D5, Piece::Pawn).with_capture(Piece::Pawn);
+        let mv = Move::new(Square::E4, Square::D5, Move::CAPTURE);
 
         board.make_move(&mv).unwrap();
 
@@ -642,7 +670,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv = Move::new(Square::G1, Square::F3, Piece::Knight);
+        let mv = Move::new(Square::G1, Square::F3, Move::QUIET);
 
         board.make_move(&mv).unwrap();
 
@@ -655,7 +683,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv = Move::new(Square::E1, Square::F1, Piece::King);
+        let mv = Move::new(Square::E1, Square::F1, Move::QUIET);
 
         board.make_move(&mv).unwrap();
 
@@ -672,7 +700,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv = Move::new(Square::H1, Square::G1, Piece::Rook);
+        let mv = Move::new(Square::H1, Square::G1, Move::QUIET);
 
         board.make_move(&mv).unwrap();
 
@@ -686,7 +714,7 @@ mod tests {
             .parse()
             .unwrap();
 
-        let mv = Move::new(Square::H3, Square::H8, Piece::Bishop).with_capture(Piece::Rook);
+        let mv = Move::new(Square::H3, Square::H8, Move::CAPTURE);
 
         board.make_move(&mv).unwrap();
 
