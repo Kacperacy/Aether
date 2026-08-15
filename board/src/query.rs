@@ -133,12 +133,12 @@ impl Board {
 
     #[inline]
     pub fn is_threefold_repetition(&self) -> bool {
-        self.repetition_count() >= 2
+        self.has_repetitions(2)
     }
 
     #[inline]
     pub fn is_twofold_repetition(&self) -> bool {
-        self.repetition_count() >= 1
+        self.has_repetitions(1)
     }
 
     #[inline]
@@ -212,6 +212,42 @@ impl Board {
         self.zobrist_history.len()
     }
 
+    /// True when the current position has already occurred at least `n` times
+    /// within the halfmove-clock window.
+    ///
+    /// Preferred over [`Board::repetition_count`] in the search, which calls it
+    /// once per node and again per move made. Two things make it cheaper without
+    /// changing the answer: it stops at the `n`th match instead of counting
+    /// every occurrence, and it steps back two plies at a time — only positions
+    /// with the same side to move can repeat, and those are exactly two apart —
+    /// rather than testing the parity of every index.
+    #[inline]
+    pub fn has_repetitions(&self, n: usize) -> bool {
+        if n == 0 {
+            return true;
+        }
+
+        let history_len = self.zobrist_history.len();
+        let look_back = (self.state.halfmove_clock as usize).min(history_len);
+        let min_idx = history_len - look_back;
+
+        let mut count = 0;
+        let mut i = history_len;
+
+        while i >= min_idx + 2 {
+            i -= 2;
+
+            if self.zobrist_history[i] == self.state.zobrist_hash {
+                count += 1;
+                if count >= n {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     /// How many earlier positions in the current fifty-move window match the
     /// present one (same side to move).
     pub fn repetition_count(&self) -> usize {
@@ -253,5 +289,69 @@ impl Board {
             (black_sq.file().to_index() + black_sq.rank().to_index()).is_multiple_of(2);
 
         white_square_parity == black_square_parity
+    }
+}
+
+#[cfg(test)]
+mod repetition_tests {
+    use crate::Board;
+
+    /// `has_repetitions` is an optimisation of `repetition_count`, so the two
+    /// must agree — including the window the halfmove clock imposes.
+    #[test]
+    fn test_has_repetitions_agrees_with_repetition_count() {
+        let mut board = Board::starting_position().unwrap();
+
+        let shuffle = [
+            ("g1f3", "g8f6"),
+            ("f3g1", "f6g8"),
+            ("b1c3", "b8c6"),
+            ("c3b1", "c6b8"),
+        ];
+
+        for _ in 0..3 {
+            for (white, black) in shuffle {
+                for uci in [white, black] {
+                    let mv = movegen_parse(&board, uci);
+                    board.make_move(&mv).unwrap();
+
+                    let count = board.repetition_count();
+                    for n in 0..4 {
+                        assert_eq!(
+                            board.has_repetitions(n),
+                            count >= n,
+                            "disagreement at n={n}, count={count}"
+                        );
+                    }
+                }
+            }
+        }
+
+        assert!(
+            board.repetition_count() >= 1,
+            "shuffling should have repeated a position"
+        );
+    }
+
+    /// Minimal UCI parse so this test does not depend on the movegen crate,
+    /// which depends on this one.
+    fn movegen_parse(board: &Board, uci: &str) -> aether_core::Move {
+        use aether_core::{Move, Square};
+
+        let from = Square::from_index(square_index(&uci[0..2]));
+        let to = Square::from_index(square_index(&uci[2..4]));
+        let flags = if board.is_square_occupied(to) {
+            Move::CAPTURE
+        } else {
+            Move::QUIET
+        };
+        Move::new(from, to, flags)
+    }
+
+    fn square_index(s: &str) -> i8 {
+        let b = s.as_bytes();
+        let file = (b[0] - b'a') as i8;
+        let rank = (b[1] - b'1') as i8;
+        rank * 8 + file
     }
 }
