@@ -121,6 +121,26 @@ mod tests {
         }
     }
 
+    /// CI pins the bench node count and compares it on a machine that is not
+    /// this one, so the run must not depend on how fast the machine is. A
+    /// depth-only limit is what guarantees that: nothing consults the clock, so
+    /// a slower CPU searches the same nodes, just later.
+    ///
+    /// If someone gives `SearchLimits::depth` a default time or node cap, this
+    /// fails here rather than as an unexplained CI mismatch.
+    #[test]
+    fn test_bench_is_limited_by_depth_alone() {
+        let limits = SearchLimits::depth(DEFAULT_BENCH_DEPTH);
+
+        assert_eq!(limits.depth, Some(DEFAULT_BENCH_DEPTH));
+        assert!(limits.time.is_none(), "bench must not be time-limited");
+        assert!(
+            limits.hard_time.is_none(),
+            "bench must not have a hard time limit"
+        );
+        assert!(limits.nodes.is_none(), "bench must not be node-limited");
+    }
+
     /// The whole point of bench is reproducibility: two runs of the same binary
     /// at the same depth must agree exactly. If this ever fails, the search has
     /// picked up a dependency on state that survives `new_game()`.

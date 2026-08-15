@@ -49,17 +49,27 @@ jobs:
       - name: Deep perft
         run: cargo test -p movegen --test perft_deep --release -- --ignored --nocapture
 
-      # The bench node count is deterministic. It must match the value recorded
-      # in docs/benchmarks.md; a mismatch means search behaviour changed.
+      # The bench node count is the search regression signal, so it is pinned.
+      #
+      # It is the same on every machine, not just on this runner, because bench
+      # is depth-limited (nothing reads the clock), single-threaded, and integer
+      # throughout (no float, so no rounding differences between CPUs). A faster
+      # CPU changes NPS, not which nodes get searched.
+      #
+      # Three changes would break that and make this gate flaky rather than
+      # wrong: a time-based cutoff reachable from a fixed-depth search, parallel
+      # search, or a floating-point evaluation. If this job starts failing with
+      # no search change, check for those first.
       - name: Bench node count
+        env:
+          EXPECTED_BENCH_NODES: "6383074"
         run: |
           cargo build --release --bin aether
-          # Portable extraction (BSD grep has no -P, so this also works locally).
-          EXPECTED=$(awk -F'|' '/^\| *bench nodes *\|/ {gsub(/[^0-9]/,"",$3); print $3; exit}' docs/benchmarks.md)
           ACTUAL=$(./target/release/aether bench | awk '/^Nodes:/ {print $2; exit}')
-          echo "expected=$EXPECTED actual=$ACTUAL"
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "::error::bench node count changed: $EXPECTED -> $ACTUAL."
-            echo "If intentional, update docs/benchmarks.md in the same commit."
+          echo "expected=$EXPECTED_BENCH_NODES actual=$ACTUAL"
+          if [ "$EXPECTED_BENCH_NODES" != "$ACTUAL" ]; then
+            echo "::error::bench node count changed: $EXPECTED_BENCH_NODES -> $ACTUAL"
+            echo "Deliberate search change? Update EXPECTED_BENCH_NODES in this file."
+            echo "Otherwise something altered the search tree unintentionally."
             exit 1
           fi
