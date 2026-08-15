@@ -1,5 +1,6 @@
 use crate::eval::{EvalState, Evaluator};
-use crate::eval::{MATE_SCORE, NEG_MATE_SCORE, Score, mated_in, material};
+use crate::eval::{MATE_SCORE, NEG_MATE_SCORE, Score, mated_in};
+use crate::params::*;
 use crate::search::move_ordering::MoveOrderer;
 use crate::search::move_picker::MovePicker;
 use crate::search::{
@@ -13,18 +14,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-const NODE_CHECK_MASK: u64 = 0xFFF;
-const DELTA_PRUNING_MARGIN: Score = 200;
-const DELTA_MAX_GAIN: Score = material::QUEEN_VALUE * 2 - material::PAWN_VALUE;
-const NULL_MOVE_REDUCTION: u8 = 3;
-const NULL_MOVE_MIN_DEPTH: u8 = 3;
-const LMR_FULL_DEPTH_MOVES: usize = 4;
-const LMR_MIN_DEPTH: u8 = 3;
-const ASPIRATION_DEPTH: u8 = 5;
-const ASPIRATION_WINDOW: Score = 25;
-const ASPIRATION_MAX_DELTA: Score = 400;
-const FUTILITY_MARGIN: [Score; 4] = [0, 100, 200, 300];
-
 /// Futility margin for `depth`, clamped to the table rather than indexed by a
 /// separate bound constant that could drift out of sync and panic.
 #[inline]
@@ -32,10 +21,6 @@ fn futility_margin(depth: u8) -> Score {
     let idx = (depth as usize).min(FUTILITY_MARGIN.len() - 1);
     FUTILITY_MARGIN[idx]
 }
-const FUTILITY_MAX_DEPTH: u8 = 3;
-const RFP_MARGIN: Score = 120;
-const RFP_MAX_DEPTH: u8 = 3;
-const PV_COLLECTION_LIMIT: usize = 32;
 
 pub struct AlphaBetaSearcher<E: Evaluator> {
     evaluator: E,
@@ -189,8 +174,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             let score;
 
-            if depth >= ASPIRATION_DEPTH {
-                let mut delta = ASPIRATION_WINDOW;
+            if depth >= aspiration_depth() {
+                let mut delta = aspiration_window();
                 let mut alpha = (prev_score - delta).max(NEG_MATE_SCORE);
                 let mut beta = (prev_score + delta).min(MATE_SCORE);
                 let mut best_pv_len = 0;
@@ -211,7 +196,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                         alpha = (alpha - delta).max(NEG_MATE_SCORE);
                         delta *= 2;
 
-                        if delta > ASPIRATION_MAX_DELTA {
+                        if delta > aspiration_max_delta() {
                             alpha = NEG_MATE_SCORE;
                             beta = MATE_SCORE;
                         }
@@ -223,7 +208,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                         beta = (beta + delta).min(MATE_SCORE);
                         delta *= 2;
 
-                        if delta > ASPIRATION_MAX_DELTA {
+                        if delta > aspiration_max_delta() {
                             alpha = NEG_MATE_SCORE;
                             beta = MATE_SCORE;
                         }
@@ -369,8 +354,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // ===== Reverse Futility Pruning (Static Null Move) =====
         if !is_pv_node
             && !in_check
-            && depth <= RFP_MAX_DEPTH
-            && static_eval - RFP_MARGIN * (depth as Score) >= beta
+            && depth <= rfp_max_depth()
+            && static_eval - rfp_margin() * (depth as Score) >= beta
         {
             return beta;
         }
@@ -378,7 +363,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // ===== Null move pruning =====
         if !is_pv_node
             && !in_check
-            && depth >= NULL_MOVE_MIN_DEPTH
+            && depth >= null_move_min_depth()
             && self.has_non_pawn_material(board)
         {
             board.make_null_move();
@@ -386,7 +371,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             let null_score = -self.alpha_beta(
                 board,
-                depth.saturating_sub(NULL_MOVE_REDUCTION + 1),
+                depth.saturating_sub(null_move_reduction() + 1),
                 ply + 1,
                 -beta,
                 -beta + 1,
@@ -404,7 +389,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         // ===== Futility pruning flag =====
         let can_futility_prune = !is_pv_node
             && !in_check
-            && depth <= FUTILITY_MAX_DEPTH
+            && depth <= futility_max_depth()
             && static_eval + futility_margin(depth) <= alpha;
 
         // ===== Generate and order moves =====
@@ -461,8 +446,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     is_pv_node,
                 );
             } else {
-                let can_reduce = moves_searched >= LMR_FULL_DEPTH_MOVES
-                    && depth >= LMR_MIN_DEPTH
+                let can_reduce = moves_searched >= lmr_full_depth_moves()
+                    && depth >= lmr_min_depth()
                     && !mv.is_capture()
                     && !mv.is_promotion()
                     && !in_check
@@ -471,7 +456,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 let mut lmr_score;
 
                 if can_reduce {
-                    let reduction = 1 + (moves_searched as u8 / 6);
+                    let reduction = 1 + (moves_searched / lmr_divisor()) as u8;
                     lmr_score = -self.alpha_beta(
                         board,
                         depth.saturating_sub(reduction + 1) + extension,
@@ -623,7 +608,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 alpha = stand_pat;
             }
 
-            if stand_pat + DELTA_MAX_GAIN + DELTA_PRUNING_MARGIN < alpha {
+            if stand_pat + DELTA_MAX_GAIN + delta_pruning_margin() < alpha {
                 return alpha;
             }
         }

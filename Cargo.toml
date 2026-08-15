@@ -59,3 +59,6 @@ debug = "line-tables-only"
 [profile.release-native]
 inherits = "release"
 # Use with: RUSTFLAGS="-C target-cpu=native" cargo build --profile release-native
+
+[features]
+tune = ["interface/tune"]

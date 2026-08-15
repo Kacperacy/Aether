@@ -12,3 +12,9 @@ movegen = { workspace = true }
 
 [lints]
 workspace = true
+
+[features]
+# Exposes the search parameters as hidden UCI options so an external tuner
+# can drive them without recompiling. Off by default; the shipping build folds
+# every parameter to a compile-time constant.
+tune = []

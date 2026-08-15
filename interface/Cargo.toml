@@ -12,3 +12,6 @@ movegen = { workspace = true }
 
 [lints]
 workspace = true
+
+[features]
+tune = ["engine/tune"]

@@ -122,6 +122,20 @@ impl UciHandler {
             },
         }));
 
+        // Hidden tuning knobs. Present only in a `tune` build, so the shipping
+        // engine advertises exactly the options it advertised before.
+        #[cfg(feature = "tune")]
+        for t in engine::params::TUNABLES {
+            send_response(&UciResponse::Option(OptionInfo {
+                name: t.name.to_string(),
+                option_type: OptionType::Spin {
+                    default: t.default as i64,
+                    min: t.min as i64,
+                    max: t.max as i64,
+                },
+            }));
+        }
+
         send_response(&UciResponse::UciOk);
     }
 
@@ -150,6 +164,18 @@ impl UciHandler {
                     self.options.threads = t.clamp(1, 1);
                 }
             }
+            // A tuner drives the search parameters through this path. The name
+            // is matched case-insensitively and the value clamped to the
+            // parameter's declared range by `set_by_name`.
+            #[cfg(feature = "tune")]
+            other => {
+                if let Some(v) = value
+                    && let Ok(parsed) = v.parse::<i32>()
+                {
+                    engine::params::set_by_name(other, parsed);
+                }
+            }
+            #[cfg(not(feature = "tune"))]
             _ => {}
         }
     }

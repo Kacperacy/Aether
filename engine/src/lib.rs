@@ -1,5 +1,6 @@
 pub mod bench;
 pub mod eval;
+pub mod params;
 pub mod search;
 
 use crate::eval::Score;
