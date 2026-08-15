@@ -6,7 +6,7 @@
 //! so paths that never evaluate (perft, plain move generation) pay nothing.
 
 use super::pst;
-use aether_core::{CastlingPath, Move, Piece};
+use aether_core::{Move, Piece};
 use board::Board;
 
 pub const MAX_GAME_PHASE: i32 = 256;
@@ -47,6 +47,31 @@ pub struct EvalState {
     stack: Vec<Frame>,
 }
 
+impl super::Accumulator for EvalState {
+    fn empty() -> Self {
+        Self {
+            current: Frame::default(),
+            stack: Vec::with_capacity(crate::search::MAX_PLY),
+        }
+    }
+
+    fn reset(&mut self, board: &Board) {
+        EvalState::reset(self, board);
+    }
+
+    fn push(&mut self, board: &Board, mv: &Move) {
+        EvalState::push(self, board, mv);
+    }
+
+    fn push_null(&mut self) {
+        EvalState::push_null(self);
+    }
+
+    fn pop(&mut self) {
+        EvalState::pop(self);
+    }
+}
+
 impl EvalState {
     /// A zeroed accumulator, for constructing a searcher before a position is
     /// known. [`EvalState::reset`] must run before any evaluation.
@@ -83,60 +108,43 @@ impl EvalState {
 
     /// Apply `mv`'s evaluation delta. Must be called **before**
     /// `board.make_move(mv)` — it reads the pre-move position.
+    ///
+    /// The move is decoded into piece additions and removals by
+    /// [`super::delta::decode_move`], and only the per-piece arithmetic below is
+    /// specific to this evaluator. An NNUE accumulator replaces `apply` and
+    /// reuses the decode unchanged.
     pub fn push(&mut self, board: &Board, mv: &Move) {
         self.stack.push(self.current);
 
-        let side = board.side_to_move();
-        let opponent = side.opponent();
-
-        let Some((moving_piece, _)) = board.piece_at(mv.from_sq()) else {
+        let Some(delta) = super::delta::decode_move(board, mv) else {
             return;
         };
 
-        let captured_piece = if mv.is_en_passant() {
-            Some(Piece::Pawn)
-        } else if mv.is_capture() {
-            board.piece_at(mv.to_sq()).map(|(p, _)| p)
+        for change in delta.iter() {
+            self.apply(change);
+        }
+
+        // Phase is clamped once, after the whole move, rather than per piece:
+        // a quiet knight move removes and re-adds the same phase weight, and
+        // clamping in between could floor the intermediate value and leave the
+        // counter permanently wrong.
+        self.current.phase = self.current.phase.clamp(0, MAX_GAME_PHASE as i16);
+    }
+
+    /// Fold one piece addition or removal into the running sums.
+    #[inline(always)]
+    fn apply(&mut self, change: super::delta::PieceChange) {
+        let (mg, eg) = pst::piece_value(change.piece, change.square, change.color);
+        let phase = phase_delta(change.piece);
+
+        if change.added {
+            self.current.mg += mg;
+            self.current.eg += eg;
+            self.current.phase += phase;
         } else {
-            None
-        };
-
-        if let Some(captured) = captured_piece {
-            self.current.phase = (self.current.phase - phase_delta(captured)).max(0);
-        }
-
-        if let Some(promo) = mv.promotion_piece() {
-            self.current.phase =
-                (self.current.phase + phase_delta(promo)).min(MAX_GAME_PHASE as i16);
-        }
-
-        let (from_mg, from_eg) = pst::piece_value(moving_piece, mv.from_sq(), side);
-        self.current.mg -= from_mg;
-        self.current.eg -= from_eg;
-
-        if let Some(captured) = captured_piece {
-            let (cap_mg, cap_eg) = if mv.is_en_passant() {
-                let captured_sq = mv.to_sq().down(side).expect("Invalid en passant square");
-                pst::piece_value(Piece::Pawn, captured_sq, opponent)
-            } else {
-                pst::piece_value(captured, mv.to_sq(), opponent)
-            };
-            self.current.mg -= cap_mg;
-            self.current.eg -= cap_eg;
-        }
-
-        let final_piece = mv.promotion_piece().unwrap_or(moving_piece);
-        let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to_sq(), side);
-        self.current.mg += to_mg;
-        self.current.eg += to_eg;
-
-        if mv.is_castling()
-            && let Some(path) = CastlingPath::for_king_destination(side, mv.to_sq())
-        {
-            let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, path.rook_from, side);
-            let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, path.rook_to, side);
-            self.current.mg += rt_mg - rf_mg;
-            self.current.eg += rt_eg - rf_eg;
+            self.current.mg -= mg;
+            self.current.eg -= eg;
+            self.current.phase -= phase;
         }
     }
 

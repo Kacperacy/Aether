@@ -171,6 +171,8 @@ impl SimpleEvaluator {
 }
 
 impl Evaluator for SimpleEvaluator {
+    type Acc = EvalState;
+
     #[inline(always)]
     fn evaluate(&self, board: &Board, eval_state: &EvalState) -> i32 {
         let score = self.evaluate_position(board, eval_state);

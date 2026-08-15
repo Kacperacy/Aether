@@ -1,4 +1,4 @@
-use crate::eval::{EvalState, Evaluator};
+use crate::eval::{Accumulator, Evaluator};
 use crate::eval::{MATE_SCORE, NEG_MATE_SCORE, Score, mated_in};
 use crate::params::*;
 use crate::search::move_ordering::MoveOrderer;
@@ -34,7 +34,7 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     nodes_limit: Option<u64>,
     pv_table: [[Move; MAX_PV_LENGTH]; MAX_PV_LENGTH],
     pv_length: [usize; MAX_PV_LENGTH],
-    eval_state: EvalState,
+    eval_state: E::Acc,
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
@@ -51,7 +51,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             nodes_limit: None,
             pv_table: [[Move::NULL; MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
-            eval_state: EvalState::empty(),
+            eval_state: E::Acc::empty(),
         }
     }
 
