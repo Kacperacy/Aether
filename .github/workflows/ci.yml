@@ -62,7 +62,7 @@ jobs:
       # no search change, check for those first.
       - name: Bench node count
         env:
-          EXPECTED_BENCH_NODES: "6383074"
+          EXPECTED_BENCH_NODES: "3973130"
         run: |
           cargo build --release --bin aether
           ACTUAL=$(./target/release/aether bench | awk '/^Nodes:/ {print $2; exit}')

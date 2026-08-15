@@ -342,15 +342,15 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut tt_move: Option<Move> = None;
 
         if let Some(entry) = self.tt.probe(zobrist_key) {
-            tt_move = entry.best_move;
+            tt_move = entry.best_move();
 
             if entry.depth >= depth && !is_pv_node {
-                let tt_score = TTEntry::score_from_tt(entry.score, ply);
+                let tt_score = TTEntry::score_from_tt(entry.score(), ply);
 
                 // Return the stored score rather than the window edge: the
                 // search is fail-soft, and `beta`/`alpha` would throw away the
                 // mate distance the entry carries.
-                match entry.node_type {
+                match entry.node_type() {
                     NodeType::Exact => return tt_score,
                     NodeType::LowerBound if tt_score >= beta => return tt_score,
                     NodeType::UpperBound if tt_score <= alpha => return tt_score,
@@ -592,6 +592,24 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return self.evaluator.evaluate(board, &self.eval_state);
         }
 
+        // Quiescence shares the table with the main search. Every stored entry
+        // is at least as deep as this node — quiescence stores at depth 0 and
+        // nothing is shallower — so any hit is usable without a depth test.
+        let zobrist_key = board.zobrist_hash_raw();
+        let mut tt_move: Option<Move> = None;
+
+        if let Some(entry) = self.tt.probe(zobrist_key) {
+            tt_move = entry.best_move();
+            let tt_score = TTEntry::score_from_tt(entry.score(), ply);
+
+            match entry.node_type() {
+                NodeType::Exact => return tt_score,
+                NodeType::LowerBound if tt_score >= beta => return tt_score,
+                NodeType::UpperBound if tt_score <= alpha => return tt_score,
+                _ => {}
+            }
+        }
+
         let in_check = board.is_in_check(board.side_to_move());
 
         if !in_check {
@@ -610,12 +628,21 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        let mut picker =
-            MovePicker::quiescence(board, &self.move_orderer, ply, in_check, depth == 0);
+        let mut picker = MovePicker::quiescence(
+            board,
+            &self.move_orderer,
+            tt_move,
+            ply,
+            in_check,
+            depth == 0,
+        );
 
         if in_check && picker.is_empty() {
             return mated_in(ply as u32);
         }
+
+        let original_alpha = alpha;
+        let mut best_move: Option<Move> = None;
 
         while let Some(mv) = picker.next() {
             if self.do_move(board, &mv).is_err() {
@@ -625,12 +652,40 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             self.undo_move(board, &mv);
 
             if score >= beta {
+                if !self.aborted() {
+                    self.tt.store(TTEntry::new(
+                        zobrist_key,
+                        Some(mv),
+                        TTEntry::score_to_tt(score, ply),
+                        0,
+                        NodeType::LowerBound,
+                        self.tt.generation(),
+                    ));
+                }
                 return score;
             }
 
             if score > alpha {
                 alpha = score;
+                best_move = Some(mv);
             }
+        }
+
+        if !self.aborted() {
+            let node_type = if alpha > original_alpha {
+                NodeType::Exact
+            } else {
+                NodeType::UpperBound
+            };
+
+            self.tt.store(TTEntry::new(
+                zobrist_key,
+                best_move,
+                TTEntry::score_to_tt(alpha, ply),
+                0,
+                node_type,
+                self.tt.generation(),
+            ));
         }
 
         alpha

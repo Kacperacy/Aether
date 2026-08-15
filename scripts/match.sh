@@ -30,6 +30,27 @@ fi
 
 command -v fastchess >/dev/null || { echo "fastchess not found in PATH" >&2; exit 1; }
 
+# A fixed-node search is fully deterministic, so one opening always produces the
+# exact same game. If the book has fewer openings than rounds it cycles, and the
+# repeats are replayed verbatim — while fastchess still computes its confidence
+# interval as though every game were independent. A pure-noise result then looks
+# decisive: 10 openings over 100 rounds once reported "52 +/- 35 Elo, LOS 99.9%"
+# off what were really 10 distinct games.
+#
+# Under a clock this does not bite nearly as hard, because timing jitter makes
+# repeated openings diverge into genuinely different games.
+OPENINGS=$(grep -cve '^[[:space:]]*$' scripts/openings.epd)
+if [ "$ROUNDS" -gt "$OPENINGS" ]; then
+  if [ -n "${NODES:-}" ]; then
+    echo "ERROR: $ROUNDS rounds but only $OPENINGS openings, at a fixed node count." >&2
+    echo "Each opening would replay identically $(( ROUNDS / OPENINGS ))x, so the" >&2
+    echo "reported error bars would badly understate the true noise." >&2
+    echo "Use at most $(( OPENINGS * 2 )) games, or enlarge scripts/openings.epd." >&2
+    exit 1
+  fi
+  echo "WARNING: $ROUNDS rounds but only $OPENINGS openings; openings will repeat." >&2
+fi
+
 exec fastchess \
   -engine "cmd=$BASE" name=Baseline \
   -engine "cmd=$CAND" name=Candidate \

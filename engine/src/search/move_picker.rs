@@ -80,6 +80,7 @@ impl MovePicker {
     pub fn quiescence(
         board: &Board,
         orderer: &MoveOrderer,
+        tt_move: Option<Move>,
         ply: usize,
         in_check: bool,
         include_checks: bool,
@@ -93,7 +94,7 @@ impl MovePicker {
                 movegen::checks(board, &mut moves);
             }
         }
-        Self::score_all(moves, orderer, None, ply, board)
+        Self::score_all(moves, orderer, tt_move, ply, board)
     }
 
     /// True when the position produced no moves at all — checkmate or stalemate
@@ -225,7 +226,7 @@ mod tests {
         let board = pos("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
 
         let yielded = drain(&mut MovePicker::quiescence(
-            &board, &orderer, 0, false, false,
+            &board, &orderer, None, 0, false, false,
         ));
 
         assert!(!yielded.is_empty());
