@@ -186,3 +186,56 @@ fn test_long_game_then_search_respects_unmake_stack() {
         );
     }
 }
+
+/// The incrementally-maintained zobrist hash must equal a full recompute at
+/// every node of a real tree, and must be restored exactly by `unmake_move`.
+///
+/// This is the invariant that matters and it does not depend on the key values,
+/// so it survives changing how the keys are generated. A drift here corrupts
+/// transposition-table lookups and repetition detection at once.
+#[test]
+fn test_incremental_zobrist_matches_full_recompute() {
+    const POSITIONS: &[&str] = &[
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        // Castling rights on both sides, dense tactics.
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        // En passant available.
+        "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3",
+        // Promotions, including capture-promotions.
+        "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N w - - 0 1",
+    ];
+
+    fn walk(board: &mut Board, depth: u32) {
+        assert_eq!(
+            board.zobrist_hash_raw(),
+            board.calculate_zobrist_hash(),
+            "incremental hash drifted from the recomputed hash"
+        );
+
+        if depth == 0 {
+            return;
+        }
+
+        let mut moves = movegen::MoveList::new();
+        movegen::legal(board, &mut moves);
+
+        for mv in &moves {
+            let before = board.zobrist_hash_raw();
+
+            board.make_move(mv).unwrap();
+            walk(board, depth - 1);
+            board.unmake_move(mv).unwrap();
+
+            assert_eq!(
+                board.zobrist_hash_raw(),
+                before,
+                "unmake_move did not restore the hash after {mv}"
+            );
+        }
+    }
+
+    for fen in POSITIONS {
+        let mut board: Board = fen.parse().expect("valid FEN");
+        walk(&mut board, 3);
+    }
+}

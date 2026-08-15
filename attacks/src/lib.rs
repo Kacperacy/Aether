@@ -7,7 +7,7 @@ mod magic;
 mod magic_constants;
 mod pieces;
 
-use aether_core::{BitBoard, Color, File, Piece, Rank, Square};
+use aether_core::{BitBoard, Color, Piece, Square};
 pub use magic::*;
 pub use pieces::*;
 
@@ -103,7 +103,9 @@ pub fn compute_slider_blockers(
     (blockers, pinners)
 }
 
-#[inline]
+/// Only the test-only reference implementations use this now; the shipping
+/// path is a table lookup.
+#[cfg(test)]
 fn line_direction(sq1: Square, sq2: Square) -> Option<(i8, i8)> {
     if sq1 == sq2 {
         return None;
@@ -127,23 +129,65 @@ fn line_direction(sq1: Square, sq2: Square) -> Option<(i8, i8)> {
     Some((df, dr))
 }
 
-#[must_use]
-#[inline]
-pub fn line_between(sq1: Square, sq2: Square) -> BitBoard {
-    let Some((df, dr)) = line_direction(sq1, sq2) else {
-        return BitBoard::EMPTY;
+// `line_between` and `line_through` are called from the two hottest loops in the
+// engine — `update_blockers` on every make_move, and the per-move pin test in
+// `movegen::legality` — so they are tables, not ray-walks.
+//
+// Both are `static` with a `const` initialiser: the tables are built by the
+// compiler and cost nothing at runtime. A `LazyLock` would have put an atomic
+// acquire on every call, which is the same overhead this is meant to remove.
+// 4096 entries x 8 bytes = 32KB each.
+
+/// Step direction from `a` towards `b`, plus whether the two squares share a
+/// rank, file or diagonal at all. Mirrors `line_direction`.
+const fn line_step(a: usize, b: usize) -> (i8, i8, bool) {
+    if a == b {
+        return (0, 0, false);
+    }
+
+    let (f1, r1) = ((a & 7) as i8, (a >> 3) as i8);
+    let (f2, r2) = ((b & 7) as i8, (b >> 3) as i8);
+    let (fd, rd) = (f2 - f1, r2 - r1);
+
+    let file_diff = if fd < 0 { -fd } else { fd };
+    let rank_diff = if rd < 0 { -rd } else { rd };
+
+    if file_diff != rank_diff && f1 != f2 && r1 != r2 {
+        return (0, 0, false);
+    }
+
+    let df = if fd > 0 {
+        1
+    } else if fd < 0 {
+        -1
+    } else {
+        0
+    };
+    let dr = if rd > 0 {
+        1
+    } else if rd < 0 {
+        -1
+    } else {
+        0
     };
 
-    let f2 = sq2.file().to_index() as i8;
-    let r2 = sq2.rank().to_index() as i8;
+    (df, dr, true)
+}
 
-    let mut result = BitBoard::EMPTY;
-    let mut f = sq1.file().to_index() as i8 + df;
-    let mut r = sq1.rank().to_index() as i8 + dr;
+/// Squares strictly between `a` and `b`, exclusive of both.
+const fn between_bits(a: usize, b: usize) -> u64 {
+    let (df, dr, aligned) = line_step(a, b);
+    if !aligned {
+        return 0;
+    }
+
+    let (f2, r2) = ((b & 7) as i8, (b >> 3) as i8);
+    let mut f = (a & 7) as i8 + df;
+    let mut r = (a >> 3) as i8 + dr;
+    let mut result = 0u64;
 
     while f != f2 || r != r2 {
-        let sq = Square::new(File::from_index(f), Rank::from_index(r));
-        result |= sq.bitboard();
+        result |= 1u64 << (r * 8 + f);
         f += df;
         r += dr;
     }
@@ -151,31 +195,122 @@ pub fn line_between(sq1: Square, sq2: Square) -> BitBoard {
     result
 }
 
-#[must_use]
-#[inline]
-pub fn line_through(sq1: Square, sq2: Square) -> BitBoard {
-    let Some((df, dr)) = line_direction(sq1, sq2) else {
-        return BitBoard::EMPTY;
-    };
+/// The whole rank, file or diagonal containing both squares, edge to edge.
+const fn through_bits(a: usize, b: usize) -> u64 {
+    let (df, dr, aligned) = line_step(a, b);
+    if !aligned {
+        return 0;
+    }
 
-    let mut f = sq1.file().to_index() as i8;
-    let mut r = sq1.rank().to_index() as i8;
-
+    // Walk back to the edge of the board, then forward across it.
+    let mut f = (a & 7) as i8;
+    let mut r = (a >> 3) as i8;
     while f - df >= 0 && f - df <= 7 && r - dr >= 0 && r - dr <= 7 {
         f -= df;
         r -= dr;
     }
 
-    let mut result = BitBoard::EMPTY;
-
-    while (0..=7).contains(&f) && (0..=7).contains(&r) {
-        let sq = Square::new(File::from_index(f), Rank::from_index(r));
-        result |= sq.bitboard();
+    let mut result = 0u64;
+    while f >= 0 && f <= 7 && r >= 0 && r <= 7 {
+        result |= 1u64 << (r * 8 + f);
         f += df;
         r += dr;
     }
 
     result
+}
+
+const fn build_table(between: bool) -> [[u64; 64]; 64] {
+    let mut table = [[0u64; 64]; 64];
+    let mut a = 0;
+
+    while a < 64 {
+        let mut b = 0;
+        while b < 64 {
+            table[a][b] = if between {
+                between_bits(a, b)
+            } else {
+                through_bits(a, b)
+            };
+            b += 1;
+        }
+        a += 1;
+    }
+
+    table
+}
+
+static LINE_BETWEEN: [[u64; 64]; 64] = build_table(true);
+static LINE_THROUGH: [[u64; 64]; 64] = build_table(false);
+
+/// Squares strictly between `sq1` and `sq2`, or empty when they do not share a
+/// rank, file or diagonal.
+#[must_use]
+#[inline(always)]
+pub fn line_between(sq1: Square, sq2: Square) -> BitBoard {
+    BitBoard::new(LINE_BETWEEN[sq1.to_index() as usize][sq2.to_index() as usize])
+}
+
+/// The full line through `sq1` and `sq2`, or empty when they are not aligned.
+#[must_use]
+#[inline(always)]
+pub fn line_through(sq1: Square, sq2: Square) -> BitBoard {
+    BitBoard::new(LINE_THROUGH[sq1.to_index() as usize][sq2.to_index() as usize])
+}
+
+/// The ray-walking originals, kept as the definition the tables are checked
+/// against. Not compiled into the engine.
+#[cfg(test)]
+mod reference {
+    use super::*;
+    use aether_core::{File, Rank};
+
+    pub fn line_between(sq1: Square, sq2: Square) -> BitBoard {
+        let Some((df, dr)) = line_direction(sq1, sq2) else {
+            return BitBoard::EMPTY;
+        };
+
+        let f2 = sq2.file().to_index() as i8;
+        let r2 = sq2.rank().to_index() as i8;
+
+        let mut result = BitBoard::EMPTY;
+        let mut f = sq1.file().to_index() as i8 + df;
+        let mut r = sq1.rank().to_index() as i8 + dr;
+
+        while f != f2 || r != r2 {
+            let sq = Square::new(File::from_index(f), Rank::from_index(r));
+            result |= sq.bitboard();
+            f += df;
+            r += dr;
+        }
+
+        result
+    }
+
+    pub fn line_through(sq1: Square, sq2: Square) -> BitBoard {
+        let Some((df, dr)) = line_direction(sq1, sq2) else {
+            return BitBoard::EMPTY;
+        };
+
+        let mut f = sq1.file().to_index() as i8;
+        let mut r = sq1.rank().to_index() as i8;
+
+        while f - df >= 0 && f - df <= 7 && r - dr >= 0 && r - dr <= 7 {
+            f -= df;
+            r -= dr;
+        }
+
+        let mut result = BitBoard::EMPTY;
+
+        while (0..=7).contains(&f) && (0..=7).contains(&r) {
+            let sq = Square::new(File::from_index(f), Rank::from_index(r));
+            result |= sq.bitboard();
+            f += df;
+            r += dr;
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
@@ -233,5 +368,48 @@ mod tests {
         assert!(attacks.contains(Square::E6));
         assert!(!attacks.contains(Square::E7));
         assert!(!attacks.contains(Square::E8));
+    }
+}
+
+#[cfg(test)]
+mod line_table_tests {
+    use super::*;
+
+    /// The tables must agree with the ray-walk definition on every one of the
+    /// 4096 square pairs — including the unaligned pairs and `sq == sq`, which
+    /// both yield an empty board.
+    #[test]
+    fn test_line_tables_match_the_ray_walk() {
+        for a in 0..64i8 {
+            for b in 0..64i8 {
+                let (sq1, sq2) = (Square::from_index(a), Square::from_index(b));
+
+                assert_eq!(
+                    line_between(sq1, sq2),
+                    reference::line_between(sq1, sq2),
+                    "line_between({sq1}, {sq2})"
+                );
+                assert_eq!(
+                    line_through(sq1, sq2),
+                    reference::line_through(sq1, sq2),
+                    "line_through({sq1}, {sq2})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_unaligned_and_identical_squares_are_empty() {
+        assert_eq!(line_between(Square::A1, Square::B3), BitBoard::EMPTY);
+        assert_eq!(line_through(Square::A1, Square::B3), BitBoard::EMPTY);
+        assert_eq!(line_between(Square::E4, Square::E4), BitBoard::EMPTY);
+        assert_eq!(line_through(Square::E4, Square::E4), BitBoard::EMPTY);
+    }
+
+    /// Adjacent squares have nothing between them, but do share a full line.
+    #[test]
+    fn test_adjacent_squares() {
+        assert_eq!(line_between(Square::A1, Square::A2), BitBoard::EMPTY);
+        assert!(line_through(Square::A1, Square::A2).contains(Square::A8));
     }
 }
