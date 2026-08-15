@@ -1,13 +1,14 @@
 use crate::eval::{EvalState, Evaluator};
 use crate::eval::{MATE_SCORE, NEG_MATE_SCORE, Score, mated_in, material};
 use crate::search::move_ordering::MoveOrderer;
+use crate::search::move_picker::MovePicker;
 use crate::search::{
     MAX_PLY, MAX_PV_LENGTH, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry,
     TranspositionTable,
 };
 use aether_core::{Move, Piece};
 use board::Board;
-use std::mem;
+use movegen::MoveList;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -22,8 +23,15 @@ const LMR_MIN_DEPTH: u8 = 3;
 const ASPIRATION_DEPTH: u8 = 5;
 const ASPIRATION_WINDOW: Score = 25;
 const ASPIRATION_MAX_DELTA: Score = 400;
-const AVG_LEGAL_MOVES: usize = 40;
 const FUTILITY_MARGIN: [Score; 4] = [0, 100, 200, 300];
+
+/// Futility margin for `depth`, clamped to the table rather than indexed by a
+/// separate bound constant that could drift out of sync and panic.
+#[inline]
+fn futility_margin(depth: u8) -> Score {
+    let idx = (depth as usize).min(FUTILITY_MARGIN.len() - 1);
+    FUTILITY_MARGIN[idx]
+}
 const FUTILITY_MAX_DEPTH: u8 = 3;
 const RFP_MARGIN: Score = 120;
 const RFP_MAX_DEPTH: u8 = 3;
@@ -41,16 +49,11 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     nodes_limit: Option<u64>,
     pv_table: [[Move; MAX_PV_LENGTH]; MAX_PV_LENGTH],
     pv_length: [usize; MAX_PV_LENGTH],
-    move_lists: Vec<Vec<Move>>,
     eval_state: EvalState,
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
     pub fn new(evaluator: E, tt_size_mb: usize) -> Self {
-        let move_lists = (0..MAX_PLY)
-            .map(|_| Vec::with_capacity(AVG_LEGAL_MOVES))
-            .collect();
-
         Self {
             evaluator,
             tt: TranspositionTable::new(tt_size_mb),
@@ -63,7 +66,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             nodes_limit: None,
             pv_table: [[Move::NULL; MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
-            move_lists,
             eval_state: EvalState::empty(),
         }
     }
@@ -136,7 +138,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut best_score: Score = NEG_MATE_SCORE;
         self.info.pv.reserve(max_depth as usize);
 
-        let mut legal_moves = Vec::with_capacity(AVG_LEGAL_MOVES);
+        let mut legal_moves = MoveList::new();
         movegen::legal(board, &mut legal_moves);
 
         if legal_moves.is_empty() {
@@ -277,7 +279,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         depth: u8,
         ply: usize,
         mut alpha: Score,
-        beta: Score,
+        mut beta: Score,
         is_pv_node: bool,
     ) -> Score {
         self.info.nodes += 1;
@@ -324,6 +326,17 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
 
         // ===== Transposition table probe =====
+        // ===== Mate-distance pruning =====
+        // A mate found deeper than one already proven at this ply cannot improve
+        // the result, and this keeps reported mate distances honest.
+        if ply > 0 {
+            alpha = alpha.max(mated_in(ply as u32));
+            beta = beta.min(-mated_in(ply as u32 + 1));
+            if alpha >= beta {
+                return alpha;
+            }
+        }
+
         let zobrist_key = board.zobrist_hash_raw();
         self.tt.prefetch(zobrist_key);
         let mut tt_move: Option<Move> = None;
@@ -334,10 +347,13 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             if entry.depth >= depth && !is_pv_node {
                 let tt_score = TTEntry::score_from_tt(entry.score, ply);
 
+                // Return the stored score rather than the window edge: the
+                // search is fail-soft, and `beta`/`alpha` would throw away the
+                // mate distance the entry carries.
                 match entry.node_type {
                     NodeType::Exact => return tt_score,
-                    NodeType::LowerBound if tt_score >= beta => return beta,
-                    NodeType::UpperBound if tt_score <= alpha => return alpha,
+                    NodeType::LowerBound if tt_score >= beta => return tt_score,
+                    NodeType::UpperBound if tt_score <= alpha => return tt_score,
                     _ => {}
                 }
             }
@@ -389,20 +405,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let can_futility_prune = !is_pv_node
             && !in_check
             && depth <= FUTILITY_MAX_DEPTH
-            && static_eval + FUTILITY_MARGIN[depth as usize] <= alpha;
+            && static_eval + futility_margin(depth) <= alpha;
 
         // ===== Generate and order moves =====
-        let mut moves = mem::take(&mut self.move_lists[ply]);
-        moves.clear();
-        movegen::legal(board, &mut moves);
+        let mut picker = MovePicker::new(board, &self.move_orderer, tt_move, ply);
 
-        if moves.is_empty() {
-            self.move_lists[ply] = moves;
+        if picker.is_empty() {
             return if in_check { mated_in(ply as u32) } else { 0 };
         }
-
-        self.move_orderer
-            .order_moves_with_see(&mut moves, tt_move, ply, board);
 
         // ===== Main move loop =====
         let mut best_score = NEG_MATE_SCORE;
@@ -411,8 +421,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         let mut moves_searched = 0;
 
-        for mv in moves.iter() {
-            if self.do_move(board, mv).is_err() {
+        while let Some(mv) = picker.next() {
+            if self.do_move(board, &mv).is_err() {
                 continue;
             }
 
@@ -422,7 +432,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let gives_check = board.is_in_check(board.side_to_move());
 
             if dominated && !gives_check {
-                self.undo_move(board, mv);
+                self.undo_move(board, &mv);
                 continue;
             }
 
@@ -430,7 +440,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             moves_searched += 1;
 
             if board.is_twofold_repetition() {
-                self.move_orderer.mark_repetition_move(mv);
+                self.move_orderer.mark_repetition_move(&mv);
             }
 
             let extension: u8 = if gives_check && ply < MAX_PLY - 10 {
@@ -495,14 +505,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 score = lmr_score;
             }
 
-            self.undo_move(board, mv);
+            self.undo_move(board, &mv);
 
             if score > best_score {
                 best_score = score;
-                best_move = Some(*mv);
+                best_move = Some(mv);
 
                 if ply < PV_COLLECTION_LIMIT {
-                    self.pv_table[ply][0] = *mv;
+                    self.pv_table[ply][0] = mv;
                     let child_len = self.pv_length[ply + 1].min(MAX_PV_LENGTH - ply - 2);
                     for i in 0..child_len {
                         self.pv_table[ply][i + 1] = self.pv_table[ply + 1][i];
@@ -513,24 +523,25 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             if score >= beta {
                 if !mv.is_capture() && !mv.is_promotion() {
-                    self.move_orderer.store_killer(*mv, ply);
-                    if let Some((piece, _)) = board.piece_at(mv.from_sq()) {
-                        self.move_orderer.update_history(*mv, piece, depth as usize);
+                    self.move_orderer.store_killer(mv, ply);
+                    if let Some((piece, side)) = board.piece_at(mv.from_sq()) {
+                        self.move_orderer
+                            .update_history(mv, piece, side, depth as usize);
                     }
                 }
 
-                let tt_score = TTEntry::score_to_tt(best_score, ply);
-                let entry = TTEntry::new(
-                    zobrist_key,
-                    best_move,
-                    tt_score,
-                    depth,
-                    NodeType::LowerBound,
-                    self.tt.generation(),
-                );
-                self.tt.store(entry);
+                if !self.aborted() {
+                    let tt_score = TTEntry::score_to_tt(best_score, ply);
+                    self.tt.store(TTEntry::new(
+                        zobrist_key,
+                        best_move,
+                        tt_score,
+                        depth,
+                        NodeType::LowerBound,
+                        self.tt.generation(),
+                    ));
+                }
 
-                self.move_lists[ply] = moves;
                 return best_score;
             }
 
@@ -541,18 +552,21 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
 
         // ===== Store in transposition table =====
-        let tt_score = TTEntry::score_to_tt(best_score, ply);
-        let entry = TTEntry::new(
-            zobrist_key,
-            best_move,
-            tt_score,
-            depth,
-            node_type,
-            self.tt.generation(),
-        );
-        self.tt.store(entry);
+        // An aborted search returns a fabricated 0 from wherever it stopped, so
+        // every score on the unwinding path is meaningless. Writing those as
+        // real bounds poisons the table for the next `go`.
+        if !self.aborted() {
+            let tt_score = TTEntry::score_to_tt(best_score, ply);
+            self.tt.store(TTEntry::new(
+                zobrist_key,
+                best_move,
+                tt_score,
+                depth,
+                node_type,
+                self.tt.generation(),
+            ));
+        }
 
-        self.move_lists[ply] = moves;
         best_score
     }
 
@@ -596,25 +610,14 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        let mut moves = Vec::with_capacity(if in_check { AVG_LEGAL_MOVES } else { 16 });
-        if in_check {
-            movegen::legal(board, &mut moves);
+        let mut picker =
+            MovePicker::quiescence(board, &self.move_orderer, ply, in_check, depth == 0);
 
-            if moves.is_empty() {
-                return mated_in(ply as u32);
-            }
-        } else {
-            movegen::captures(board, &mut moves);
-
-            if depth == 0 {
-                movegen::checks(board, &mut moves);
-            }
+        if in_check && picker.is_empty() {
+            return mated_in(ply as u32);
         }
 
-        self.move_orderer
-            .order_moves_with_see(&mut moves, None, ply, board);
-
-        for mv in moves {
+        while let Some(mv) = picker.next() {
             if self.do_move(board, &mv).is_err() {
                 continue;
             }
@@ -631,6 +634,13 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
 
         alpha
+    }
+
+    /// True once the search has been told to stop, by the caller or by its own
+    /// time/node limit. Scores produced after this point are not real.
+    #[inline(always)]
+    fn aborted(&self) -> bool {
+        self.stop_flag.load(Ordering::Relaxed)
     }
 
     #[inline]
@@ -774,7 +784,7 @@ mod tests {
 
         board.make_move(&best_move1).unwrap();
 
-        let mut opponent_moves = Vec::new();
+        let mut opponent_moves = MoveList::new();
         movegen::legal(&board, &mut opponent_moves);
         board.make_move(&opponent_moves[0]).unwrap();
 

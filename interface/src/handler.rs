@@ -7,7 +7,11 @@ use crate::uci::{
 use aether_core::{Color, Move};
 use board::Board;
 use engine::eval::score_to_mate_moves;
+use engine::search::SearchLimits;
 use engine::{DEFAULT_HASH_MB, Engine, MAX_HASH_MB, MIN_HASH_MB};
+
+/// Depth used for a `go` with no depth, node or time bound (and no `infinite`).
+const DEFAULT_GO_DEPTH: u8 = 8;
 
 /// Engine options
 #[derive(Debug, Clone)]
@@ -82,6 +86,7 @@ impl UciHandler {
             UciCommand::Quit => {}      // Handled in main loop
             UciCommand::Display => self.cmd_display(),
             UciCommand::Perft(depth) => self.cmd_perft(depth),
+            UciCommand::Bench(depth) => Self::cmd_bench(depth),
             UciCommand::Unknown(s) => {
                 if self.options.debug {
                     send_response(&UciResponse::Info(
@@ -206,21 +211,28 @@ impl UciHandler {
 
     fn cmd_go(&mut self, params: SearchParams) {
         let is_white = self.board.side_to_move() == Color::White;
-        let time_limit = params.calculate_move_time(is_white);
-        let hard_limit = params.calculate_hard_limit(is_white);
-        let depth_limit = params.depth;
-        let nodes_limit = params.nodes;
-        let infinite = params.infinite;
+
+        // Every limit the GUI supplied applies at once; the search stops at
+        // whichever fires first. `infinite` simply means no limits at all.
+        let mut limits = SearchLimits {
+            depth: params.depth,
+            nodes: params.nodes,
+            time: params.calculate_move_time(is_white),
+            hard_time: params.calculate_hard_limit(is_white),
+        };
+
+        // A bare `go` carries no bounds at all. Only honour that as "search
+        // forever" when the GUI actually asked for `go infinite` — otherwise fall
+        // back to a fixed depth, because the search runs on this thread and
+        // cannot observe a `stop` command until it returns.
+        if limits.is_unbounded() && !params.infinite {
+            limits.depth = Some(DEFAULT_GO_DEPTH);
+        }
 
         // Perform search with callback for UCI info
-        let result = self.engine.search(
-            &mut self.board,
-            depth_limit,
-            time_limit,
-            hard_limit,
-            nodes_limit,
-            infinite,
-            |info, best_move, score| {
+        let result = self
+            .engine
+            .search(&mut self.board, &limits, |info, best_move, score| {
                 // Send UCI info for each completed depth
                 if let Some(_mv) = best_move {
                     let pv: Vec<String> = info.pv.iter().map(Self::move_to_uci).collect();
@@ -239,8 +251,7 @@ impl UciHandler {
 
                     send_response(&UciResponse::Info(response));
                 }
-            },
-        );
+            });
 
         // Send best move
         let best_move_str = result
@@ -276,6 +287,20 @@ impl UciHandler {
 
         let legal_moves = self.engine.legal_moves(&self.board);
         println!("Legal moves: {}", legal_moves.len());
+    }
+
+    /// Fixed-workload benchmark. Prints the node count that serves as the
+    /// project's search-regression signal.
+    fn cmd_bench(depth: Option<u8>) {
+        let depth = depth.unwrap_or(engine::bench::DEFAULT_BENCH_DEPTH);
+        let result = engine::bench::run(depth);
+
+        println!();
+        println!("Positions: {}", result.positions);
+        println!("Depth: {}", result.depth);
+        println!("Nodes: {}", result.nodes);
+        println!("Time: {:?}", result.elapsed);
+        println!("NPS: {}", result.nps());
     }
 
     fn cmd_perft(&mut self, depth: u8) {

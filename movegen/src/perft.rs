@@ -6,6 +6,8 @@
 use crate::legal;
 use aether_core::Move;
 use board::Board;
+
+use crate::MoveList;
 use std::time::Duration;
 
 /// Number of leaf nodes at `depth`.
@@ -15,7 +17,7 @@ pub fn perft(board: &mut Board, depth: u32) -> u64 {
         return 1;
     }
 
-    let mut moves = Vec::new();
+    let mut moves = MoveList::new();
     legal(board, &mut moves);
 
     if depth == 1 {
@@ -23,10 +25,10 @@ pub fn perft(board: &mut Board, depth: u32) -> u64 {
     }
 
     let mut nodes = 0;
-    for mv in moves {
-        board.make_move(&mv).expect("legal move should not fail");
+    for mv in moves.iter() {
+        board.make_move(mv).expect("legal move should not fail");
         nodes += perft(board, depth - 1);
-        board.unmake_move(&mv).expect("unmake should not fail");
+        board.unmake_move(mv).expect("unmake should not fail");
     }
 
     nodes
@@ -39,15 +41,15 @@ pub(crate) fn perft_divide(board: &mut Board, depth: u32) -> Vec<(Move, u64)> {
         return Vec::new();
     }
 
-    let mut moves = Vec::new();
+    let mut moves = MoveList::new();
     legal(board, &mut moves);
 
     let mut results = Vec::with_capacity(moves.len());
-    for mv in moves {
-        board.make_move(&mv).expect("legal move should not fail");
+    for mv in moves.iter() {
+        board.make_move(mv).expect("legal move should not fail");
         let nodes = perft(board, depth - 1);
-        board.unmake_move(&mv).expect("unmake should not fail");
-        results.push((mv, nodes));
+        board.unmake_move(mv).expect("unmake should not fail");
+        results.push((*mv, nodes));
     }
 
     results

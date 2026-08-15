@@ -1,0 +1,5 @@
+[toolchain]
+# Pinned so local builds and CI agree. The workspace is edition 2024 and uses
+# let-chains, so the true minimum is 1.88; pin to a known-good stable above that.
+channel = "1.92"
+components = ["rustfmt", "clippy"]

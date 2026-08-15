@@ -1,5 +1,6 @@
 pub mod alpha_beta;
 mod move_ordering;
+mod move_picker;
 pub mod see;
 pub mod tt;
 
@@ -12,30 +13,25 @@ use std::time::Duration;
 pub(crate) const MAX_PLY: usize = 128;
 const MAX_PV_LENGTH: usize = MAX_PLY;
 
-#[derive(Debug, Clone)]
+/// Bounds on a search. **Every field applies simultaneously** — the search stops
+/// at whichever fires first. A field left `None` imposes no bound, so an
+/// all-`None` value means "search until told to stop".
+#[derive(Debug, Clone, Default)]
 pub struct SearchLimits {
+    /// Maximum iterative-deepening depth.
     pub depth: Option<u8>,
+    /// Maximum nodes to visit.
     pub nodes: Option<u64>,
+    /// Soft limit: do not *start* a new iteration past this.
     pub time: Option<Duration>,
+    /// Hard limit: abandon the search in progress past this.
     pub hard_time: Option<Duration>,
 }
 
-impl Default for SearchLimits {
-    fn default() -> Self {
-        Self {
-            depth: Some(3), // Default depth of 3
-            nodes: None,
-            time: None,
-            hard_time: None,
-        }
-    }
-}
-
 impl SearchLimits {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
+    /// Search to a fixed depth and nothing else. Used by `bench` and by tests,
+    /// where reproducibility matters more than wall-clock.
+    #[must_use]
     pub fn depth(depth: u8) -> Self {
         Self {
             depth: Some(depth),
@@ -43,42 +39,14 @@ impl SearchLimits {
         }
     }
 
-    pub fn nodes(nodes: u64) -> Self {
-        Self {
-            depth: None,
-            nodes: Some(nodes),
-            time: None,
-            hard_time: None,
-        }
-    }
-
-    pub fn time(time: Duration) -> Self {
-        Self {
-            depth: None,
-            nodes: None,
-            time: Some(time),
-            hard_time: None,
-        }
-    }
-
-    pub fn time_with_hard_limit(time: Duration, hard_time: Duration) -> Self {
-        Self {
-            depth: None,
-            nodes: None,
-            time: Some(time),
-            hard_time: Some(hard_time),
-        }
-    }
-
-    /// "Search forever": no clock or node cap, bounded only by the ply limit.
-    /// The caller stops it by setting the searcher's stop flag.
-    pub fn infinite() -> Self {
-        Self {
-            depth: Some(MAX_PLY as u8),
-            nodes: None,
-            time: None,
-            hard_time: None,
-        }
+    /// True when no bound at all is set, i.e. the search would only end when
+    /// the stop flag is raised.
+    #[must_use]
+    pub const fn is_unbounded(&self) -> bool {
+        self.depth.is_none()
+            && self.nodes.is_none()
+            && self.time.is_none()
+            && self.hard_time.is_none()
     }
 }
 

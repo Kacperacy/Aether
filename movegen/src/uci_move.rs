@@ -8,6 +8,8 @@
 use crate::legal;
 use aether_core::{Move, Piece, Square};
 use board::Board;
+
+use crate::MoveList;
 use std::str::FromStr;
 
 /// Resolve a UCI move string (`"e2e4"`, `"e7e8q"`) to the matching legal move.
@@ -26,11 +28,12 @@ pub fn parse_uci_move(board: &Board, move_str: &str) -> Option<Move> {
         None => None,
     };
 
-    let mut moves = Vec::new();
+    let mut moves = MoveList::new();
     legal(board, &mut moves);
 
     moves
-        .into_iter()
+        .iter()
+        .copied()
         .find(|m| m.from_sq() == from && m.to_sq() == to && m.promotion_piece() == promotion)
 }
 

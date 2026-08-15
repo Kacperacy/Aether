@@ -102,6 +102,8 @@ pub enum UciCommand {
     Quit,
     Display,
     Perft(u8),
+    /// Fixed-workload search benchmark; `None` uses the default depth.
+    Bench(Option<u8>),
     Unknown(String),
 }
 
@@ -129,6 +131,7 @@ pub fn parse_command(input: &str) -> UciCommand {
             let depth = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
             UciCommand::Perft(depth)
         }
+        Some("bench") => UciCommand::Bench(parts.next().and_then(|s| s.parse().ok())),
         _ => UciCommand::Unknown(input.to_string()),
     }
 }

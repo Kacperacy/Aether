@@ -1,3 +1,4 @@
+pub mod bench;
 pub mod eval;
 pub mod search;
 
@@ -9,7 +10,6 @@ use aether_core::Move;
 use board::Board;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::time::Duration;
 
 /// Default transposition-table size in MiB, and the UCI `Hash` option default.
 pub const DEFAULT_HASH_MB: usize = 16;
@@ -56,51 +56,26 @@ impl Engine {
     }
 
     #[must_use]
-    pub fn legal_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves = Vec::new();
+    pub fn legal_moves(&self, board: &Board) -> movegen::MoveList {
+        let mut moves = movegen::MoveList::new();
         movegen::legal(board, &mut moves);
         moves
     }
 
+    /// Search `board` under `limits`, reporting each completed iteration to
+    /// `on_info`.
+    ///
+    /// Every limit in [`SearchLimits`] applies simultaneously — the search stops
+    /// at whichever fires first. (This used to take the limits as loose
+    /// positional arguments and select just one of them, so `go depth 12` was
+    /// silently ignored whenever a clock was also present.)
     pub fn search(
         &mut self,
         board: &mut Board,
-        depth: Option<u8>,
-        time_limit: Option<Duration>,
-        hard_limit: Option<Duration>,
-        nodes: Option<u64>,
-        infinite: bool,
+        limits: &SearchLimits,
         on_info: impl FnMut(&SearchInfo, Option<Move>, Score),
     ) -> SearchResult {
-        let limits = self.create_search_limits(depth, time_limit, hard_limit, nodes, infinite);
-        self.searcher.search(board, &limits, on_info)
-    }
-
-    fn create_search_limits(
-        &self,
-        depth: Option<u8>,
-        time_limit: Option<Duration>,
-        hard_limit: Option<Duration>,
-        nodes: Option<u64>,
-        infinite: bool,
-    ) -> SearchLimits {
-        if infinite {
-            return SearchLimits::infinite();
-        }
-
-        if let Some(n) = nodes {
-            return SearchLimits::nodes(n);
-        }
-
-        if let (Some(soft), Some(hard)) = (time_limit, hard_limit) {
-            SearchLimits::time_with_hard_limit(soft, hard)
-        } else if let Some(t) = time_limit {
-            SearchLimits::time(t)
-        } else if let Some(d) = depth {
-            SearchLimits::depth(d)
-        } else {
-            SearchLimits::default()
-        }
+        self.searcher.search(board, limits, on_info)
     }
 }
 
@@ -128,7 +103,7 @@ mod tests {
         let mut engine = Engine::new(16);
         let mut board = Board::starting_position().unwrap();
 
-        let result = engine.search(&mut board, Some(3), None, None, None, false, |_, _, _| {});
+        let result = engine.search(&mut board, &SearchLimits::depth(3), |_, _, _| {});
 
         assert!(result.best_move.is_some());
         assert!(!result.pv().is_empty());
@@ -149,7 +124,7 @@ mod tests {
         let mut engine = Engine::new(16);
         let mut board = Board::starting_position().unwrap();
 
-        engine.search(&mut board, Some(6), None, None, None, false, |_, _, _| {});
+        engine.search(&mut board, &SearchLimits::depth(6), |_, _, _| {});
         assert!(engine.hashfull() > 0);
 
         engine.new_game();

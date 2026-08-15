@@ -1,16 +1,50 @@
 use crate::eval::material;
 use crate::search::MAX_PLY;
 use crate::search::see::see_value;
-use aether_core::{Move, Piece, Square};
+use aether_core::{Color, Move, Piece, Square};
 use board::Board;
 
-const REPETITION_PENALTY: i32 = -5000;
+// Move ordering uses one flat score space divided into bands. The ordering
+// between bands is the whole point, so the constants are coupled: a change to
+// one must respect the others. From best to worst:
+//
+//   TT move          20_000
+//   good capture     10_000 + MVV/LVA        (can reach ~19_000)
+//   promotion         9_000 + piece value
+//   killer 1          8_500
+//   killer 2          8_000
+//   history           0 ..= MAX_HISTORY      <-- must stay below the killers
+//   bad capture      -2_000 + SEE
+//   repetition       -5_000
+const TT_MOVE_SCORE: i32 = 20_000;
 const GOOD_CAPTURE_SCORE: i32 = 10_000;
+const PROMOTION_SCORE: i32 = 9_000;
+const KILLER_FIRST_SCORE: i32 = 8_500;
+const KILLER_SECOND_SCORE: i32 = 8_000;
 const BAD_CAPTURE_SCORE: i32 = -2_000;
+const REPETITION_PENALTY: i32 = -5_000;
+
+/// Ceiling for a history entry; the gravity update asymptotes here.
+///
+/// Must stay strictly below [`KILLER_SECOND_SCORE`]: a quiet move that merely
+/// has good history must never be searched before a killer or a winning
+/// capture. Raising this above the killer band inverts move ordering and costs
+/// a large amount of strength.
+const MAX_HISTORY: i32 = 7_000;
+/// Largest single increment, so one deep cutoff cannot saturate an entry.
+const MAX_HISTORY_BONUS: i32 = 512;
+
+const _: () = assert!(
+    MAX_HISTORY < KILLER_SECOND_SCORE,
+    "history must be ordered below killer moves"
+);
 
 pub struct MoveOrderer {
     killers: [[Option<Move>; 2]; MAX_PLY],
-    history: [[i32; 64]; 6],
+    /// `[side][piece][to]`. The side dimension matters: without it White's and
+    /// Black's histories overwrite each other, so a quiet move that is good for
+    /// one side suppresses the same from→to for the other.
+    history: [[[i32; Square::NUM]; Piece::NUM]; Color::NUM],
     repetition_moves: [bool; 64 * 64],
 }
 
@@ -18,14 +52,14 @@ impl MoveOrderer {
     pub fn new() -> Self {
         Self {
             killers: [[None; 2]; MAX_PLY],
-            history: [[0; 64]; 6],
+            history: [[[0; Square::NUM]; Piece::NUM]; Color::NUM],
             repetition_moves: [false; 64 * 64],
         }
     }
 
     pub fn clear(&mut self) {
         self.killers = [[None; 2]; MAX_PLY];
-        self.history = [[0; 64]; 6];
+        self.history = [[[0; Square::NUM]; Piece::NUM]; Color::NUM];
         self.repetition_moves = [false; 64 * 64];
     }
 
@@ -45,34 +79,29 @@ impl MoveOrderer {
         self.repetition_moves[idx]
     }
 
-    pub fn update_history(&mut self, mv: Move, piece: Piece, depth: usize) {
+    /// Reward a quiet move that caused a beta cutoff.
+    ///
+    /// Uses the standard gravity update: the increment shrinks as the entry
+    /// approaches [`MAX_HISTORY`], so values are self-limiting and never need an
+    /// ad-hoc "halve everything when it gets big" pass, which discarded relative
+    /// ordering across the whole table.
+    pub fn update_history(&mut self, mv: Move, piece: Piece, side: Color, depth: usize) {
         if mv.is_capture() {
             return;
         }
 
-        let bonus = depth as i32 * depth as i32;
-        let idx = mv.to_sq().to_index() as usize;
-        self.history[piece as usize][idx] += bonus;
-
-        if self.history[piece as usize][idx] > 8_000 {
-            self.age_history();
-        }
-    }
-
-    fn age_history(&mut self) {
-        for piece in 0..Piece::NUM {
-            for sq in 0..Square::NUM {
-                self.history[piece][sq] /= 2;
-            }
-        }
+        let bonus = ((depth * depth) as i32).min(MAX_HISTORY_BONUS);
+        let entry =
+            &mut self.history[side as usize][piece as usize][mv.to_sq().to_index() as usize];
+        *entry += bonus - *entry * bonus / MAX_HISTORY;
     }
 
     #[inline(always)]
-    fn history_score(&self, mv: &Move, piece: Piece) -> i32 {
+    fn history_score(&self, mv: &Move, piece: Piece, side: Color) -> i32 {
         if mv.is_capture() {
             return 0;
         }
-        self.history[piece as usize][mv.to_sq().to_index() as usize]
+        self.history[side as usize][piece as usize][mv.to_sq().to_index() as usize]
     }
 
     #[inline]
@@ -93,15 +122,24 @@ impl MoveOrderer {
             return None;
         }
         if self.killers[ply][0] == Some(*mv) {
-            Some(8_500)
+            Some(KILLER_FIRST_SCORE)
         } else if self.killers[ply][1] == Some(*mv) {
-            Some(8_000)
+            Some(KILLER_SECOND_SCORE)
         } else {
             None
         }
     }
 
-    pub fn order_moves_with_see(
+    /// Eagerly sort every move — the old ordering path, kept as the oracle that
+    /// [`crate::search::move_picker::MovePicker`] is tested against.
+    ///
+    /// The search no longer calls this: sorting a whole list at a node that
+    /// usually cuts off on move one or two is wasted work, and
+    /// `sort_by_cached_key` heap-allocates to do it. The picker selects lazily
+    /// instead. Its correctness claim is precisely "same order as this
+    /// function", so this is the definition that claim is checked against.
+    #[cfg(test)]
+    pub(crate) fn order_moves_with_see(
         &self,
         moves: &mut [Move],
         tt_move: Option<Move>,
@@ -114,7 +152,7 @@ impl MoveOrderer {
     }
 
     #[inline(always)]
-    fn move_score_with_see(
+    pub(crate) fn move_score_with_see(
         &self,
         mv: &Move,
         tt_move: Option<Move>,
@@ -123,7 +161,7 @@ impl MoveOrderer {
     ) -> i32 {
         let side = board.side_to_move();
         if Some(*mv) == tt_move {
-            return 20_000;
+            return TT_MOVE_SCORE;
         }
 
         let moving_piece = board.piece_at(mv.from_sq()).map(|(p, _)| p);
@@ -154,7 +192,7 @@ impl MoveOrderer {
         }
 
         if let Some(promo) = mv.promotion_piece() {
-            return 9_000 + material::value(promo);
+            return PROMOTION_SCORE + material::value(promo);
         }
 
         if let Some(killer_score) = self.killer_score(mv, ply) {
@@ -165,7 +203,9 @@ impl MoveOrderer {
             return REPETITION_PENALTY;
         }
 
-        moving_piece.map(|p| self.history_score(mv, p)).unwrap_or(0)
+        moving_piece
+            .map(|p| self.history_score(mv, p, side))
+            .unwrap_or(0)
     }
 }
 

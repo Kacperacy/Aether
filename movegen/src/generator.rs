@@ -5,6 +5,8 @@ use attacks::{
 };
 use board::Board;
 
+use crate::MoveList;
+
 #[inline]
 fn occupancies(board: &Board, side: Color) -> (BitBoard, BitBoard, BitBoard) {
     let own = board.occupied_by(side);
@@ -20,12 +22,7 @@ fn promo_flag(piece: Piece, is_capture: bool) -> u16 {
 }
 
 #[inline]
-fn generate_piece_moves(
-    from: Square,
-    targets: BitBoard,
-    occupied: BitBoard,
-    moves: &mut Vec<Move>,
-) {
+fn generate_piece_moves(from: Square, targets: BitBoard, occupied: BitBoard, moves: &mut MoveList) {
     for to in targets.iter() {
         let flags = if occupied.contains(to) {
             Move::CAPTURE
@@ -42,7 +39,7 @@ fn generate_pawn_moves(
     side: Color,
     occupied: BitBoard,
     opponent_pieces: BitBoard,
-    moves: &mut Vec<Move>,
+    moves: &mut MoveList,
 ) {
     let push_targets = pawn_moves(from, side, occupied);
     for to in push_targets.iter() {
@@ -87,7 +84,7 @@ fn generate_knight_moves(
     from: Square,
     occupied: BitBoard,
     own_pieces: BitBoard,
-    moves: &mut Vec<Move>,
+    moves: &mut MoveList,
 ) {
     let targets = knight_attacks(from) & !own_pieces;
     generate_piece_moves(from, targets, occupied, moves);
@@ -98,7 +95,7 @@ fn generate_slider_moves(
     piece: Piece,
     occupied: BitBoard,
     own_pieces: BitBoard,
-    moves: &mut Vec<Move>,
+    moves: &mut MoveList,
 ) {
     let attacks = match piece {
         Piece::Bishop => bishop_attacks(from, occupied),
@@ -115,7 +112,7 @@ fn generate_king_moves(
     from: Square,
     occupied: BitBoard,
     own_pieces: BitBoard,
-    moves: &mut Vec<Move>,
+    moves: &mut MoveList,
 ) {
     let targets = king_attacks(from) & !own_pieces;
     generate_piece_moves(from, targets, occupied, moves);
@@ -125,7 +122,7 @@ fn generate_king_moves(
     }
 }
 
-fn generate_castling_moves(board: &Board, king_square: Square, side: Color, moves: &mut Vec<Move>) {
+fn generate_castling_moves(board: &Board, king_square: Square, side: Color, moves: &mut MoveList) {
     if board.can_castle_short(side) {
         try_castle(
             board,
@@ -156,7 +153,7 @@ fn try_castle(
     side: Color,
     path: CastlingPath,
     flag: u16,
-    moves: &mut Vec<Move>,
+    moves: &mut MoveList,
 ) {
     if king_square != path.king_from {
         return;
@@ -174,9 +171,8 @@ fn try_castle(
     }
 }
 
-pub(crate) fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
+pub(crate) fn pseudo_legal(board: &Board, moves: &mut MoveList) {
     moves.clear();
-    moves.reserve(256);
 
     let side = board.side_to_move();
     let (occupied, own_pieces, opponent_pieces) = occupancies(board, side);
@@ -197,17 +193,48 @@ pub(crate) fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
     }
 }
 
-pub fn legal(board: &Board, moves: &mut Vec<Move>) {
+pub fn legal(board: &Board, moves: &mut MoveList) {
     pseudo_legal(board, moves);
-    moves.retain(|mv| !crate::legality::would_leave_king_in_check(board, mv));
+    moves.retain(|mv| !crate::legality::would_leave_king_in_check(board, &mv));
 }
 
-pub fn captures(board: &Board, moves: &mut Vec<Move>) {
+/// Legal captures and en-passant captures.
+///
+/// Legality is not optional here: quiescence consumes this directly, and
+/// `Board::make_move` does not validate moves, so an unfiltered pseudo-legal
+/// capture would let a pinned piece move — and let the reply capture the king.
+pub fn captures(board: &Board, moves: &mut MoveList) {
     pseudo_legal(board, moves);
-    moves.retain(|m| m.is_capture() || m.is_en_passant());
+    moves.retain(|m| {
+        (m.is_capture() || m.is_en_passant())
+            && !crate::legality::would_leave_king_in_check(board, &m)
+    });
 }
 
-pub fn checks(board: &Board, moves: &mut Vec<Move>) {
+/// Legal non-capturing moves — the exact complement of [`captures`].
+///
+/// `captures` and `quiets` partition [`legal`]: every legal move satisfies
+/// exactly one of them, so a staged consumer that takes both yields the full
+/// legal set once each, with no duplicates and nothing missed. Quiet promotions
+/// belong here, since they capture nothing.
+pub fn quiets(board: &Board, moves: &mut MoveList) {
+    pseudo_legal(board, moves);
+    moves.retain(|m| {
+        if m.is_capture() || m.is_en_passant() {
+            return false;
+        }
+        !crate::legality::would_leave_king_in_check(board, &m)
+    });
+}
+
+/// Appends legal *quiet* moves that give direct check.
+///
+/// Deliberately partial: it covers direct checks by knights and sliders only —
+/// no pawn checks, no discovered checks, no castling checks. That is a
+/// completeness gap, not a correctness one; every move it does emit is legal.
+/// Appends rather than clears, so it can extend a capture list.
+pub fn checks(board: &Board, moves: &mut MoveList) {
+    let first_appended = moves.len();
     let side = board.side_to_move();
     let opponent = side.opponent();
     let king_sq = board.get_king_square(opponent);
@@ -252,6 +279,19 @@ pub fn checks(board: &Board, moves: &mut Vec<Move>) {
             moves.push(Move::new(from, to, Move::QUIET));
         }
     }
+
+    // Only the moves this function appended need filtering; anything already in
+    // the list came from `captures`, which is legal by construction.
+    let mut i = first_appended;
+    while i < moves.len() {
+        if crate::legality::would_leave_king_in_check(board, &moves[i]) {
+            let last = moves.len() - 1;
+            moves.swap(i, last);
+            moves.truncate(last);
+        } else {
+            i += 1;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -261,7 +301,7 @@ mod tests {
     #[test]
     fn test_legal_moves_starting_position() {
         let board = Board::starting_position().unwrap();
-        let mut moves = Vec::new();
+        let mut moves = MoveList::new();
 
         legal(&board, &mut moves);
 

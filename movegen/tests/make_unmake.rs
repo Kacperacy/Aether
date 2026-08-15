@@ -7,12 +7,12 @@ fn test_make_unmake_symmetry_starting_position() {
     let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash_raw();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
 
-    for mv in moves {
-        board.make_move(&mv).unwrap();
-        board.unmake_move(&mv).unwrap();
+    for mv in moves.iter() {
+        board.make_move(mv).unwrap();
+        board.unmake_move(mv).unwrap();
 
         assert_eq!(
             board.to_string(),
@@ -38,12 +38,12 @@ fn test_make_unmake_complex_position() {
     let original_fen = board.to_string();
     let original_zobrist = board.zobrist_hash_raw();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
 
-    for mv in moves {
-        board.make_move(&mv).unwrap();
-        board.unmake_move(&mv).unwrap();
+    for mv in moves.iter() {
+        board.make_move(mv).unwrap();
+        board.unmake_move(mv).unwrap();
 
         assert_eq!(board.to_string(), original_fen);
         assert_eq!(board.zobrist_hash_raw(), original_zobrist);
@@ -57,7 +57,7 @@ fn test_make_unmake_castling() {
         .unwrap();
     let original_fen = board.to_string();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
 
     let castle_move = moves
@@ -78,7 +78,7 @@ fn test_make_unmake_en_passant() {
         .unwrap();
     let original_fen = board.to_string();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
 
     let ep_move = moves
@@ -97,7 +97,7 @@ fn test_make_unmake_promotion() {
     let mut board: Board = "7k/P7/8/8/8/8/7p/K7 w - - 0 1".parse().unwrap();
     let original_fen = board.to_string();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
 
     let promo_move = moves
@@ -170,7 +170,7 @@ fn test_long_game_then_search_respects_unmake_stack() {
     let fen_before = board.to_string();
     let zobrist_before = board.zobrist_hash_raw();
 
-    let mut moves = Vec::new();
+    let mut moves = movegen::MoveList::new();
     movegen::legal(&board, &mut moves);
     assert!(!moves.is_empty());
 

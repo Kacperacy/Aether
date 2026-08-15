@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["Kacper Maciołek"]
 repository = "https://github.com/Kacperacy/Aether"
 edition = "2024"
+rust-version = "1.88"
 
 [dependencies]
+engine = { workspace = true }
 interface = { workspace = true }
 
 [workspace]
@@ -48,6 +50,11 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = "line-tables-only"
 
 [profile.release-native]
 inherits = "release"

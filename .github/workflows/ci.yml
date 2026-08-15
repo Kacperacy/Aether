@@ -2,30 +2,64 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  check:
+    name: Format, lint, docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Format check
         run: cargo fmt --all -- --check
 
-      #      - name: Clippy
-      #        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run tests
-        run: cargo test --all
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Check documentation
         run: cargo doc --no-deps --all-features
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Unit and integration tests
+        run: cargo test --workspace
+
+      - name: Tests (release)
+        run: cargo test --workspace --release
+
+  regression:
+    name: Perft and bench regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Deep perft
+        run: cargo test -p movegen --test perft_deep --release -- --ignored --nocapture
+
+      # The bench node count is deterministic. It must match the value recorded
+      # in docs/benchmarks.md; a mismatch means search behaviour changed.
+      - name: Bench node count
+        run: |
+          cargo build --release --bin aether
+          # Portable extraction (BSD grep has no -P, so this also works locally).
+          EXPECTED=$(awk -F'|' '/^\| *bench nodes *\|/ {gsub(/[^0-9]/,"",$3); print $3; exit}' docs/benchmarks.md)
+          ACTUAL=$(./target/release/aether bench | awk '/^Nodes:/ {print $2; exit}')
+          echo "expected=$EXPECTED actual=$ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::bench node count changed: $EXPECTED -> $ACTUAL."
+            echo "If intentional, update docs/benchmarks.md in the same commit."
+            exit 1
+          fi

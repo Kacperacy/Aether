@@ -15,3 +15,10 @@ target/
 .idea/
 .vscode/
 .DS_Store
+
+# fastchess drops its resolved config next to the working directory on every
+# run (scripts/match.sh, scripts/sprt.sh), along with match logs and PGNs.
+config.json
+*.pgn
+scripts/*.log
+docs/
