@@ -6,7 +6,7 @@ mod legality;
 mod perft;
 mod uci_move;
 
-pub use generator::{captures, checks, legal, pseudo_legal, quiet_moves};
-pub use legality::would_leave_king_in_check;
-pub use perft::{PerftReport, perft, perft_divide, perft_report};
+pub use generator::{captures, checks, legal};
+
+pub use perft::{PerftReport, perft, perft_report};
 pub use uci_move::parse_uci_move;

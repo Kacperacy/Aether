@@ -9,130 +9,6 @@ use attacks::{bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_a
 use board::Board;
 
 #[inline]
-pub fn see_ge(board: &Board, mv: &Move, threshold: Score) -> bool {
-    let side = board.side_to_move();
-    let pieces = board.pieces();
-    let from = mv.from_sq();
-    let to = mv.to_sq();
-
-    let target_value = if mv.is_en_passant() {
-        material::PAWN_VALUE
-    } else if mv.is_capture() {
-        match board.piece_at(to) {
-            Some((piece, c)) if c != side => material::value(piece),
-            _ => return threshold <= 0,
-        }
-    } else {
-        return threshold <= 0;
-    };
-
-    let (promotion_gain, attacker_value) = match mv.promotion_piece() {
-        Some(promo_piece) => {
-            let promo_value = material::value(promo_piece);
-            (promo_value - material::PAWN_VALUE, promo_value)
-        }
-        None => {
-            let (moving_piece, _) = board.piece_at(from).expect("SEE: no piece at from-square");
-            (0, material::value(moving_piece))
-        }
-    };
-
-    let mut swap = target_value + promotion_gain - threshold;
-    if swap < 0 {
-        return false;
-    }
-
-    swap = attacker_value - swap;
-    if swap <= 0 {
-        return true;
-    }
-
-    let mut occ = board.occupied() ^ from.bitboard() ^ to.bitboard();
-    let mut attackers = all_attackers_to_square(to, occ, pieces);
-    attackers &= occ;
-
-    let mut stm = side.opponent();
-    let mut result = 1i32;
-
-    loop {
-        let stm_attackers = attackers & board.occupied_by(stm);
-
-        if stm_attackers.is_empty() {
-            break;
-        }
-
-        result ^= 1;
-
-        let pawn_attackers = stm_attackers & pieces[stm as usize][Piece::Pawn as usize];
-        if !pawn_attackers.is_empty() {
-            swap = material::PAWN_VALUE - swap;
-            if swap < result as Score {
-                break;
-            }
-            occ ^= pawn_attackers.lsb().bitboard();
-            attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
-            attackers &= occ;
-            stm = stm.opponent();
-            continue;
-        }
-
-        let knight_attackers = stm_attackers & pieces[stm as usize][Piece::Knight as usize];
-        if !knight_attackers.is_empty() {
-            swap = material::KNIGHT_VALUE - swap;
-            if swap < result as Score {
-                break;
-            }
-            occ ^= knight_attackers.lsb().bitboard();
-            attackers &= occ;
-            stm = stm.opponent();
-            continue;
-        }
-
-        let bishop_attackers = stm_attackers & pieces[stm as usize][Piece::Bishop as usize];
-        if !bishop_attackers.is_empty() {
-            swap = material::BISHOP_VALUE - swap;
-            if swap < result as Score {
-                break;
-            }
-            occ ^= bishop_attackers.lsb().bitboard();
-            attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
-            attackers &= occ;
-            stm = stm.opponent();
-            continue;
-        }
-
-        let rook_attackers = stm_attackers & pieces[stm as usize][Piece::Rook as usize];
-        if !rook_attackers.is_empty() {
-            swap = material::ROOK_VALUE - swap;
-            if swap < result as Score {
-                break;
-            }
-            occ ^= rook_attackers.lsb().bitboard();
-            attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
-            attackers &= occ;
-            stm = stm.opponent();
-            continue;
-        }
-
-        let queen_attackers = stm_attackers & pieces[stm as usize][Piece::Queen as usize];
-        if !queen_attackers.is_empty() {
-            swap = material::QUEEN_VALUE - swap;
-            occ ^= queen_attackers.lsb().bitboard();
-            attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
-            attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
-            attackers &= occ;
-            stm = stm.opponent();
-            continue;
-        }
-
-        let opponent_attackers = attackers & board.occupied_by(stm.opponent());
-        return opponent_attackers.is_empty() != (result != 0);
-    }
-
-    result != 0
-}
-
-#[inline]
 pub fn see_value(board: &Board, mv: &Move) -> Score {
     let side = board.side_to_move();
     let pieces = board.pieces();
@@ -289,11 +165,7 @@ mod tests {
     use super::*;
     use crate::eval::material::{BISHOP_VALUE, KNIGHT_VALUE, PAWN_VALUE, QUEEN_VALUE, ROOK_VALUE};
 
-    /// Positions carry distant kings so they are legal boards; the kings never
-    /// participate in the exchanges under test.
-    fn pos(fen: &str) -> Board {
-        fen.parse().expect("valid FEN")
-    }
+    use crate::search::test_support::pos;
 
     fn capture(from: Square, to: Square) -> Move {
         Move::new(from, to, Move::CAPTURE)
@@ -304,9 +176,6 @@ mod tests {
         let b = pos("7k/8/8/3p4/4P3/8/8/K7 w - - 0 1");
         let mv = capture(Square::E4, Square::D5);
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(see_ge(&b, &mv, PAWN_VALUE));
-        assert!(!see_ge(&b, &mv, PAWN_VALUE + 1));
         assert_eq!(see_value(&b, &mv), PAWN_VALUE);
     }
 
@@ -315,8 +184,6 @@ mod tests {
         let b = pos("7k/8/2p5/3p4/4P3/8/8/K7 w - - 0 1");
         let mv = capture(Square::E4, Square::D5);
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(!see_ge(&b, &mv, 1));
         assert_eq!(see_value(&b, &mv), 0);
     }
 
@@ -325,8 +192,6 @@ mod tests {
         let b = pos("7k/8/4p3/3p4/8/8/8/K2Q4 w - - 0 1");
         let mv = capture(Square::D1, Square::D5);
 
-        assert!(!see_ge(&b, &mv, 0));
-        assert!(see_ge(&b, &mv, PAWN_VALUE - QUEEN_VALUE));
         assert_eq!(see_value(&b, &mv), PAWN_VALUE - QUEEN_VALUE);
     }
 
@@ -336,9 +201,6 @@ mod tests {
         let mv = capture(Square::F3, Square::E5);
         let expected = ROOK_VALUE - KNIGHT_VALUE;
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(see_ge(&b, &mv, expected));
-        assert!(!see_ge(&b, &mv, expected + 1));
         assert_eq!(see_value(&b, &mv), expected);
     }
 
@@ -348,8 +210,6 @@ mod tests {
         let b = pos("3q3k/8/8/8/3R4/8/8/K2R4 w - - 0 1");
         let mv = capture(Square::D4, Square::D8);
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(see_ge(&b, &mv, QUEEN_VALUE));
         assert_eq!(see_value(&b, &mv), QUEEN_VALUE);
     }
 
@@ -358,7 +218,6 @@ mod tests {
         let b = pos("7k/8/8/8/R2Rb3/8/8/K7 w - - 0 1");
         let mv = capture(Square::D4, Square::E4);
 
-        assert!(see_ge(&b, &mv, 0));
         assert_eq!(see_value(&b, &mv), BISHOP_VALUE);
     }
 
@@ -368,7 +227,6 @@ mod tests {
         let mv = capture(Square::C3, Square::E4);
 
         // NxB then QxN nets the bishop-knight difference.
-        assert!(see_ge(&b, &mv, 0));
         assert_eq!(see_value(&b, &mv), BISHOP_VALUE - KNIGHT_VALUE);
     }
 
@@ -377,8 +235,6 @@ mod tests {
         let b = pos("7k/8/8/8/4n3/2N5/8/K7 w - - 0 1");
         let mv = capture(Square::C3, Square::E4);
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(see_ge(&b, &mv, KNIGHT_VALUE));
         assert_eq!(see_value(&b, &mv), KNIGHT_VALUE);
     }
 
@@ -387,8 +243,6 @@ mod tests {
         let b = pos("7k/8/8/6n1/4n3/2N5/8/K7 w - - 0 1");
         let mv = capture(Square::C3, Square::E4);
 
-        assert!(see_ge(&b, &mv, 0));
-        assert!(!see_ge(&b, &mv, 1));
         assert_eq!(see_value(&b, &mv), 0);
     }
 
@@ -398,7 +252,5 @@ mod tests {
         let quiet = Move::new(Square::C3, Square::E4, Move::QUIET);
 
         assert_eq!(see_value(&b, &quiet), 0);
-        assert!(see_ge(&b, &quiet, 0));
-        assert!(!see_ge(&b, &quiet, 1));
     }
 }

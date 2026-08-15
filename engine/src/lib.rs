@@ -35,6 +35,7 @@ impl Engine {
         self.searcher.stop_flag()
     }
 
+    /// Ask an in-flight search to stop at its next check point.
     pub fn stop(&mut self) {
         self.searcher.stop();
     }
@@ -48,6 +49,7 @@ impl Engine {
         self.searcher.resize_tt(size_mb);
     }
 
+    /// Transposition-table occupancy in permille — the only view into TT state.
     #[must_use]
     pub fn hashfull(&self) -> u16 {
         self.searcher.hashfull()
@@ -102,12 +104,6 @@ impl Engine {
     }
 }
 
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new(DEFAULT_HASH_MB)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,7 +131,7 @@ mod tests {
         let result = engine.search(&mut board, Some(3), None, None, None, false, |_, _, _| {});
 
         assert!(result.best_move.is_some());
-        assert!(!result.pv.is_empty());
+        assert!(!result.pv().is_empty());
         assert!(result.info.nodes > 0);
     }
 

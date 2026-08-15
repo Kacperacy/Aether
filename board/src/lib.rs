@@ -9,16 +9,23 @@ mod zobrist;
 mod zobrist_keys;
 
 pub use builder::BoardBuilder;
-pub use error::{BoardError, FenError, MoveError};
+pub use error::{BoardError, FenError};
 pub use fen::STARTING_POSITION_FEN;
 
 use aether_core::{BitBoard, Color, File, Piece, Rank, Square};
 use cache::BoardCache;
 use state_info::StateInfo;
-use std::num::NonZeroU64;
 
 pub type Result<T> = std::result::Result<T, BoardError>;
 
+/// Capacity of the unmake stack, in plies.
+///
+/// `state_history` is indexed `history_index % MAX_SEARCH_DEPTH`, so the
+/// invariant is that no more than this many moves are *live* (made but not yet
+/// unmade) at once. Search is bounded well under this, but a replayed game is
+/// not — moves committed by `position ... moves ...` are never unmade, so
+/// [`Board::commit_history`] drops them from the stack rather than letting them
+/// consume (and eventually wrap) it.
 const MAX_SEARCH_DEPTH: usize = 256;
 const ZOBRIST_HISTORY_CAPACITY: usize = 512;
 const FIFTY_MOVE_THRESHOLD: u16 = 100;
@@ -40,59 +47,19 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn empty() -> Self {
-        Self {
-            pieces: [[BitBoard::EMPTY; Piece::NUM]; Color::NUM],
-            mailbox: [None; Square::NUM],
-            cache: BoardCache::new(),
-            side_to_move: Color::White,
-            fullmove_number: 1,
-            state: StateInfo::new(),
-            state_history: [StateInfo::default(); MAX_SEARCH_DEPTH],
-            history_index: 0,
-            zobrist_history: Vec::with_capacity(ZOBRIST_HISTORY_CAPACITY),
-        }
-    }
-
     pub fn starting_position() -> Result<Self> {
         BoardBuilder::starting_position().build()
     }
 
+    /// Mark every move played so far as permanent, emptying the unmake stack.
+    ///
+    /// Call this once a position is fully set up (e.g. after replaying a game's
+    /// moves) — those moves will never be unmade, so keeping them on the stack
+    /// only eats into the depth available to search. Repetition detection is
+    /// unaffected: it reads `zobrist_history`, which this leaves intact.
     #[inline]
-    pub fn zobrist_hash(&self) -> Option<NonZeroU64> {
-        NonZeroU64::new(self.state.zobrist_hash)
-    }
-
-    #[inline]
-    pub fn ply(&self) -> usize {
-        self.zobrist_history.len()
-    }
-
-    #[inline]
-    pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
-        attacks::attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
-    }
-
-    pub fn repetition_count(&self) -> usize {
-        let history_len = self.zobrist_history.len();
-
-        if history_len == 0 {
-            return 0;
-        }
-
-        let mut count = 0;
-        let look_back = (self.state.halfmove_clock as usize).min(history_len);
-        let min_idx = history_len - look_back;
-
-        let same_side_parity = history_len % 2;
-
-        for i in min_idx..history_len {
-            if i % 2 == same_side_parity && self.zobrist_history[i] == self.state.zobrist_hash {
-                count += 1;
-            }
-        }
-
-        count
+    pub fn commit_history(&mut self) {
+        self.history_index = 0;
     }
 
     pub fn as_ascii(&self) -> String {
@@ -356,7 +323,7 @@ mod tests {
             Move::new(Square::F6, Square::G8, Move::QUIET),
         ];
 
-        // Make 200 moves (50 cycles) - more than MAX_SEARCH_DEPTH
+        // 200 plies of make/unmake churn through the ring buffer.
         for _ in 0..50 {
             for mv in &move_sequence {
                 board.make_move(mv).unwrap();

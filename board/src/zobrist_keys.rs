@@ -61,12 +61,6 @@ impl ZobristKeys {
     }
 }
 
-impl Default for ZobristKeys {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 use std::sync::OnceLock;
 
 static ZOBRIST_KEYS: OnceLock<ZobristKeys> = OnceLock::new();

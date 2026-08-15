@@ -18,17 +18,6 @@ impl File {
     pub const G: File = File(6);
     pub const H: File = File(7);
 
-    pub const ALL: [Self; Self::NUM] = [
-        Self::A,
-        Self::B,
-        Self::C,
-        Self::D,
-        Self::E,
-        Self::F,
-        Self::G,
-        Self::H,
-    ];
-
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
         debug_assert!(index >= 0 && index < 8, "File index out of bounds");
@@ -55,26 +44,8 @@ impl File {
     }
 
     #[inline(always)]
-    pub const fn flip(self) -> Self {
-        Self(7 - self.0)
-    }
-
-    #[inline(always)]
     pub const fn bitboard(self) -> BitBoard {
         BitBoard::new(0x0101010101010101_u64 << self.0)
-    }
-
-    #[inline(always)]
-    pub const fn adjacent(self) -> BitBoard {
-        let bb = self.bitboard().value();
-        let mut adj = 0;
-        if self.0 > 0 {
-            adj |= bb >> 1;
-        }
-        if self.0 < 7 {
-            adj |= bb << 1;
-        }
-        BitBoard::new(adj)
     }
 }
 
@@ -143,27 +114,9 @@ mod test {
     }
 
     #[test]
-    fn test_flip() {
-        assert_eq!(File::A.flip(), File::H);
-        assert_eq!(File::B.flip(), File::G);
-        assert_eq!(File::C.flip(), File::F);
-        assert_eq!(File::D.flip(), File::E);
-    }
-
-    #[test]
     fn test_bitboard() {
         assert_eq!(File::A.bitboard().value(), 0x0101010101010101);
         assert_eq!(File::B.bitboard().value(), 0x0202020202020202);
         assert_eq!(File::H.bitboard().value(), 0x8080808080808080);
-    }
-
-    #[test]
-    fn test_adjacent() {
-        assert_eq!(File::A.adjacent().value(), File::B.bitboard().value());
-
-        let expected_b_adj = (File::A.bitboard() | File::C.bitboard()).value();
-        assert_eq!(File::B.adjacent().value(), expected_b_adj);
-
-        assert_eq!(File::H.adjacent().value(), File::G.bitboard().value());
     }
 }

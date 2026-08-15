@@ -27,8 +27,5 @@ jobs:
       - name: Run tests
         run: cargo test --all
 
-      - name: Run benchmarks
-        run: cargo bench --features bench
-
       - name: Check documentation
         run: cargo doc --no-deps --all-features

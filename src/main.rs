@@ -15,7 +15,7 @@ fn print_usage() {
     println!("  aether --version    Show version information");
     println!();
     println!("Development commands:");
-    println!("  cargo run -p aether-core --features codegen --bin gen_magics");
+    println!("  cargo run -p attacks --features codegen --bin gen_magics");
     println!("                      Generate magic bitboards");
     println!("  cargo test --workspace");
     println!("                      Run all tests");
@@ -42,7 +42,7 @@ fn main() {
             }
             "generate-magics" => {
                 println!("This command has moved. Use:");
-                println!("  cargo run -p aether-core --features codegen --bin gen_magics");
+                println!("  cargo run -p attacks --features codegen --bin gen_magics");
                 return;
             }
             _ => {

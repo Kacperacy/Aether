@@ -1,7 +1,6 @@
-use crate::error::MoveError;
 use crate::state_info::StateInfo;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{BitBoard, CastlingPath, CastlingRights, Color, File, Move, Piece, Square};
+use aether_core::{CastlingPath, CastlingRights, Color, File, Move, Piece, Square};
 use attacks::compute_slider_blockers;
 
 impl Board {
@@ -22,6 +21,14 @@ impl Board {
         } else {
             None
         };
+
+        debug_assert!(
+            self.history_index < MAX_SEARCH_DEPTH,
+            "unmake stack overflow: {} live plies exceeds capacity {}; \
+             call Board::commit_history after replaying a game",
+            self.history_index,
+            MAX_SEARCH_DEPTH
+        );
 
         self.zobrist_history.push(self.state.zobrist_hash);
 
@@ -107,7 +114,7 @@ impl Board {
     #[inline(always)]
     pub fn unmake_move(&mut self, mv: &Move) -> Result<()> {
         if self.history_index == 0 {
-            return Err(BoardError::ChessMoveError(MoveError::NoMoveToUnmake));
+            return Err(BoardError::NoMoveToUnmake);
         }
 
         self.history_index -= 1;
@@ -217,21 +224,6 @@ impl Board {
     }
 
     #[inline(always)]
-    pub fn is_in_check(&self, color: Color) -> bool {
-        if color == self.side_to_move {
-            !self.state.checkers.is_empty()
-        } else {
-            let king_sq = self.get_king_square(color);
-            self.is_square_attacked(king_sq, color.opponent())
-        }
-    }
-
-    #[inline(always)]
-    pub fn checkers(&self) -> BitBoard {
-        self.state.checkers
-    }
-
-    #[inline(always)]
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = square.bitboard();
         self.pieces[color as usize][piece as usize] |= bb;
@@ -323,17 +315,6 @@ impl Board {
 
         self.state.blockers_for_king = [white_blockers, black_blockers];
         self.state.pinners = [white_pinners, black_pinners];
-    }
-
-    #[inline(always)]
-    pub fn blockers_for_king(&self, color: Color) -> BitBoard {
-        self.state.blockers_for_king[color as usize]
-    }
-
-    /// Returns enemy pieces that are pinning our pieces to our king.
-    #[inline(always)]
-    pub fn pinners(&self, color: Color) -> BitBoard {
-        self.state.pinners[color as usize]
     }
 }
 

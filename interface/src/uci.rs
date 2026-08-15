@@ -19,8 +19,6 @@ impl Default for EngineInfo {
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchParams {
-    pub searchmoves: Vec<String>,
-    pub ponder: bool,
     pub wtime: Option<u64>,
     pub btime: Option<u64>,
     pub winc: Option<u64>,
@@ -28,7 +26,6 @@ pub struct SearchParams {
     pub movestogo: Option<u32>,
     pub depth: Option<u8>,
     pub nodes: Option<u64>,
-    pub mate: Option<u32>,
     pub movetime: Option<u64>,
     pub infinite: bool,
 }
@@ -216,13 +213,8 @@ fn parse_go<'a>(parts: &mut impl Iterator<Item = &'a str>) -> UciCommand {
 
     for part in parts {
         match part {
-            "searchmoves" | "wtime" | "btime" | "winc" | "binc" | "movestogo" | "depth"
-            | "nodes" | "mate" | "movetime" => {
+            "wtime" | "btime" | "winc" | "binc" | "movestogo" | "depth" | "nodes" | "movetime" => {
                 current_key = Some(part);
-            }
-            "ponder" => {
-                params.ponder = true;
-                current_key = None;
             }
             "infinite" => {
                 params.infinite = true;
@@ -231,7 +223,6 @@ fn parse_go<'a>(parts: &mut impl Iterator<Item = &'a str>) -> UciCommand {
             value => {
                 if let Some(key) = current_key {
                     match key {
-                        "searchmoves" => params.searchmoves.push(value.to_string()),
                         "wtime" => params.wtime = value.parse().ok(),
                         "btime" => params.btime = value.parse().ok(),
                         "winc" => params.winc = value.parse().ok(),
@@ -239,13 +230,10 @@ fn parse_go<'a>(parts: &mut impl Iterator<Item = &'a str>) -> UciCommand {
                         "movestogo" => params.movestogo = value.parse().ok(),
                         "depth" => params.depth = value.parse().ok(),
                         "nodes" => params.nodes = value.parse().ok(),
-                        "mate" => params.mate = value.parse().ok(),
                         "movetime" => params.movetime = value.parse().ok(),
                         _ => {}
                     }
-                    if key != "searchmoves" {
-                        current_key = None;
-                    }
+                    current_key = None;
                 }
             }
         }
@@ -264,8 +252,6 @@ pub enum UciResponse {
         best: String,
         ponder: Option<String>,
     },
-    CopyProtection(String),
-    Registration(String),
     Info(InfoResponse),
     Option(OptionInfo),
 }
@@ -277,14 +263,10 @@ pub struct InfoResponse {
     pub time: Option<u64>,
     pub nodes: Option<u64>,
     pub pv: Vec<String>,
-    pub multipv: Option<u8>,
     pub score_cp: Option<i32>,
     pub score_mate: Option<i32>,
-    pub currmove: Option<String>,
-    pub currmovenumber: Option<u32>,
     pub hashfull: Option<u16>,
     pub nps: Option<u64>,
-    pub tbhits: Option<u64>,
     pub string: Option<String>,
 }
 
@@ -354,22 +336,8 @@ impl Display for OptionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "option name {} type ", self.name)?;
         match &self.option_type {
-            OptionType::Check { default } => {
-                write!(f, "check default {}", default)
-            }
             OptionType::Spin { default, min, max } => {
                 write!(f, "spin default {} min {} max {}", default, min, max)
-            }
-            OptionType::Combo { default, options } => {
-                write!(f, "combo default {}", default)?;
-                for opt in options {
-                    write!(f, " var {}", opt)?;
-                }
-                Ok(())
-            }
-            OptionType::Button => write!(f, "button"),
-            OptionType::String { default } => {
-                write!(f, "string default {}", default)
             }
         }
     }
@@ -377,22 +345,7 @@ impl Display for OptionInfo {
 
 #[derive(Debug, Clone)]
 pub enum OptionType {
-    Check {
-        default: bool,
-    },
-    Spin {
-        default: i64,
-        min: i64,
-        max: i64,
-    },
-    Combo {
-        default: String,
-        options: Vec<String>,
-    },
-    Button,
-    String {
-        default: String,
-    },
+    Spin { default: i64, min: i64, max: i64 },
 }
 
 impl Display for UciResponse {
@@ -409,8 +362,6 @@ impl Display for UciResponse {
                 }
                 Ok(())
             }
-            UciResponse::CopyProtection(status) => write!(f, "copyprotection {}", status),
-            UciResponse::Registration(status) => write!(f, "registration {}", status),
             UciResponse::Info(info) => {
                 write!(f, "info")?;
                 if let Some(d) = info.depth {
@@ -418,9 +369,6 @@ impl Display for UciResponse {
                 }
                 if let Some(sd) = info.seldepth {
                     write!(f, " seldepth {}", sd)?;
-                }
-                if let Some(mp) = info.multipv {
-                    write!(f, " multipv {}", mp)?;
                 }
                 if let Some(cp) = info.score_cp {
                     write!(f, " score cp {}", cp)?;
@@ -439,12 +387,6 @@ impl Display for UciResponse {
                 }
                 if let Some(hf) = info.hashfull {
                     write!(f, " hashfull {}", hf)?;
-                }
-                if let Some(cm) = &info.currmove {
-                    write!(f, " currmove {}", cm)?;
-                }
-                if let Some(cmn) = info.currmovenumber {
-                    write!(f, " currmovenumber {}", cmn)?;
                 }
                 if !info.pv.is_empty() {
                     write!(f, " pv {}", info.pv.join(" "))?;
@@ -490,12 +432,6 @@ impl UciInput {
             Ok(_) => Some(parse_command(&line)),
             Err(_) => None,
         }
-    }
-}
-
-impl Default for UciInput {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

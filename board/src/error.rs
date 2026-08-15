@@ -3,9 +3,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BoardError {
-    #[error("Invalid piece placement: {piece:?} at {square:?}")]
-    InvalidPiecePlacement { piece: String, square: Square },
-
     #[error("King not found for {color:?}")]
     KingNotFound { color: Color },
 
@@ -21,11 +18,11 @@ pub enum BoardError {
     #[error("Invalid en passant square: {square:?}")]
     InvalidEnPassantSquare { square: Square },
 
-    #[error("Invalid move: {0}")]
-    ChessMoveError(#[from] MoveError),
+    #[error("No move to unmake")]
+    NoMoveToUnmake,
 
     #[error("FEN parsing error: {0}")]
-    FenParsingError(#[from] FenError),
+    FenParsingError(FenError),
 
     #[error("Invalid castling destination square {square:?} for {color:?}")]
     InvalidCastlingDestination { square: Square, color: Color },
@@ -35,9 +32,6 @@ pub enum BoardError {
 pub enum FenError {
     #[error("Empty fen string")]
     EmptyFen,
-
-    #[error("FEN must contain at least piece placement field")]
-    EmptyFields,
 
     #[error("FEN contains too many fields")]
     TooManyFields,
@@ -74,34 +68,4 @@ pub enum FenError {
 
     #[error("Invalid fullmove number: {number}")]
     InvalidFullmoveNumber { number: String },
-}
-
-#[derive(Debug, Error)]
-pub enum MoveError {
-    #[error("Invalid move format: {move_str}")]
-    InvalidMoveFormat { move_str: String },
-
-    #[error("Illegal move: {move_str}")]
-    IllegalMove { move_str: String },
-
-    #[error("No piece at source square: {square}")]
-    NoPieceAtSource { square: Square },
-
-    #[error("Destination square occupied by own piece: {square}")]
-    DestinationOccupiedByOwnPiece { square: Square },
-
-    #[error("Move puts own king in check: {move_str}")]
-    MovePutsKingInCheck { move_str: String },
-
-    #[error("Piece mismatch for move: expected {expected:?}, found {found:?}")]
-    PieceMismatch { expected: String, found: String },
-
-    #[error("Invalid rook for castling at square: {square}")]
-    InvalidRookForCastling { square: Square },
-
-    #[error("No rook found for castling at square: {square}")]
-    NoRookForCastling { square: Square },
-
-    #[error("No move to unmake")]
-    NoMoveToUnmake,
 }

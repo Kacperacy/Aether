@@ -34,7 +34,7 @@ pub fn perft(board: &mut Board, depth: u32) -> u64 {
 
 /// Per-root-move node counts, the standard "divide" breakdown.
 #[must_use]
-pub fn perft_divide(board: &mut Board, depth: u32) -> Vec<(Move, u64)> {
+pub(crate) fn perft_divide(board: &mut Board, depth: u32) -> Vec<(Move, u64)> {
     if depth == 0 {
         return Vec::new();
     }

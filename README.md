@@ -18,11 +18,11 @@ A modular chess engine written in Rust.
 ```
 aether/
 ├── core/       - Core types: BitBoard, Move, Piece, Square, etc.
-├── board/      - Board representation and FEN parsing
-├── movegen/    - Move generation with magic bitboards
+├── attacks/    - Magic bitboards and attack lookup tables
+├── board/      - Board representation, make/unmake, FEN parsing
+├── movegen/    - Move generation, legality, perft
 ├── engine/     - Search and evaluation
-├── interface/  - UCI protocol implementation
-└── benches/    - Performance benchmarks
+└── interface/  - UCI protocol implementation
 ```
 
 ## Building
@@ -49,10 +49,16 @@ cargo test --workspace
 
 ## Perft
 
-Run move generation correctness tests:
+Run the move-generation correctness suite:
 
 ```bash
-cargo run --release -- perft 6
+cargo test -p movegen --test perft --release
+```
+
+`perft` is also available inside a UCI session:
+
+```bash
+printf 'position startpos\nperft 6\nquit\n' | cargo run --release
 ```
 
 ## Magic Bitboards
@@ -60,7 +66,7 @@ cargo run --release -- perft 6
 Generate magic constants (only needed after modifying move generation):
 
 ```bash
-cargo run -p movegen --features codegen --bin gen_magics
+cargo run -p attacks --features codegen --bin gen_magics
 ```
 
-Output: `movegen/src/magic_constants.rs`
+Output: `attacks/src/magic_constants.rs`

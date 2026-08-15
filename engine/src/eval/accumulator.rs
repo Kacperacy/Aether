@@ -6,7 +6,7 @@
 //! so paths that never evaluate (perft, plain move generation) pay nothing.
 
 use super::pst;
-use aether_core::{Move, Piece};
+use aether_core::{CastlingPath, Move, Piece};
 use board::Board;
 
 pub const MAX_GAME_PHASE: i32 = 256;
@@ -67,21 +67,6 @@ impl EvalState {
             phase: compute_game_phase(board),
         };
         self.stack.clear();
-    }
-
-    /// Recompute from scratch. Use at the search root, or whenever the board
-    /// has been mutated without a matching [`EvalState::push`].
-    #[must_use]
-    pub fn from_board(board: &Board) -> Self {
-        let (mg, eg) = pst::compute_pst_score(board.pieces());
-        Self {
-            current: Frame {
-                mg,
-                eg,
-                phase: compute_game_phase(board),
-            },
-            stack: Vec::with_capacity(crate::search::MAX_PLY),
-        }
     }
 
     #[inline(always)]
@@ -146,10 +131,10 @@ impl EvalState {
         self.current.eg += to_eg;
 
         if mv.is_castling()
-            && let Some((rook_from, rook_to)) = castling_rook_squares(mv.to_sq(), side)
+            && let Some(path) = CastlingPath::for_king_destination(side, mv.to_sq())
         {
-            let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, rook_from, side);
-            let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, rook_to, side);
+            let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, path.rook_from, side);
+            let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, path.rook_to, side);
             self.current.mg += rt_mg - rf_mg;
             self.current.eg += rt_eg - rf_eg;
         }
@@ -185,41 +170,30 @@ fn compute_game_phase(board: &Board) -> i16 {
     ((material * MAX_GAME_PHASE) / PHASE_TOTAL as i32).min(MAX_GAME_PHASE) as i16
 }
 
-/// Mirrors `Board`'s castling rook relocation so the accumulator can account
-/// for the rook's PST change.
-#[inline]
-fn castling_rook_squares(
-    king_to: aether_core::Square,
-    side: aether_core::Color,
-) -> Option<(aether_core::Square, aether_core::Square)> {
-    use aether_core::{Color, Square};
-
-    match (side, king_to) {
-        (Color::White, Square::G1) => Some((Square::H1, Square::F1)),
-        (Color::White, Square::C1) => Some((Square::A1, Square::D1)),
-        (Color::Black, Square::G8) => Some((Square::H8, Square::F8)),
-        (Color::Black, Square::C8) => Some((Square::A8, Square::D8)),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use board::STARTING_POSITION_FEN;
+
+    /// Full from-scratch recompute, to check the incremental path against.
+    fn recompute(board: &Board) -> EvalState {
+        let mut state = EvalState::empty();
+        state.reset(board);
+        state
+    }
 
     /// The incremental path must agree with a from-scratch recompute after any
     /// sequence of make/unmake — this is the invariant the board crate used to
     /// guarantee internally.
     fn assert_incremental_matches_full(fen: &str, moves: &[Move]) {
         let mut board: Board = fen.parse().unwrap();
-        let mut acc = EvalState::from_board(&board);
+        let mut acc = recompute(&board);
 
         for mv in moves {
             acc.push(&board, mv);
             board.make_move(mv).unwrap();
 
-            let fresh = EvalState::from_board(&board);
+            let fresh = recompute(&board);
             assert_eq!(acc.scores(), fresh.scores(), "pst mismatch after {mv}");
             assert_eq!(
                 acc.game_phase(),
@@ -232,7 +206,7 @@ mod tests {
             board.unmake_move(mv).unwrap();
             acc.pop();
 
-            let fresh = EvalState::from_board(&board);
+            let fresh = recompute(&board);
             assert_eq!(acc.scores(), fresh.scores(), "pst mismatch unmaking {mv}");
             assert_eq!(
                 acc.game_phase(),
@@ -301,7 +275,7 @@ mod tests {
     #[test]
     fn test_null_move_is_neutral() {
         let board: Board = STARTING_POSITION_FEN.parse().unwrap();
-        let mut acc = EvalState::from_board(&board);
+        let mut acc = recompute(&board);
         let before = (acc.scores(), acc.game_phase());
 
         acc.push_null();

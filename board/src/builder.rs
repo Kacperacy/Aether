@@ -195,15 +195,13 @@ impl BoardBuilder {
         self.pieces[Color::Black as usize][Piece::King as usize] = BitBoard(0x1000000000000000);
     }
 
+    /// The builder has no occupancy cache yet, so fold the piece boards.
     fn is_square_occupied(&self, square: Square) -> bool {
-        for color in Color::ALL {
-            for &piece in &Piece::ALL {
-                if self.pieces[color as usize][piece as usize].contains(square) {
-                    return true;
-                }
-            }
-        }
-        false
+        let bb = square.bitboard();
+        self.pieces
+            .iter()
+            .flatten()
+            .any(|pieces| !(*pieces & bb).is_empty())
     }
 }
 

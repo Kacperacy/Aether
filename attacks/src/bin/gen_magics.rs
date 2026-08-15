@@ -48,6 +48,6 @@ fn main() -> std::io::Result<()> {
 #[cfg(not(feature = "codegen"))]
 fn main() {
     eprintln!("Error: This binary requires the 'codegen' feature");
-    eprintln!("Run with: cargo run -p aether-core --features codegen --bin gen_magics");
+    eprintln!("Run with: cargo run -p attacks --features codegen --bin gen_magics");
     std::process::exit(1);
 }

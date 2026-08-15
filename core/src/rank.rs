@@ -1,5 +1,5 @@
 use crate::CoreError::InvalidRank;
-use crate::{BitBoard, Color, CoreError, Result};
+use crate::{BitBoard, CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -17,17 +17,6 @@ impl Rank {
     pub const SIX: Rank = Rank(5);
     pub const SEVEN: Rank = Rank(6);
     pub const EIGHT: Rank = Rank(7);
-
-    pub const ALL: [Self; Self::NUM] = [
-        Self::ONE,
-        Self::TWO,
-        Self::THREE,
-        Self::FOUR,
-        Self::FIVE,
-        Self::SIX,
-        Self::SEVEN,
-        Self::EIGHT,
-    ];
 
     #[inline(always)]
     pub const fn from_index(index: i8) -> Self {
@@ -55,20 +44,8 @@ impl Rank {
     }
 
     #[inline(always)]
-    pub const fn flip(self) -> Self {
-        Self(7 - self.0)
-    }
-
-    #[inline(always)]
     pub const fn bitboard(self) -> BitBoard {
         BitBoard::new(0xFF_u64 << (self.0 * 8))
-    }
-
-    pub const fn relative_to(self, color: Color) -> Self {
-        match color {
-            Color::White => self,
-            Color::Black => self.flip(),
-        }
     }
 }
 
@@ -96,7 +73,6 @@ impl Display for Rank {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Color;
 
     #[test]
     fn test_rank_creation_and_index() {
@@ -136,26 +112,9 @@ mod tests {
     }
 
     #[test]
-    fn test_flip() {
-        assert_eq!(Rank::ONE.flip(), Rank::EIGHT);
-        assert_eq!(Rank::TWO.flip(), Rank::SEVEN);
-        assert_eq!(Rank::THREE.flip(), Rank::SIX);
-        assert_eq!(Rank::FOUR.flip(), Rank::FIVE);
-    }
-
-    #[test]
     fn test_bitboard() {
         assert_eq!(Rank::ONE.bitboard().value(), 0x00000000000000FF);
         assert_eq!(Rank::TWO.bitboard().value(), 0x000000000000FF00);
         assert_eq!(Rank::EIGHT.bitboard().value(), 0xFF00000000000000);
-    }
-
-    #[test]
-    fn test_relative_to() {
-        assert_eq!(Rank::TWO.relative_to(Color::White), Rank::TWO);
-
-        assert_eq!(Rank::TWO.relative_to(Color::Black), Rank::SEVEN);
-
-        assert_eq!(Rank::EIGHT.relative_to(Color::Black), Rank::ONE);
     }
 }

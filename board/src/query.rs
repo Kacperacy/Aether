@@ -12,9 +12,16 @@ impl Board {
         self.cache.occupied.contains(square)
     }
 
+    /// Uses the short-circuiting attack test rather than building the full
+    /// attacker set and checking emptiness.
     #[inline(always)]
     pub fn is_square_attacked(&self, square: Square, by_color: Color) -> bool {
-        !self.attackers_to_square(square, by_color).is_empty()
+        attacks::is_square_attacked(
+            square,
+            by_color,
+            self.cache.occupied,
+            &self.pieces[by_color as usize],
+        )
     }
 
     #[inline(always)]
@@ -159,6 +166,74 @@ impl Board {
     #[inline]
     pub fn castling_rights(&self) -> CastlingRights {
         self.state.castling_rights
+    }
+
+    /// True when `color`'s king is currently attacked.
+    ///
+    /// For the side to move this is the cached `checkers` set; for the opponent
+    /// it has to be recomputed, since `checkers` only tracks the mover.
+    #[inline(always)]
+    pub fn is_in_check(&self, color: Color) -> bool {
+        if color == self.side_to_move {
+            !self.state.checkers.is_empty()
+        } else {
+            let king_sq = self.get_king_square(color);
+            self.is_square_attacked(king_sq, color.opponent())
+        }
+    }
+
+    /// Pieces giving check to the side to move.
+    #[inline(always)]
+    pub fn checkers(&self) -> BitBoard {
+        self.state.checkers
+    }
+
+    /// Own pieces that stand between `color`'s king and an enemy slider.
+    #[inline(always)]
+    pub fn blockers_for_king(&self, color: Color) -> BitBoard {
+        self.state.blockers_for_king[color as usize]
+    }
+
+    /// Enemy pieces pinning one of `color`'s pieces to its king.
+    #[inline(always)]
+    pub fn pinners(&self, color: Color) -> BitBoard {
+        self.state.pinners[color as usize]
+    }
+
+    /// Pieces of `color` attacking `sq`.
+    #[inline]
+    pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
+        attacks::attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
+    }
+
+    /// Plies played since the board was created, including committed history.
+    #[inline]
+    pub fn ply(&self) -> usize {
+        self.zobrist_history.len()
+    }
+
+    /// How many earlier positions in the current fifty-move window match the
+    /// present one (same side to move).
+    pub fn repetition_count(&self) -> usize {
+        let history_len = self.zobrist_history.len();
+
+        if history_len == 0 {
+            return 0;
+        }
+
+        let mut count = 0;
+        let look_back = (self.state.halfmove_clock as usize).min(history_len);
+        let min_idx = history_len - look_back;
+
+        let same_side_parity = history_len % 2;
+
+        for i in min_idx..history_len {
+            if i % 2 == same_side_parity && self.zobrist_history[i] == self.state.zobrist_hash {
+                count += 1;
+            }
+        }
+
+        count
     }
 
     fn are_bishops_on_same_color(&self) -> bool {

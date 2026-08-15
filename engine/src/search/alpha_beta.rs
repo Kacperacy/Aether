@@ -97,10 +97,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.stop_flag.store(true, Ordering::Release);
     }
 
-    pub fn get_info(&self) -> &SearchInfo {
-        &self.info
-    }
-
     pub fn clear_tt(&mut self) {
         self.tt.clear();
     }
@@ -138,7 +134,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         let mut best_move: Option<Move> = None;
         let mut best_score: Score = NEG_MATE_SCORE;
-        let mut pv = Vec::with_capacity(max_depth as usize);
+        self.info.pv.reserve(max_depth as usize);
 
         let mut legal_moves = Vec::with_capacity(AVG_LEGAL_MOVES);
         movegen::legal(board, &mut legal_moves);
@@ -151,7 +147,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 } else {
                     0
                 },
-                pv: Vec::new(),
                 info: self.info.clone(),
             };
         }
@@ -165,12 +160,12 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
             self.info.depth = 1;
             self.info.time_elapsed = start_time.elapsed();
+            self.info.pv = vec![only_move];
             self.info.calculate_nps();
 
             return SearchResult {
                 best_move: Some(only_move),
                 score,
-                pv: vec![only_move],
                 info: self.info.clone(),
             };
         }
@@ -204,9 +199,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
                     if self.stop_flag.load(Ordering::Acquire) {
                         score = prev_score;
-                        for i in 0..best_pv_len {
-                            self.pv_table[0][i] = best_pv_backup[i];
-                        }
+                        self.pv_table[0][..best_pv_len]
+                            .copy_from_slice(&best_pv_backup[..best_pv_len]);
                         self.pv_length[0] = best_pv_len;
                         break;
                     }
@@ -221,9 +215,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                         }
                     } else if result >= beta {
                         let len = self.pv_length[0];
-                        for i in 0..len {
-                            best_pv_backup[i] = self.pv_table[0][i];
-                        }
+                        best_pv_backup[..len].copy_from_slice(&self.pv_table[0][..len]);
                         best_pv_len = len;
 
                         beta = (beta + delta).min(MATE_SCORE);
@@ -249,18 +241,19 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             prev_score = score;
             best_score = score;
 
+            // Publish this iteration's PV directly. This used to `mem::swap` into
+            // a caller-held Vec, which left the returned result holding the
+            // *previous* depth's PV.
             let pv_len = self.pv_length[0];
             if pv_len > 0 {
                 best_move = Some(self.pv_table[0][0]);
-                pv.clear();
+                self.info.pv.clear();
                 for i in 0..pv_len {
-                    pv.push(self.pv_table[0][i]);
+                    self.info.pv.push(self.pv_table[0][i]);
                 }
             }
 
-            self.info.score = score;
             self.info.time_elapsed = start_time.elapsed();
-            mem::swap(&mut self.info.pv, &mut pv);
             self.info.hash_full = self.tt.hashfull();
             self.info.calculate_nps();
 
@@ -274,7 +267,6 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         SearchResult {
             best_move,
             score: best_score,
-            pv,
             info: self.info.clone(),
         }
     }
@@ -708,8 +700,34 @@ mod tests {
         let result = searcher.search(&mut board, &limits, |_, _, _| {});
 
         assert!(result.best_move.is_some());
-        assert!(!result.pv.is_empty());
+        assert!(!result.pv().is_empty());
         assert!(result.info.nodes > 0);
+    }
+
+    /// The reported PV must belong to the same iteration as `best_move`.
+    /// A previous `mem::swap` published the *previous* depth's PV, so the two
+    /// could disagree about the very first move.
+    #[test]
+    fn test_reported_pv_matches_best_move() {
+        for depth in 1..=5u8 {
+            let mut searcher = AlphaBetaSearcher::new(SimpleEvaluator::new(), 1);
+            let mut board = Board::starting_position().unwrap();
+
+            let result = searcher.search(&mut board, &SearchLimits::depth(depth), |_, _, _| {});
+
+            let best = result.best_move.expect("a best move at every depth");
+            assert_eq!(
+                result.pv().first().copied(),
+                Some(best),
+                "depth {depth}: PV head {:?} disagrees with best_move {best}",
+                result.pv().first()
+            );
+            assert_eq!(
+                result.pv(),
+                result.info.pv.as_slice(),
+                "depth {depth}: result and info must expose the same PV"
+            );
+        }
     }
 
     #[test]

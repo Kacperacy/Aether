@@ -7,7 +7,6 @@ pub struct BitBoard(pub u64);
 
 impl BitBoard {
     pub const EMPTY: Self = Self(0);
-    pub const UNIVERSE: Self = Self(!0);
 
     #[inline(always)]
     pub const fn new(val: u64) -> Self {
@@ -48,13 +47,6 @@ impl BitBoard {
     pub const fn lsb(self) -> Square {
         debug_assert!(!self.is_empty(), "Can't invoke lsb() on empty BitBoard");
         Square::from_index(self.0.trailing_zeros() as i8)
-    }
-
-    #[inline(always)]
-    pub fn pop_lsb(&mut self) -> Square {
-        let sq = self.lsb();
-        self.0 &= self.0.wrapping_sub(1);
-        sq
     }
 
     #[inline]
@@ -236,20 +228,13 @@ mod test {
     }
 
     #[test]
-    fn test_lsb_and_pop_lsb() {
-        let mut bb = BitBoard::new((1 << 3) | (1 << 8));
+    fn test_lsb() {
+        let bb = BitBoard::new((1 << 3) | (1 << 8));
 
         assert_eq!(bb.lsb(), Square::D1);
         assert_eq!(bb.count(), 2);
-
-        assert_eq!(bb.pop_lsb(), Square::D1);
-        assert_eq!(bb.count(), 1);
-        assert!(!bb.contains(Square::D1));
-
-        assert_eq!(bb.lsb(), Square::A2);
-        assert_eq!(bb.pop_lsb(), Square::A2);
-
-        assert!(bb.is_empty());
+        assert!(bb.contains(Square::D1));
+        assert!(bb.contains(Square::A2));
     }
 
     #[test]

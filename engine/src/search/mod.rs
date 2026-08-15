@@ -18,7 +18,6 @@ pub struct SearchLimits {
     pub nodes: Option<u64>,
     pub time: Option<Duration>,
     pub hard_time: Option<Duration>,
-    pub infinite: bool,
 }
 
 impl Default for SearchLimits {
@@ -28,7 +27,6 @@ impl Default for SearchLimits {
             nodes: None,
             time: None,
             hard_time: None,
-            infinite: false,
         }
     }
 }
@@ -51,7 +49,6 @@ impl SearchLimits {
             nodes: Some(nodes),
             time: None,
             hard_time: None,
-            infinite: false,
         }
     }
 
@@ -61,7 +58,6 @@ impl SearchLimits {
             nodes: None,
             time: Some(time),
             hard_time: None,
-            infinite: false,
         }
     }
 
@@ -71,17 +67,17 @@ impl SearchLimits {
             nodes: None,
             time: Some(time),
             hard_time: Some(hard_time),
-            infinite: false,
         }
     }
 
+    /// "Search forever": no clock or node cap, bounded only by the ply limit.
+    /// The caller stops it by setting the searcher's stop flag.
     pub fn infinite() -> Self {
         Self {
-            depth: Some(128),
+            depth: Some(MAX_PLY as u8),
             nodes: None,
             time: None,
             hard_time: None,
-            infinite: true,
         }
     }
 }
@@ -93,7 +89,6 @@ pub struct SearchInfo {
     pub nodes: u64,
     pub time_elapsed: Duration,
     pub pv: Vec<Move>,
-    pub score: Score,
     pub nps: u64,
     pub hash_full: u16,
 }
@@ -110,35 +105,31 @@ impl SearchInfo {
     }
 }
 
+/// Outcome of a search. The principal variation, node counts and timing all live
+/// on `info` — there is deliberately no second copy of them here, because the two
+/// used to be updated separately and drift apart.
 #[derive(Debug, Clone)]
 pub struct SearchResult {
     pub best_move: Option<Move>,
     pub score: Score,
-    pub pv: Vec<Move>,
     pub info: SearchInfo,
 }
 
 impl SearchResult {
-    pub fn new(best_move: Option<Move>, score: Score) -> Self {
-        Self {
-            best_move,
-            score,
-            pv: Vec::new(),
-            info: SearchInfo::new(),
-        }
+    /// The principal variation of the last completed iteration.
+    #[must_use]
+    pub fn pv(&self) -> &[Move] {
+        &self.info.pv
     }
+}
 
-    pub fn with_info(
-        best_move: Option<Move>,
-        score: Score,
-        pv: Vec<Move>,
-        info: SearchInfo,
-    ) -> Self {
-        Self {
-            best_move,
-            score,
-            pv,
-            info,
-        }
+#[cfg(test)]
+pub(crate) mod test_support {
+    use board::Board;
+
+    /// Parse a test position. Fixtures carry distant kings so the board is
+    /// legal without the kings taking part in whatever is under test.
+    pub(crate) fn pos(fen: &str) -> Board {
+        fen.parse().expect("valid FEN")
     }
 }

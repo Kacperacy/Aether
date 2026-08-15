@@ -173,12 +173,6 @@ impl TranspositionTable {
     }
 }
 
-impl Default for TranspositionTable {
-    fn default() -> Self {
-        Self::new(crate::DEFAULT_HASH_MB)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5,7 +5,7 @@ use board::Board;
 fn test_make_unmake_symmetry_starting_position() {
     let mut board = Board::starting_position().unwrap();
     let original_fen = board.to_string();
-    let original_zobrist = board.zobrist_hash();
+    let original_zobrist = board.zobrist_hash_raw();
 
     let mut moves = Vec::new();
     movegen::legal(&board, &mut moves);
@@ -22,7 +22,7 @@ fn test_make_unmake_symmetry_starting_position() {
         );
 
         assert_eq!(
-            board.zobrist_hash(),
+            board.zobrist_hash_raw(),
             original_zobrist,
             "Zobrist hash changed after make/unmake for move: {}",
             mv
@@ -36,7 +36,7 @@ fn test_make_unmake_complex_position() {
         .parse()
         .unwrap();
     let original_fen = board.to_string();
-    let original_zobrist = board.zobrist_hash();
+    let original_zobrist = board.zobrist_hash_raw();
 
     let mut moves = Vec::new();
     movegen::legal(&board, &mut moves);
@@ -46,7 +46,7 @@ fn test_make_unmake_complex_position() {
         board.unmake_move(&mv).unwrap();
 
         assert_eq!(board.to_string(), original_fen);
-        assert_eq!(board.zobrist_hash(), original_zobrist);
+        assert_eq!(board.zobrist_hash_raw(), original_zobrist);
     }
 }
 
@@ -125,4 +125,64 @@ fn test_halfmove_clock() {
         0,
         "Pawn move should reset halfmove clock"
     );
+}
+
+/// Regression for the unmake-stack invariant.
+///
+/// `state_history` is a fixed 256-entry ring indexed by `history_index % 256`,
+/// and a replayed game shares it with search. A long game therefore used to push
+/// `history_index` past the ring size; the overwritten slots happened to be
+/// game-history entries that nothing unmakes back to, so it never corrupted a
+/// real search — but it silently broke the buffer's invariant, and any future
+/// deep unwind would have read clobbered state.
+///
+/// `commit_history` drops the permanently-played moves from the stack. With the
+/// `debug_assert!` in `make_move`, this test panics without that call.
+#[test]
+fn test_long_game_then_search_respects_unmake_stack() {
+    let mut board = Board::starting_position().unwrap();
+
+    // 4-ply cycle back to the same position; 80 cycles = 320 plies > the 256 ring.
+    let shuffle = [
+        Move::new(Square::G1, Square::F3, Move::QUIET),
+        Move::new(Square::G8, Square::F6, Move::QUIET),
+        Move::new(Square::F3, Square::G1, Move::QUIET),
+        Move::new(Square::F6, Square::G8, Move::QUIET),
+    ];
+
+    for cycle in 0..80 {
+        for mv in &shuffle {
+            board.make_move(mv).unwrap();
+        }
+        // Mirrors what the UCI `position` handler does once the game is replayed.
+        board.commit_history();
+        assert_eq!(
+            board.ply(),
+            (cycle + 1) * 4,
+            "game history must still be tracked"
+        );
+    }
+
+    // Repetition detection reads zobrist_history, which commit_history leaves alone.
+    assert_eq!(board.ply(), 320);
+
+    // Search-style make/unmake from here must be exact.
+    let fen_before = board.to_string();
+    let zobrist_before = board.zobrist_hash_raw();
+
+    let mut moves = Vec::new();
+    movegen::legal(&board, &mut moves);
+    assert!(!moves.is_empty());
+
+    for mv in &moves {
+        board.make_move(mv).unwrap();
+        board.unmake_move(mv).unwrap();
+
+        assert_eq!(board.to_string(), fen_before, "position corrupted: {mv}");
+        assert_eq!(
+            board.zobrist_hash_raw(),
+            zobrist_before,
+            "zobrist corrupted: {mv}"
+        );
+    }
 }

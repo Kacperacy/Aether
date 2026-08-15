@@ -25,11 +25,6 @@ impl Color {
         }
     }
 
-    #[inline(always)]
-    pub const fn to_index(self) -> u8 {
-        self as u8
-    }
-
     #[inline]
     pub const fn as_char(self) -> char {
         match self {
@@ -134,8 +129,8 @@ mod tests {
 
     #[test]
     fn test_color_creation_and_index() {
-        assert_eq!(Color::White.to_index(), 0);
-        assert_eq!(Color::Black.to_index(), 1);
+        assert_eq!(Color::White as usize, 0);
+        assert_eq!(Color::Black as usize, 1);
         assert_eq!(Color::from_index(0), Color::White);
         assert_eq!(Color::from_index(1), Color::Black);
     }

@@ -42,12 +42,6 @@ impl BoardCache {
     }
 }
 
-impl Default for BoardCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -174,7 +174,7 @@ fn try_castle(
     }
 }
 
-pub fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
+pub(crate) fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
     moves.clear();
     moves.reserve(256);
 
@@ -205,11 +205,6 @@ pub fn legal(board: &Board, moves: &mut Vec<Move>) {
 pub fn captures(board: &Board, moves: &mut Vec<Move>) {
     pseudo_legal(board, moves);
     moves.retain(|m| m.is_capture() || m.is_en_passant());
-}
-
-pub fn quiet_moves(board: &Board, moves: &mut Vec<Move>) {
-    pseudo_legal(board, moves);
-    moves.retain(|m| !m.is_capture() && !m.is_en_passant() && !m.is_castling());
 }
 
 pub fn checks(board: &Board, moves: &mut Vec<Move>) {

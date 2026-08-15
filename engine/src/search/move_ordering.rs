@@ -169,19 +169,11 @@ impl MoveOrderer {
     }
 }
 
-impl Default for MoveOrderer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn pos(fen: &str) -> Board {
-        fen.parse().expect("valid FEN")
-    }
+    use crate::search::test_support::pos;
 
     fn score(orderer: &MoveOrderer, board: &Board, mv: &Move) -> i32 {
         orderer.move_score_with_see(mv, None, 0, board)

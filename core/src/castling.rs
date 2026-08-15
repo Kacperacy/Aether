@@ -110,11 +110,6 @@ impl CastlingRights {
     pub const ALL: Self = Self(0b1111);
 
     #[inline(always)]
-    pub const fn new(val: u8) -> Self {
-        Self(val)
-    }
-
-    #[inline(always)]
     pub const fn kingside(color: Color) -> Self {
         match color {
             Color::White => Self::WK,
@@ -139,11 +134,6 @@ impl CastlingRights {
     }
 
     #[inline(always)]
-    pub const fn value(self) -> u8 {
-        self.0
-    }
-
-    #[inline(always)]
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
@@ -156,11 +146,6 @@ impl CastlingRights {
     #[inline(always)]
     pub const fn any(self, rights: Self) -> bool {
         (self.0 & rights.0) != 0
-    }
-
-    #[inline(always)]
-    pub fn add(&mut self, rights: Self) {
-        self.0 |= rights.0;
     }
 
     #[inline(always)]
@@ -262,13 +247,6 @@ impl Display for CastlingRights {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_castling_creation_and_values() {
-        assert_eq!(CastlingRights::NONE.value(), 0);
-        assert_eq!(CastlingRights::ALL.value(), 15);
-        assert_eq!(CastlingRights::WHITE.value(), 3);
-    }
 
     #[test]
     fn test_contains_and_any() {

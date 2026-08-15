@@ -8,8 +8,6 @@ use aether_core::{Color, Move};
 use board::Board;
 use engine::eval::score_to_mate_moves;
 use engine::{DEFAULT_HASH_MB, Engine, MAX_HASH_MB, MIN_HASH_MB};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Engine options
 #[derive(Debug, Clone)]
@@ -42,22 +40,18 @@ pub struct UciHandler {
     engine: Engine,
     /// Engine options
     options: EngineOptions,
-    /// Stop flag for search
-    stop_flag: Arc<AtomicBool>,
 }
 
 impl UciHandler {
     /// Create a new UCI handler
     pub fn new() -> Self {
         let engine = Engine::new(DEFAULT_HASH_MB);
-        let stop_flag = engine.stop_flag();
 
         Self {
             info: EngineInfo::default(),
             board: Board::starting_position().expect("Failed to create starting position"),
             engine,
             options: EngineOptions::default(),
-            stop_flag,
         }
     }
 
@@ -65,15 +59,10 @@ impl UciHandler {
     pub fn run(&mut self) {
         let mut input = UciInput::new();
 
-        loop {
-            if let Some(cmd) = input.read_command() {
-                match cmd {
-                    UciCommand::Quit => break,
-                    _ => self.handle_command(cmd),
-                }
-            } else {
-                // EOF or error
-                break;
+        while let Some(cmd) = input.read_command() {
+            match cmd {
+                UciCommand::Quit => break,
+                _ => self.handle_command(cmd),
             }
         }
     }
@@ -205,6 +194,10 @@ impl UciHandler {
                 return;
             }
         }
+
+        // These moves are part of the game, not of a search — they will never be
+        // unmade, so they must not occupy the unmake stack.
+        self.board.commit_history();
     }
 
     fn parse_uci_move(&self, move_str: &str) -> Option<Move> {
@@ -273,7 +266,7 @@ impl UciHandler {
     }
 
     fn cmd_stop(&mut self) {
-        self.stop_flag.store(true, Ordering::SeqCst);
+        self.engine.stop();
     }
 
     fn cmd_display(&self) {
