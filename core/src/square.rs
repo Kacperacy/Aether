@@ -94,6 +94,12 @@ impl Square {
     pub const fn down(self, color: crate::Color) -> Option<Self> {
         self.offset(0, -color.forward_direction())
     }
+
+    /// True when a pawn of `color` reaching this square promotes.
+    #[inline(always)]
+    pub const fn is_promotion_rank(self, color: crate::Color) -> bool {
+        self.rank().to_index() == color.pawn_promotion_rank().to_index()
+    }
 }
 
 impl FromStr for Square {
@@ -132,6 +138,19 @@ mod tests {
         assert_eq!(Square::from_index(28), Square::E4);
 
         assert_eq!(Square::new(File::E, Rank::FOUR), Square::E4);
+    }
+
+    #[test]
+    fn test_is_promotion_rank() {
+        use crate::Color;
+
+        assert!(Square::E8.is_promotion_rank(Color::White));
+        assert!(Square::A8.is_promotion_rank(Color::White));
+        assert!(!Square::E7.is_promotion_rank(Color::White));
+
+        assert!(Square::E1.is_promotion_rank(Color::Black));
+        assert!(Square::H1.is_promotion_rank(Color::Black));
+        assert!(!Square::E2.is_promotion_rank(Color::Black));
     }
 
     #[test]

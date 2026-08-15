@@ -10,7 +10,6 @@ fn main() -> std::io::Result<()> {
 
     let output_path = PathBuf::from(&manifest_dir)
         .join("src")
-        .join("attacks")
         .join("magic_constants.rs");
 
     println!("Output: {}\n", output_path.display());
@@ -32,7 +31,7 @@ fn main() -> std::io::Result<()> {
         println!();
     }
 
-    use aether_core::attacks::codegen;
+    use attacks::codegen;
 
     println!("Generating magic bitboards...");
     println!("This will take 10-30 seconds...\n");

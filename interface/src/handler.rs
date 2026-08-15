@@ -4,10 +4,10 @@ use crate::uci::{
     EngineInfo, InfoResponse, OptionInfo, OptionType, SearchParams, UciCommand, UciInput,
     UciResponse, send_response, send_responses,
 };
-use aether_core::{Color, Move, Piece, Square, score_to_mate_moves};
+use aether_core::{Color, Move};
 use board::Board;
-use engine::Engine;
-use std::str::FromStr;
+use engine::eval::score_to_mate_moves;
+use engine::{DEFAULT_HASH_MB, Engine, MAX_HASH_MB, MIN_HASH_MB};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -25,7 +25,7 @@ pub struct EngineOptions {
 impl Default for EngineOptions {
     fn default() -> Self {
         Self {
-            hash_size: 16,
+            hash_size: DEFAULT_HASH_MB,
             threads: 1,
             debug: false,
         }
@@ -49,7 +49,7 @@ pub struct UciHandler {
 impl UciHandler {
     /// Create a new UCI handler
     pub fn new() -> Self {
-        let engine = Engine::new(16);
+        let engine = Engine::new(DEFAULT_HASH_MB);
         let stop_flag = engine.stop_flag();
 
         Self {
@@ -113,9 +113,9 @@ impl UciHandler {
         send_response(&UciResponse::Option(OptionInfo {
             name: "Hash".to_string(),
             option_type: OptionType::Spin {
-                default: 16,
-                min: 1,
-                max: 1024,
+                default: DEFAULT_HASH_MB as i64,
+                min: MIN_HASH_MB as i64,
+                max: MAX_HASH_MB as i64,
             },
         }));
 
@@ -142,18 +142,18 @@ impl UciHandler {
     fn cmd_setoption(&mut self, name: &str, value: Option<String>) {
         match name.to_lowercase().as_str() {
             "hash" => {
-                if let Some(v) = value {
-                    if let Ok(size) = v.parse::<usize>() {
-                        self.options.hash_size = size.clamp(1, 1024);
-                        self.engine.resize_tt(self.options.hash_size);
-                    }
+                if let Some(v) = value
+                    && let Ok(size) = v.parse::<usize>()
+                {
+                    self.options.hash_size = size.clamp(MIN_HASH_MB, MAX_HASH_MB);
+                    self.engine.resize_tt(self.options.hash_size);
                 }
             }
             "threads" => {
-                if let Some(v) = value {
-                    if let Ok(t) = v.parse::<usize>() {
-                        self.options.threads = t.clamp(1, 1);
-                    }
+                if let Some(v) = value
+                    && let Ok(t) = v.parse::<usize>()
+                {
+                    self.options.threads = t.clamp(1, 1);
                 }
             }
             _ => {}
@@ -208,23 +208,7 @@ impl UciHandler {
     }
 
     fn parse_uci_move(&self, move_str: &str) -> Option<Move> {
-        if move_str.len() < 4 {
-            return None;
-        }
-        let from = Square::from_str(&move_str[0..2]).ok()?;
-        let to = Square::from_str(&move_str[2..4]).ok()?;
-        let promotion = if move_str.len() > 4 {
-            Piece::from_char(move_str.chars().nth(4)?)
-        } else {
-            None
-        };
-
-        // Generate legal moves and find matching one
-        let legal_moves = self.engine.legal_moves(&self.board);
-
-        legal_moves
-            .into_iter()
-            .find(|m| m.from_sq() == from && m.to_sq() == to && m.promotion_piece() == promotion)
+        movegen::parse_uci_move(&self.board, move_str)
     }
 
     fn cmd_go(&mut self, params: SearchParams) {
@@ -246,7 +230,7 @@ impl UciHandler {
             |info, best_move, score| {
                 // Send UCI info for each completed depth
                 if let Some(_mv) = best_move {
-                    let pv: Vec<String> = info.pv.iter().map(|m| Self::move_to_uci(m)).collect();
+                    let pv: Vec<String> = info.pv.iter().map(Self::move_to_uci).collect();
 
                     let mut response = InfoResponse::new()
                         .with_depth(info.depth)
@@ -302,30 +286,16 @@ impl UciHandler {
     }
 
     fn cmd_perft(&mut self, depth: u8) {
-        use std::time::Instant;
+        let report = movegen::perft_report(&mut self.board, u32::from(depth));
 
-        let start = Instant::now();
-
-        // Use perft_divide for detailed output
-        let results = self.engine.perft_divide(&mut self.board, depth);
-
-        let mut total = 0u64;
-        for (mv, nodes) in &results {
+        for (mv, nodes) in &report.moves {
             println!("{}: {}", Self::move_to_uci(mv), nodes);
-            total += nodes;
         }
 
-        let elapsed = start.elapsed();
-        let nps = if elapsed.as_millis() > 0 {
-            (total as u128 * 1000 / elapsed.as_millis()) as u64
-        } else {
-            0
-        };
-
         println!();
-        println!("Nodes: {}", total);
-        println!("Time: {:?}", elapsed);
-        println!("NPS: {}", nps);
+        println!("Nodes: {}", report.nodes);
+        println!("Time: {:?}", report.elapsed);
+        println!("NPS: {}", report.nps());
     }
 }
 
@@ -372,15 +342,5 @@ mod tests {
         // After e4 e5, the position should reflect this
         let legal_moves = handler.engine.legal_moves(&handler.board);
         assert!(!legal_moves.is_empty());
-    }
-
-    #[test]
-    fn test_perft_initial() {
-        let mut handler = UciHandler::new();
-
-        // Known perft values for starting position
-        assert_eq!(handler.engine.perft(&mut handler.board, 1), 20);
-        assert_eq!(handler.engine.perft(&mut handler.board, 2), 400);
-        assert_eq!(handler.engine.perft(&mut handler.board, 3), 8902);
     }
 }

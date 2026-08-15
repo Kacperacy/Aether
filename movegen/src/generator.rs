@@ -1,6 +1,7 @@
-use aether_core::{
-    BitBoard, Color, File, Move, Piece, Square, bishop_attacks, is_promotion_rank, king_attacks,
-    knight_attacks, pawn_attacks, pawn_moves, queen_attacks, rook_attacks,
+use aether_core::{BitBoard, CastlingPath, Color, Move, Piece, Square};
+use attacks::{
+    bishop_attacks, king_attacks, knight_attacks, pawn_attacks, pawn_moves, queen_attacks,
+    rook_attacks,
 };
 use board::Board;
 
@@ -45,7 +46,7 @@ fn generate_pawn_moves(
 ) {
     let push_targets = pawn_moves(from, side, occupied);
     for to in push_targets.iter() {
-        let is_promotion = is_promotion_rank(to, side);
+        let is_promotion = to.is_promotion_rank(side);
         let is_double_push = to.rank().to_index().abs_diff(from.rank().to_index()) == 2;
 
         if is_promotion {
@@ -64,7 +65,7 @@ fn generate_pawn_moves(
 
     let capture_targets = pawn_attacks(from, side) & opponent_pieces;
     for to in capture_targets.iter() {
-        let is_promotion = is_promotion_rank(to, side);
+        let is_promotion = to.is_promotion_rank(side);
 
         if is_promotion {
             for &promo_piece in &Piece::PROMOTIONS {
@@ -75,10 +76,10 @@ fn generate_pawn_moves(
         }
     }
 
-    if let Some(ep_square) = board.en_passant_square() {
-        if pawn_attacks(from, side).contains(ep_square) {
-            moves.push(Move::new(from, ep_square, Move::EN_PASSANT));
-        }
+    if let Some(ep_square) = board.en_passant_square()
+        && pawn_attacks(from, side).contains(ep_square)
+    {
+        moves.push(Move::new(from, ep_square, Move::EN_PASSANT));
     }
 }
 
@@ -125,41 +126,51 @@ fn generate_king_moves(
 }
 
 fn generate_castling_moves(board: &Board, king_square: Square, side: Color, moves: &mut Vec<Move>) {
-    let opponent = side.opponent();
-
     if board.can_castle_short(side) {
-        let back = side.back_rank();
-        let king_start = Square::new(File::E, back);
-        let f_square = Square::new(File::F, back);
-        let g_square = Square::new(File::G, back);
-
-        let path_clear = !board.is_square_occupied(f_square) && !board.is_square_occupied(g_square);
-        let path_safe = !board.is_square_attacked(king_start, opponent)
-            && !board.is_square_attacked(f_square, opponent)
-            && !board.is_square_attacked(g_square, opponent);
-
-        if king_square == king_start && path_clear && path_safe {
-            moves.push(Move::new(king_start, g_square, Move::CASTLE_KS));
-        }
+        try_castle(
+            board,
+            king_square,
+            side,
+            CastlingPath::kingside(side),
+            Move::CASTLE_KS,
+            moves,
+        );
     }
 
     if board.can_castle_long(side) {
-        let back = side.back_rank();
-        let king_start = Square::new(File::E, back);
-        let d_square = Square::new(File::D, back);
-        let c_square = Square::new(File::C, back);
-        let b_square = Square::new(File::B, back);
+        try_castle(
+            board,
+            king_square,
+            side,
+            CastlingPath::queenside(side),
+            Move::CASTLE_QS,
+            moves,
+        );
+    }
+}
 
-        let path_clear = !board.is_square_occupied(d_square)
-            && !board.is_square_occupied(c_square)
-            && !board.is_square_occupied(b_square);
-        let path_safe = !board.is_square_attacked(king_start, opponent)
-            && !board.is_square_attacked(d_square, opponent)
-            && !board.is_square_attacked(c_square, opponent);
+#[inline]
+fn try_castle(
+    board: &Board,
+    king_square: Square,
+    side: Color,
+    path: CastlingPath,
+    flag: u16,
+    moves: &mut Vec<Move>,
+) {
+    if king_square != path.king_from {
+        return;
+    }
 
-        if king_square == king_start && path_clear && path_safe {
-            moves.push(Move::new(king_start, c_square, Move::CASTLE_QS));
-        }
+    let opponent = side.opponent();
+    let path_clear = path.vacancy.iter().all(|&sq| !board.is_square_occupied(sq));
+    let path_safe = path
+        .king_safety
+        .iter()
+        .all(|&sq| !board.is_square_attacked(sq, opponent));
+
+    if path_clear && path_safe {
+        moves.push(Move::new(path.king_from, path.king_to, flag));
     }
 }
 
@@ -188,7 +199,7 @@ pub fn pseudo_legal(board: &Board, moves: &mut Vec<Move>) {
 
 pub fn legal(board: &Board, moves: &mut Vec<Move>) {
     pseudo_legal(board, moves);
-    moves.retain(|mv| !board.would_leave_king_in_check(mv));
+    moves.retain(|mv| !crate::legality::would_leave_king_in_check(board, mv));
 }
 
 pub fn captures(board: &Board, moves: &mut Vec<Move>) {

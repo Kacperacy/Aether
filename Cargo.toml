@@ -6,14 +6,12 @@ repository = "https://github.com/Kacperacy/Aether"
 edition = "2024"
 
 [dependencies]
-aether-core = { workspace = true }
-board = { workspace = true }
-movegen = { workspace = true }
 interface = { workspace = true }
 
 [workspace]
 members = [
     "core",
+    "attacks",
     "board",
     "movegen",
     "engine",
@@ -22,22 +20,22 @@ members = [
 
 [workspace.dependencies]
 # External dependencies
-rand = "0.10.0-rc.5"
-rand_chacha = "0.10.0-rc.1"
+# Pinned exactly: rand/rand_chacha are mid-release-candidate and the
+# rc.5 + 0.10.0 combination pulls an incompatible rand_core.
+rand = "=0.10.0-rc.5"
+rand_chacha = "=0.10.0-rc.1"
 thiserror = "2.0.17"
 
 # Workspace members as dependencies
 aether-core = { path = "./core" }
+attacks = { path = "./attacks" }
 board = { path = "./board" }
 movegen = { path = "./movegen" }
 engine = { path = "./engine" }
 interface = { path = "./interface" }
 
-[dev-dependencies]
-
-[features]
-default = []
-bench = []
+[lints]
+workspace = true
 
 [workspace.lints.clippy]
 all = "warn"

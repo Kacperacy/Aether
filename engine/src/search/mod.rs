@@ -5,10 +5,11 @@ pub mod tt;
 
 pub use tt::{NodeType, TTEntry, TranspositionTable};
 
-use aether_core::{Move, Score};
+use crate::eval::Score;
+use aether_core::Move;
 use std::time::Duration;
 
-const MAX_PLY: usize = 128;
+pub(crate) const MAX_PLY: usize = 128;
 const MAX_PV_LENGTH: usize = MAX_PLY;
 
 #[derive(Debug, Clone)]

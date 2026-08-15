@@ -1,8 +1,97 @@
 use crate::CoreError::InvalidCastling;
-use crate::{Color, CoreError, Result};
+use crate::{Color, CoreError, Result, Square};
 use std::fmt::Display;
 use std::ops::*;
 use std::str::FromStr;
+
+/// The fixed square geometry of one castling move.
+///
+/// Shared so that applying a castle (moving the rook) and generating one
+/// (checking vacancy and king safety) read from the same source of truth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CastlingPath {
+    pub king_from: Square,
+    pub king_to: Square,
+    pub rook_from: Square,
+    pub rook_to: Square,
+    /// Squares between king and rook that must be unoccupied.
+    pub vacancy: &'static [Square],
+    /// Squares the king stands on or crosses; none may be attacked.
+    pub king_safety: &'static [Square],
+}
+
+impl CastlingPath {
+    pub const WHITE_KINGSIDE: Self = Self {
+        king_from: Square::E1,
+        king_to: Square::G1,
+        rook_from: Square::H1,
+        rook_to: Square::F1,
+        vacancy: &[Square::F1, Square::G1],
+        king_safety: &[Square::E1, Square::F1, Square::G1],
+    };
+
+    pub const WHITE_QUEENSIDE: Self = Self {
+        king_from: Square::E1,
+        king_to: Square::C1,
+        rook_from: Square::A1,
+        rook_to: Square::D1,
+        vacancy: &[Square::D1, Square::C1, Square::B1],
+        king_safety: &[Square::E1, Square::D1, Square::C1],
+    };
+
+    pub const BLACK_KINGSIDE: Self = Self {
+        king_from: Square::E8,
+        king_to: Square::G8,
+        rook_from: Square::H8,
+        rook_to: Square::F8,
+        vacancy: &[Square::F8, Square::G8],
+        king_safety: &[Square::E8, Square::F8, Square::G8],
+    };
+
+    pub const BLACK_QUEENSIDE: Self = Self {
+        king_from: Square::E8,
+        king_to: Square::C8,
+        rook_from: Square::A8,
+        rook_to: Square::D8,
+        vacancy: &[Square::D8, Square::C8, Square::B8],
+        king_safety: &[Square::E8, Square::D8, Square::C8],
+    };
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn kingside(color: Color) -> Self {
+        match color {
+            Color::White => Self::WHITE_KINGSIDE,
+            Color::Black => Self::BLACK_KINGSIDE,
+        }
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn queenside(color: Color) -> Self {
+        match color {
+            Color::White => Self::WHITE_QUEENSIDE,
+            Color::Black => Self::BLACK_QUEENSIDE,
+        }
+    }
+
+    /// The path `color` takes to reach `king_to`, if that is a castling
+    /// destination at all.
+    #[inline(always)]
+    #[must_use]
+    pub const fn for_king_destination(color: Color, king_to: Square) -> Option<Self> {
+        let ks = Self::kingside(color);
+        let qs = Self::queenside(color);
+
+        if king_to.to_index() == ks.king_to.to_index() {
+            Some(ks)
+        } else if king_to.to_index() == qs.king_to.to_index() {
+            Some(qs)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct CastlingRights(pub u8);

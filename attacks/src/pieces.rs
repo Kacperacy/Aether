@@ -1,4 +1,4 @@
-use crate::{BitBoard, Color, Square};
+use aether_core::{BitBoard, Color, Square};
 
 static PAWN_ATTACKS: [[BitBoard; 64]; 2] = [
     init_pawn_attacks(Color::White),
@@ -33,19 +33,18 @@ pub fn pawn_moves(square: Square, color: Color, occupied: BitBoard) -> BitBoard 
 
     let push_dir = color.forward_direction();
 
-    if let Some(single) = square.offset(0, push_dir) {
-        if !occupied.contains(single) {
-            moves |= single.bitboard();
+    if let Some(single) = square.offset(0, push_dir)
+        && !occupied.contains(single)
+    {
+        moves |= single.bitboard();
 
-            let starting_rank = color.pawn_start_rank();
+        let starting_rank = color.pawn_start_rank();
 
-            if square.rank() == starting_rank {
-                if let Some(double) = square.offset(0, 2 * push_dir) {
-                    if !occupied.contains(double) {
-                        moves |= double.bitboard();
-                    }
-                }
-            }
+        if square.rank() == starting_rank
+            && let Some(double) = square.offset(0, 2 * push_dir)
+            && !occupied.contains(double)
+        {
+            moves |= double.bitboard();
         }
     }
 
@@ -62,11 +61,6 @@ pub fn knight_attacks(square: Square) -> BitBoard {
 #[inline(always)]
 pub fn king_attacks(square: Square) -> BitBoard {
     KING_ATTACKS[square.to_index() as usize]
-}
-
-#[inline(always)]
-pub const fn is_promotion_rank(square: Square, color: Color) -> bool {
-    square.rank().to_index() == color.pawn_promotion_rank().to_index()
 }
 
 const fn init_pawn_attacks(color: Color) -> [BitBoard; 64] {
@@ -303,16 +297,5 @@ mod tests {
         assert!(attacks.contains(Square::A2));
         assert!(attacks.contains(Square::B1));
         assert!(attacks.contains(Square::B2));
-    }
-
-    #[test]
-    fn test_is_promotion_rank() {
-        assert!(is_promotion_rank(Square::E8, Color::White));
-        assert!(is_promotion_rank(Square::A8, Color::White));
-        assert!(!is_promotion_rank(Square::E7, Color::White));
-
-        assert!(is_promotion_rank(Square::E1, Color::Black));
-        assert!(is_promotion_rank(Square::H1, Color::Black));
-        assert!(!is_promotion_rank(Square::E2, Color::Black));
     }
 }

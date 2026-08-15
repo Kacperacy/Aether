@@ -3,11 +3,10 @@ name = "movegen"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-default = []
-codegen = ["rand"]
-
 [dependencies]
 aether-core = { workspace = true }
+attacks = { workspace = true }
 board = { workspace = true }
-rand = { workspace = true, optional = true }
+
+[lints]
+workspace = true

@@ -1,4 +1,5 @@
-use aether_core::{MATE_THRESHOLD, Move, Score};
+use crate::eval::{MATE_THRESHOLD, Score};
+use aether_core::Move;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
@@ -174,7 +175,7 @@ impl TranspositionTable {
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new(16) // 16 MB default
+        Self::new(crate::DEFAULT_HASH_MB)
     }
 }
 

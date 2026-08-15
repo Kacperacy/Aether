@@ -146,16 +146,6 @@ impl Board {
             || self.is_insufficient_material()
     }
 
-    #[inline]
-    pub fn game_phase(&self) -> i32 {
-        self.state.game_phase as i32
-    }
-
-    #[inline(always)]
-    pub fn pst_scores(&self) -> (i32, i32) {
-        (self.state.pst_mg, self.state.pst_eg)
-    }
-
     #[inline(always)]
     pub fn fullmove_number(&self) -> u16 {
         self.fullmove_number

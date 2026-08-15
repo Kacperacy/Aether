@@ -1,10 +1,11 @@
-use crate::eval::Evaluator;
+use crate::eval::{EvalState, Evaluator};
+use crate::eval::{MATE_SCORE, NEG_MATE_SCORE, Score, mated_in, material};
 use crate::search::move_ordering::MoveOrderer;
 use crate::search::{
     MAX_PLY, MAX_PV_LENGTH, NodeType, SearchInfo, SearchLimits, SearchResult, TTEntry,
     TranspositionTable,
 };
-use aether_core::{MATE_SCORE, Move, NEG_MATE_SCORE, Piece, Score, mated_in};
+use aether_core::{Move, Piece};
 use board::Board;
 use std::mem;
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use std::time::{Duration, Instant};
 
 const NODE_CHECK_MASK: u64 = 0xFFF;
 const DELTA_PRUNING_MARGIN: Score = 200;
-const DELTA_MAX_GAIN: Score = Piece::QUEEN_VALUE * 2 - Piece::PAWN_VALUE;
+const DELTA_MAX_GAIN: Score = material::QUEEN_VALUE * 2 - material::PAWN_VALUE;
 const NULL_MOVE_REDUCTION: u8 = 3;
 const NULL_MOVE_MIN_DEPTH: u8 = 3;
 const LMR_FULL_DEPTH_MOVES: usize = 4;
@@ -41,6 +42,7 @@ pub struct AlphaBetaSearcher<E: Evaluator> {
     pv_table: [[Move; MAX_PV_LENGTH]; MAX_PV_LENGTH],
     pv_length: [usize; MAX_PV_LENGTH],
     move_lists: Vec<Vec<Move>>,
+    eval_state: EvalState,
 }
 
 impl<E: Evaluator> AlphaBetaSearcher<E> {
@@ -62,7 +64,29 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             pv_table: [[Move::NULL; MAX_PV_LENGTH]; MAX_PV_LENGTH],
             pv_length: [0; MAX_PV_LENGTH],
             move_lists,
+            eval_state: EvalState::empty(),
         }
+    }
+
+    /// Apply `mv`, keeping the evaluation accumulator in step. The accumulator
+    /// delta is computed from the pre-move position, so it must be pushed
+    /// before the board mutates — and rolled back if the move is rejected.
+    #[inline(always)]
+    fn do_move(&mut self, board: &mut Board, mv: &Move) -> board::Result<()> {
+        self.eval_state.push(board, mv);
+        match board.make_move(mv) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                self.eval_state.pop();
+                Err(e)
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn undo_move(&mut self, board: &mut Board, mv: &Move) {
+        let _ = board.unmake_move(mv);
+        self.eval_state.pop();
     }
 
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
@@ -107,6 +131,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         self.nodes_limit = limits.nodes;
         self.move_orderer.clear_repetitions();
         self.tt.new_search();
+        self.eval_state.reset(board);
 
         let start_time = self.start_time.unwrap();
         let max_depth = limits.depth.unwrap_or(MAX_PLY as u8).min(MAX_PLY as u8);
@@ -133,13 +158,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         if legal_moves.len() == 1 {
             let only_move = legal_moves[0];
-            board
-                .make_move(&only_move)
+            self.do_move(board, &only_move)
                 .expect("legal move should not fail");
             let score = -self.quiescence(board, 1, 0, NEG_MATE_SCORE, MATE_SCORE);
-            board
-                .unmake_move(&only_move)
-                .expect("unmake should not fail");
+            self.undo_move(board, &only_move);
 
             self.info.depth = 1;
             self.info.time_elapsed = start_time.elapsed();
@@ -156,10 +178,10 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut prev_score: Score = 0;
 
         for depth in 1..=max_depth {
-            if let Some(limit) = self.soft_limit {
-                if start_time.elapsed() >= limit {
-                    break;
-                }
+            if let Some(limit) = self.soft_limit
+                && start_time.elapsed() >= limit
+            {
+                break;
             }
 
             if self.stop_flag.load(Ordering::Acquire) {
@@ -287,7 +309,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
         // ===== Terminal conditions =====
         if ply >= MAX_PLY {
-            return self.evaluator.evaluate(board);
+            return self.evaluator.evaluate(board, &self.eval_state);
         }
 
         if ply > 0 {
@@ -333,7 +355,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let static_eval = if in_check {
             NEG_MATE_SCORE
         } else {
-            self.evaluator.evaluate(board)
+            self.evaluator.evaluate(board, &self.eval_state)
         };
 
         // ===== Reverse Futility Pruning (Static Null Move) =====
@@ -352,6 +374,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             && self.has_non_pawn_material(board)
         {
             board.make_null_move();
+            self.eval_state.push_null();
 
             let null_score = -self.alpha_beta(
                 board,
@@ -363,6 +386,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             );
 
             board.unmake_null_move();
+            self.eval_state.pop();
 
             if null_score >= beta {
                 return beta;
@@ -385,11 +409,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             return if in_check { mated_in(ply as u32) } else { 0 };
         }
 
-        let side = board.side_to_move();
-        let occupied = board.occupied();
-        let pieces = board.pieces();
         self.move_orderer
-            .order_moves_with_see(&mut moves, tt_move, ply, side, occupied, pieces);
+            .order_moves_with_see(&mut moves, tt_move, ply, board);
 
         // ===== Main move loop =====
         let mut best_score = NEG_MATE_SCORE;
@@ -399,7 +420,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         let mut moves_searched = 0;
 
         for mv in moves.iter() {
-            if board.make_move(mv).is_err() {
+            if self.do_move(board, mv).is_err() {
                 continue;
             }
 
@@ -409,7 +430,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             let gives_check = board.is_in_check(board.side_to_move());
 
             if dominated && !gives_check {
-                let _ = board.unmake_move(mv);
+                self.undo_move(board, mv);
                 continue;
             }
 
@@ -482,7 +503,7 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 score = lmr_score;
             }
 
-            let _ = board.unmake_move(mv);
+            self.undo_move(board, mv);
 
             if score > best_score {
                 best_score = score;
@@ -562,13 +583,13 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
         }
 
         if ply >= MAX_PLY {
-            return self.evaluator.evaluate(board);
+            return self.evaluator.evaluate(board, &self.eval_state);
         }
 
         let in_check = board.is_in_check(board.side_to_move());
 
         if !in_check {
-            let stand_pat = self.evaluator.evaluate(board);
+            let stand_pat = self.evaluator.evaluate(board, &self.eval_state);
 
             if stand_pat >= beta {
                 return stand_pat;
@@ -598,18 +619,15 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
             }
         }
 
-        let side = board.side_to_move();
-        let occupied = board.occupied();
-        let pieces = board.pieces();
         self.move_orderer
-            .order_moves_with_see(&mut moves, None, ply, side, occupied, pieces);
+            .order_moves_with_see(&mut moves, None, ply, board);
 
         for mv in moves {
-            if board.make_move(&mv).is_err() {
+            if self.do_move(board, &mv).is_err() {
                 continue;
             }
             let score = -self.quiescence(board, ply + 1, depth - 1, -beta, -alpha);
-            let _ = board.unmake_move(&mv);
+            self.undo_move(board, &mv);
 
             if score >= beta {
                 return score;
@@ -639,18 +657,17 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
 
     #[inline]
     fn should_stop(&self) -> bool {
-        if let Some(start) = self.start_time {
-            if let Some(limit) = self.hard_limit {
-                if start.elapsed() >= limit {
-                    return true;
-                }
-            }
+        if let Some(start) = self.start_time
+            && let Some(limit) = self.hard_limit
+            && start.elapsed() >= limit
+        {
+            return true;
         }
 
-        if let Some(limit) = self.nodes_limit {
-            if self.info.nodes >= limit {
-                return true;
-            }
+        if let Some(limit) = self.nodes_limit
+            && self.info.nodes >= limit
+        {
+            return true;
         }
 
         false

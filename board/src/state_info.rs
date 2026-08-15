@@ -8,9 +8,6 @@ pub struct StateInfo {
     pub captured_piece: Option<Piece>,
 
     pub zobrist_hash: u64,
-    pub game_phase: i16,
-    pub pst_mg: i32,
-    pub pst_eg: i32,
 
     pub king_square: [Square; 2],
     pub checkers: BitBoard,
@@ -26,9 +23,6 @@ impl StateInfo {
             halfmove_clock: 0,
             captured_piece: None,
             zobrist_hash: 0,
-            game_phase: 0,
-            pst_mg: 0,
-            pst_eg: 0,
             king_square: [Square::E1, Square::E8],
             checkers: BitBoard::EMPTY,
             blockers_for_king: [BitBoard::EMPTY; 2],

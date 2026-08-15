@@ -1,4 +1,5 @@
-use crate::{BISHOP_MAGICS, BISHOP_MOVES, BitBoard, ROOK_MAGICS, ROOK_MOVES, Square};
+use crate::{BISHOP_MAGICS, BISHOP_MOVES, ROOK_MAGICS, ROOK_MOVES};
+use aether_core::{BitBoard, Square};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MagicEntry {
@@ -44,20 +45,6 @@ pub fn bishop_attacks(square: Square, occupied: BitBoard) -> BitBoard {
 #[inline(always)]
 pub fn queen_attacks(square: Square, occupied: BitBoard) -> BitBoard {
     rook_attacks(square, occupied) | bishop_attacks(square, occupied)
-}
-
-pub fn rook_attacks_batch(
-    squares: &[Square],
-    occupied: BitBoard,
-) -> impl Iterator<Item = BitBoard> + '_ {
-    squares.iter().map(move |&sq| rook_attacks(sq, occupied))
-}
-
-pub fn bishop_attacks_batch(
-    squares: &[Square],
-    occupied: BitBoard,
-) -> impl Iterator<Item = BitBoard> + '_ {
-    squares.iter().map(move |&sq| bishop_attacks(sq, occupied))
 }
 
 #[cfg(test)]

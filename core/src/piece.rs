@@ -1,5 +1,5 @@
 use crate::CoreError::InvalidPiece;
-use crate::{CoreError, Result, Score};
+use crate::{CoreError, Result};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -27,22 +27,6 @@ impl Piece {
     ];
 
     pub const PROMOTIONS: [Self; 4] = [Self::Knight, Self::Bishop, Self::Rook, Self::Queen];
-
-    pub const PAWN_VALUE: Score = 100;
-    pub const KNIGHT_VALUE: Score = 320;
-    pub const BISHOP_VALUE: Score = 330;
-    pub const ROOK_VALUE: Score = 500;
-    pub const QUEEN_VALUE: Score = 900;
-    pub const KING_VALUE: Score = 20000;
-
-    pub const VALUES: [Score; Self::NUM] = [
-        Self::PAWN_VALUE,
-        Self::KNIGHT_VALUE,
-        Self::BISHOP_VALUE,
-        Self::ROOK_VALUE,
-        Self::QUEEN_VALUE,
-        Self::KING_VALUE,
-    ];
 
     #[inline(always)]
     pub const fn from_index(index: u8) -> Self {
@@ -85,33 +69,6 @@ impl Piece {
             'k' | 'K' => Some(Self::King),
             _ => None,
         }
-    }
-
-    #[inline(always)]
-    pub const fn value(self) -> Score {
-        match self {
-            Self::Pawn => Self::PAWN_VALUE,
-            Self::Knight => Self::KNIGHT_VALUE,
-            Self::Bishop => Self::BISHOP_VALUE,
-            Self::Rook => Self::ROOK_VALUE,
-            Self::Queen => Self::QUEEN_VALUE,
-            Self::King => Self::KING_VALUE,
-        }
-    }
-
-    #[inline(always)]
-    pub const fn is_sliding(self) -> bool {
-        matches!(self, Self::Bishop | Self::Rook | Self::Queen)
-    }
-
-    #[inline(always)]
-    pub const fn is_major(self) -> bool {
-        matches!(self, Self::Rook | Self::Queen)
-    }
-
-    #[inline(always)]
-    pub const fn is_minor(self) -> bool {
-        matches!(self, Self::Knight | Self::Bishop)
     }
 }
 
@@ -169,23 +126,5 @@ mod tests {
         assert!(Piece::from_str("x").is_err());
         assert!(Piece::from_str("Knight").is_err());
         assert!(Piece::from_str("").is_err());
-    }
-
-    #[test]
-    fn test_piece_properties() {
-        assert!(Piece::Queen.is_sliding());
-        assert!(!Piece::Knight.is_sliding());
-
-        assert!(Piece::Rook.is_major());
-        assert!(!Piece::Pawn.is_major());
-
-        assert!(Piece::Bishop.is_minor());
-        assert!(!Piece::King.is_minor());
-    }
-
-    #[test]
-    fn test_piece_values() {
-        assert_eq!(Piece::Pawn.value(), 100);
-        assert_eq!(Piece::Queen.value(), 900);
     }
 }

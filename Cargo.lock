@@ -6,19 +6,22 @@ version = 4
 name = "aether"
 version = "0.1.0"
 dependencies = [
- "aether-core",
- "board",
  "interface",
- "movegen",
 ]
 
 [[package]]
 name = "aether-core"
 version = "0.1.0"
 dependencies = [
- "rand",
- "rand_chacha",
  "thiserror",
+]
+
+[[package]]
+name = "attacks"
+version = "0.1.0"
+dependencies = [
+ "aether-core",
+ "rand",
 ]
 
 [[package]]
@@ -26,6 +29,9 @@ name = "board"
 version = "0.1.0"
 dependencies = [
  "aether-core",
+ "attacks",
+ "rand",
+ "rand_chacha",
  "thiserror",
 ]
 
@@ -60,6 +66,7 @@ name = "engine"
 version = "0.1.0"
 dependencies = [
  "aether-core",
+ "attacks",
  "board",
  "movegen",
 ]
@@ -83,6 +90,7 @@ dependencies = [
  "aether-core",
  "board",
  "engine",
+ "movegen",
 ]
 
 [[package]]
@@ -96,8 +104,8 @@ name = "movegen"
 version = "0.1.0"
 dependencies = [
  "aether-core",
+ "attacks",
  "board",
- "rand",
 ]
 
 [[package]]

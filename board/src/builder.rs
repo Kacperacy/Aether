@@ -2,10 +2,7 @@ use crate::error::BoardError::{
     InvalidCastlingRights, InvalidEnPassantSquare, KingNotFound, MultipleKings, OverlappingPieces,
 };
 use crate::state_info::StateInfo;
-use crate::{
-    MAX_GAME_PHASE, MAX_SEARCH_DEPTH, PHASE_BISHOP, PHASE_KNIGHT, PHASE_QUEEN, PHASE_ROOK,
-    PHASE_TOTAL, Result, ZOBRIST_HISTORY_CAPACITY, cache::BoardCache, pst,
-};
+use crate::{MAX_SEARCH_DEPTH, Result, ZOBRIST_HISTORY_CAPACITY, cache::BoardCache};
 use aether_core::{BitBoard, CastlingRights, Color, File, Piece, Square};
 
 pub struct BoardBuilder {
@@ -82,9 +79,6 @@ impl BoardBuilder {
         let mut cache = BoardCache::new();
         cache.refresh(&self.pieces);
 
-        let game_phase = self.compute_game_phase();
-        let (pst_mg, pst_eg) = pst::compute_pst_score(&self.pieces);
-
         let mut mailbox = [None; Square::NUM];
         for color in Color::ALL {
             for &piece in &Piece::ALL {
@@ -103,7 +97,7 @@ impl BoardBuilder {
         } else {
             black_king_sq
         };
-        let checkers = aether_core::attackers_to_square(
+        let checkers = attacks::attackers_to_square(
             king_sq,
             stm.opponent(),
             cache.occupied,
@@ -113,13 +107,13 @@ impl BoardBuilder {
         let white_occ = cache.color_combined[Color::White as usize];
         let black_occ = cache.color_combined[Color::Black as usize];
 
-        let (white_blockers, white_pinners) = aether_core::compute_slider_blockers(
+        let (white_blockers, white_pinners) = attacks::compute_slider_blockers(
             white_king_sq,
             white_occ,
             &self.pieces[Color::Black as usize],
             cache.occupied,
         );
-        let (black_blockers, black_pinners) = aether_core::compute_slider_blockers(
+        let (black_blockers, black_pinners) = attacks::compute_slider_blockers(
             black_king_sq,
             black_occ,
             &self.pieces[Color::White as usize],
@@ -138,9 +132,6 @@ impl BoardBuilder {
                 halfmove_clock: self.halfmove_clock,
                 captured_piece: None,
                 zobrist_hash: 0,
-                game_phase,
-                pst_mg,
-                pst_eg,
                 king_square: [white_king_sq, black_king_sq],
                 checkers,
                 blockers_for_king: [white_blockers, black_blockers],
@@ -154,28 +145,6 @@ impl BoardBuilder {
         board.state.zobrist_hash = board.calculate_zobrist_hash();
 
         Ok(board)
-    }
-
-    fn compute_game_phase(&self) -> i16 {
-        let knights = (self.pieces[Color::White as usize][Piece::Knight as usize].count()
-            + self.pieces[Color::Black as usize][Piece::Knight as usize].count())
-            as i32;
-        let bishops = (self.pieces[Color::White as usize][Piece::Bishop as usize].count()
-            + self.pieces[Color::Black as usize][Piece::Bishop as usize].count())
-            as i32;
-        let rooks = (self.pieces[Color::White as usize][Piece::Rook as usize].count()
-            + self.pieces[Color::Black as usize][Piece::Rook as usize].count())
-            as i32;
-        let queens = (self.pieces[Color::White as usize][Piece::Queen as usize].count()
-            + self.pieces[Color::Black as usize][Piece::Queen as usize].count())
-            as i32;
-
-        let material = knights * PHASE_KNIGHT as i32
-            + bishops * PHASE_BISHOP as i32
-            + rooks * PHASE_ROOK as i32
-            + queens * PHASE_QUEEN as i32;
-
-        ((material * MAX_GAME_PHASE) / PHASE_TOTAL as i32).min(MAX_GAME_PHASE) as i16
     }
 
     fn validate(&self) -> Result<()> {

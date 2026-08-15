@@ -1,5 +1,5 @@
 use crate::Board;
-use aether_core::zobrist_keys::zobrist_keys;
+use crate::zobrist_keys::zobrist_keys;
 use aether_core::{CastlingRights, Color, File, Piece, Square};
 
 impl Board {

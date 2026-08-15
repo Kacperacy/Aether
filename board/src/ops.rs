@@ -1,11 +1,8 @@
 use crate::error::MoveError;
-use crate::pst;
 use crate::state_info::StateInfo;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{
-    BitBoard, CastlingRights, Color, File, Move, Piece, Square, compute_slider_blockers,
-    is_square_attacked, line_through,
-};
+use aether_core::{BitBoard, CastlingPath, CastlingRights, Color, File, Move, Piece, Square};
+use attacks::compute_slider_blockers;
 
 impl Board {
     #[inline(always)]
@@ -33,59 +30,30 @@ impl Board {
         self.state_history[buffer_idx].captured_piece = captured_piece;
         self.history_index += 1;
 
-        if let Some(captured) = captured_piece {
-            let phase_delta = (Self::phase_weight(captured) as i32 * crate::MAX_GAME_PHASE
-                / crate::PHASE_TOTAL as i32) as i16;
-            self.state.game_phase = (self.state.game_phase - phase_delta).max(0);
-        }
-
-        if let Some(promo) = mv.promotion_piece() {
-            let phase_delta = (Self::phase_weight(promo) as i32 * crate::MAX_GAME_PHASE
-                / crate::PHASE_TOTAL as i32) as i16;
-            self.state.game_phase =
-                (self.state.game_phase + phase_delta).min(crate::MAX_GAME_PHASE as i16);
-        }
-
         if let Some(ep_sq) = self.state.en_passant_square {
             self.zobrist_toggle_en_passant(ep_sq.file());
         }
 
-        let (from_mg, from_eg) = pst::piece_value(moving_piece, mv.from_sq(), side);
-        self.state.pst_mg -= from_mg;
-        self.state.pst_eg -= from_eg;
         self.remove_piece_known(mv.from_sq(), moving_piece, side);
         self.zobrist_toggle_piece(mv.from_sq(), moving_piece, side);
 
         if let Some(captured) = captured_piece {
             if mv.is_en_passant() {
                 let captured_sq = mv.to_sq().down(side).expect("Invalid en passant square");
-                let (cap_mg, cap_eg) = pst::piece_value(Piece::Pawn, captured_sq, opponent);
-                self.state.pst_mg -= cap_mg;
-                self.state.pst_eg -= cap_eg;
                 self.remove_piece_known(captured_sq, Piece::Pawn, opponent);
                 self.zobrist_toggle_piece(captured_sq, Piece::Pawn, opponent);
             } else {
-                let (cap_mg, cap_eg) = pst::piece_value(captured, mv.to_sq(), opponent);
-                self.state.pst_mg -= cap_mg;
-                self.state.pst_eg -= cap_eg;
                 self.remove_piece_known(mv.to_sq(), captured, opponent);
                 self.zobrist_toggle_piece(mv.to_sq(), captured, opponent);
             }
         }
 
         let final_piece = mv.promotion_piece().unwrap_or(moving_piece);
-        let (to_mg, to_eg) = pst::piece_value(final_piece, mv.to_sq(), side);
-        self.state.pst_mg += to_mg;
-        self.state.pst_eg += to_eg;
         self.place_piece_internal(mv.to_sq(), final_piece, side);
         self.zobrist_toggle_piece(mv.to_sq(), final_piece, side);
 
         if mv.is_castling() {
             let (rook_from, rook_to) = Self::get_castling_rook_squares(mv.to_sq(), side)?;
-            let (rf_mg, rf_eg) = pst::piece_value(Piece::Rook, rook_from, side);
-            let (rt_mg, rt_eg) = pst::piece_value(Piece::Rook, rook_to, side);
-            self.state.pst_mg += rt_mg - rf_mg;
-            self.state.pst_eg += rt_eg - rf_eg;
             self.remove_piece_known(rook_from, Piece::Rook, side);
             self.place_piece_internal(rook_to, Piece::Rook, side);
             self.zobrist_toggle_piece(rook_from, Piece::Rook, side);
@@ -190,9 +158,6 @@ impl Board {
             halfmove_clock: saved_state.halfmove_clock,
             captured_piece: None,
             zobrist_hash: saved_state.zobrist_hash,
-            game_phase: saved_state.game_phase,
-            pst_mg: saved_state.pst_mg,
-            pst_eg: saved_state.pst_eg,
             king_square: saved_state.king_square,
             checkers: saved_state.checkers,
             blockers_for_king: saved_state.blockers_for_king,
@@ -246,8 +211,6 @@ impl Board {
 
         self.state.en_passant_square = saved_state.en_passant_square;
         self.state.zobrist_hash = saved_state.zobrist_hash;
-        self.state.pst_mg = saved_state.pst_mg;
-        self.state.pst_eg = saved_state.pst_eg;
         self.state.checkers = saved_state.checkers;
         self.state.blockers_for_king = saved_state.blockers_for_king;
         self.state.pinners = saved_state.pinners;
@@ -268,97 +231,6 @@ impl Board {
         self.state.checkers
     }
 
-    #[inline]
-    pub fn would_leave_king_in_check(&self, mv: &Move) -> bool {
-        let side = self.side_to_move;
-        let us = side as usize;
-
-        let moving_piece = self.piece_at(mv.from_sq()).map(|(p, _)| p);
-        if moving_piece == Some(Piece::King) {
-            return self.king_move_is_illegal(mv, side);
-        }
-
-        if mv.is_en_passant() {
-            return self.en_passant_is_illegal(mv, side);
-        }
-
-        if !self.state.checkers.is_empty() {
-            return self.king_still_attacked_after(mv, side);
-        }
-
-        let from_bb = mv.from_sq().bitboard();
-        let blockers = self.state.blockers_for_king[us];
-
-        if (blockers & from_bb).is_empty() {
-            return false;
-        }
-
-        let king_sq = self.state.king_square[us];
-        let pin_line = line_through(king_sq, mv.from_sq());
-        (pin_line & mv.to_sq().bitboard()).is_empty()
-    }
-
-    #[inline]
-    fn king_still_attacked_after(&self, mv: &Move, side: Color) -> bool {
-        let opponent = side.opponent();
-        let them = opponent as usize;
-
-        let king_sq = self.state.king_square[side as usize];
-
-        let mut occupied = self.cache.occupied;
-        occupied &= !mv.from_sq().bitboard();
-        occupied |= mv.to_sq().bitboard();
-
-        let mut their_pieces = self.pieces[them];
-        if let Some((captured, _)) = self.piece_at(mv.to_sq()) {
-            their_pieces[captured as usize] &= !mv.to_sq().bitboard();
-        }
-
-        is_square_attacked(king_sq, opponent, occupied, &their_pieces)
-    }
-
-    #[inline]
-    fn king_move_is_illegal(&self, mv: &Move, side: Color) -> bool {
-        let opponent = side.opponent();
-        let them = opponent as usize;
-
-        if mv.is_castling() {
-            let occupied = (self.cache.occupied & !mv.from_sq().bitboard()) | mv.to_sq().bitboard();
-            return is_square_attacked(mv.to_sq(), opponent, occupied, &self.pieces[them]);
-        }
-
-        let mut occupied = self.cache.occupied;
-        occupied &= !mv.from_sq().bitboard();
-        occupied |= mv.to_sq().bitboard();
-
-        let mut their_pieces = self.pieces[them];
-        if let Some((captured, _)) = self.piece_at(mv.to_sq()) {
-            their_pieces[captured as usize] &= !mv.to_sq().bitboard();
-        }
-
-        is_square_attacked(mv.to_sq(), opponent, occupied, &their_pieces)
-    }
-
-    #[inline]
-    fn en_passant_is_illegal(&self, mv: &Move, side: Color) -> bool {
-        let opponent = side.opponent();
-        let us = side as usize;
-        let them = opponent as usize;
-
-        let king_sq = self.state.king_square[us];
-        let captured_sq = mv.to_sq().down(side).expect("Invalid en passant");
-
-        let mut occupied = self.cache.occupied;
-        occupied &= !mv.from_sq().bitboard();
-        occupied &= !captured_sq.bitboard();
-        occupied |= mv.to_sq().bitboard();
-
-        let mut their_pieces = self.pieces[them];
-        their_pieces[Piece::Pawn as usize] &= !captured_sq.bitboard();
-
-        is_square_attacked(king_sq, opponent, occupied, &their_pieces)
-    }
-
     #[inline(always)]
     pub(crate) fn place_piece_internal(&mut self, square: Square, piece: Piece, color: Color) {
         let bb = square.bitboard();
@@ -377,16 +249,12 @@ impl Board {
 
     #[inline]
     fn get_castling_rook_squares(king_to: Square, side: Color) -> Result<(Square, Square)> {
-        match (side, king_to) {
-            (Color::White, Square::G1) => Ok((Square::H1, Square::F1)),
-            (Color::White, Square::C1) => Ok((Square::A1, Square::D1)),
-            (Color::Black, Square::G8) => Ok((Square::H8, Square::F8)),
-            (Color::Black, Square::C8) => Ok((Square::A8, Square::D8)),
-            _ => Err(BoardError::InvalidCastlingDestination {
+        CastlingPath::for_king_destination(side, king_to)
+            .map(|path| (path.rook_from, path.rook_to))
+            .ok_or(BoardError::InvalidCastlingDestination {
                 square: king_to,
                 color: side,
-            }),
-        }
+            })
     }
 
     fn update_castling_rights_after_move(

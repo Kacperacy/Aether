@@ -1,4 +1,8 @@
-pub mod attacks;
+//! Core chess vocabulary: the value types every other crate is written in.
+//!
+//! This crate is deliberately dependency-light and holds no tables, no board
+//! state, and no evaluation or search concepts.
+
 pub mod bitboard;
 pub mod castling;
 pub mod color;
@@ -7,21 +11,16 @@ pub mod file;
 pub mod r#move;
 pub mod piece;
 pub mod rank;
-pub mod score;
 pub mod square;
-pub mod zobrist_keys;
 
-pub use attacks::*;
-pub use bitboard::*;
-pub use castling::*;
-pub use color::*;
-pub use error::*;
-pub use file::*;
-pub use r#move::*;
-pub use piece::*;
-pub use rank::*;
-pub use score::*;
-pub use square::*;
-pub use zobrist_keys::*;
+pub use bitboard::{BitBoard, BitBoardIter};
+pub use castling::{CastlingPath, CastlingRights};
+pub use color::Color;
+pub use error::CoreError;
+pub use file::File;
+pub use r#move::Move;
+pub use piece::Piece;
+pub use rank::Rank;
+pub use square::Square;
 
 type Result<T> = std::result::Result<T, CoreError>;

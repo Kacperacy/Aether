@@ -1,13 +1,18 @@
+//! Attack generation: magic-bitboard sliders, leaper tables, and the
+//! aggregate queries (attackers, blockers, line geometry) built on them.
+
 #[cfg(feature = "codegen")]
 pub mod codegen;
 mod magic;
 mod magic_constants;
 mod pieces;
 
-use crate::{BitBoard, Color, File, Piece, Rank, Square};
+use aether_core::{BitBoard, Color, File, Piece, Rank, Square};
 pub use magic::*;
-pub use magic_constants::*;
 pub use pieces::*;
+
+// Generated lookup tables are an implementation detail of this crate.
+pub(crate) use magic_constants::*;
 
 #[must_use]
 #[inline(always)]
@@ -163,7 +168,7 @@ pub fn line_through(sq1: Square, sq2: Square) -> BitBoard {
 
     let mut result = BitBoard::EMPTY;
 
-    while f >= 0 && f <= 7 && r >= 0 && r <= 7 {
+    while (0..=7).contains(&f) && (0..=7).contains(&r) {
         let sq = Square::new(File::from_index(f), Rank::from_index(r));
         result |= sq.bitboard();
         f += df;

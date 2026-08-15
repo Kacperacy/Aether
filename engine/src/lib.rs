@@ -1,14 +1,21 @@
-mod eval;
+pub mod eval;
 pub mod search;
 
+use crate::eval::Score;
 use crate::eval::SimpleEvaluator;
 use crate::search::alpha_beta::AlphaBetaSearcher;
 use crate::search::{SearchInfo, SearchLimits, SearchResult};
-use aether_core::{Move, Score};
+use aether_core::Move;
 use board::Board;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
+
+/// Default transposition-table size in MiB, and the UCI `Hash` option default.
+pub const DEFAULT_HASH_MB: usize = 16;
+/// Bounds accepted for the UCI `Hash` option.
+pub const MIN_HASH_MB: usize = 1;
+pub const MAX_HASH_MB: usize = 1024;
 
 pub struct Engine {
     searcher: AlphaBetaSearcher<SimpleEvaluator>,
@@ -93,55 +100,11 @@ impl Engine {
             SearchLimits::default()
         }
     }
-
-    #[must_use]
-    pub fn perft(&self, board: &mut Board, depth: u8) -> u64 {
-        if depth == 0 {
-            return 1;
-        }
-
-        let mut moves = Vec::new();
-        movegen::legal(board, &mut moves);
-
-        if depth == 1 {
-            return moves.len() as u64;
-        }
-
-        let mut nodes = 0u64;
-        for mv in moves {
-            board.make_move(&mv).expect("legal move should not fail");
-            nodes += self.perft(board, depth - 1);
-            board.unmake_move(&mv).expect("unmake should not fail");
-        }
-
-        nodes
-    }
-
-    #[must_use]
-    pub fn perft_divide(&self, board: &mut Board, depth: u8) -> Vec<(Move, u64)> {
-        if depth == 0 {
-            return Vec::new();
-        }
-
-        let mut moves = Vec::new();
-        movegen::legal(board, &mut moves);
-
-        let mut results = Vec::new();
-
-        for mv in moves {
-            board.make_move(&mv).expect("legal move should not fail");
-            let nodes = self.perft(board, depth - 1);
-            board.unmake_move(&mv).expect("unmake should not fail");
-            results.push((mv, nodes));
-        }
-
-        results
-    }
 }
 
 impl Default for Engine {
     fn default() -> Self {
-        Self::new(16)
+        Self::new(DEFAULT_HASH_MB)
     }
 }
 
@@ -174,16 +137,6 @@ mod tests {
         assert!(result.best_move.is_some());
         assert!(!result.pv.is_empty());
         assert!(result.info.nodes > 0);
-    }
-
-    #[test]
-    fn test_perft_starting_position() {
-        let engine = Engine::new(16);
-        let mut board = Board::starting_position().unwrap();
-
-        assert_eq!(engine.perft(&mut board, 1), 20);
-        assert_eq!(engine.perft(&mut board, 2), 400);
-        assert_eq!(engine.perft(&mut board, 3), 8902);
     }
 
     #[test]

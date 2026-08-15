@@ -1,4 +1,4 @@
-use crate::{BitBoard, Square};
+use aether_core::{BitBoard, Square};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::Write;

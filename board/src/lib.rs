@@ -3,10 +3,10 @@ mod cache;
 mod error;
 mod fen;
 mod ops;
-pub mod pst;
 mod query;
 mod state_info;
 mod zobrist;
+mod zobrist_keys;
 
 pub use builder::BoardBuilder;
 pub use error::{BoardError, FenError, MoveError};
@@ -22,13 +22,6 @@ pub type Result<T> = std::result::Result<T, BoardError>;
 const MAX_SEARCH_DEPTH: usize = 256;
 const ZOBRIST_HISTORY_CAPACITY: usize = 512;
 const FIFTY_MOVE_THRESHOLD: u16 = 100;
-
-pub(crate) const MAX_GAME_PHASE: i32 = 256;
-pub(crate) const PHASE_KNIGHT: i16 = 1;
-pub(crate) const PHASE_BISHOP: i16 = 1;
-pub(crate) const PHASE_ROOK: i16 = 2;
-pub(crate) const PHASE_QUEEN: i16 = 4;
-pub(crate) const PHASE_TOTAL: i16 = 24; // 4*1 + 4*1 + 4*2 + 2*4
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -61,17 +54,6 @@ impl Board {
         }
     }
 
-    #[inline]
-    pub(crate) const fn phase_weight(piece: Piece) -> i16 {
-        match piece {
-            Piece::Knight => PHASE_KNIGHT,
-            Piece::Bishop => PHASE_BISHOP,
-            Piece::Rook => PHASE_ROOK,
-            Piece::Queen => PHASE_QUEEN,
-            Piece::Pawn | Piece::King => 0,
-        }
-    }
-
     pub fn starting_position() -> Result<Self> {
         BoardBuilder::starting_position().build()
     }
@@ -88,12 +70,7 @@ impl Board {
 
     #[inline]
     pub fn attackers_to_square(&self, sq: Square, color: Color) -> BitBoard {
-        aether_core::attackers_to_square(
-            sq,
-            color,
-            self.cache.occupied,
-            &self.pieces[color as usize],
-        )
+        attacks::attackers_to_square(sq, color, self.cache.occupied, &self.pieces[color as usize])
     }
 
     pub fn repetition_count(&self) -> usize {
@@ -116,10 +93,6 @@ impl Board {
         }
 
         count
-    }
-
-    pub fn print(&self) {
-        println!("{}", self.as_ascii());
     }
 
     pub fn as_ascii(&self) -> String {

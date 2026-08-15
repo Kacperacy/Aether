@@ -1,25 +1,26 @@
-use aether_core::{
-    BitBoard, Color, Move, Piece, Score, Square, bishop_attacks, king_attacks, knight_attacks,
-    pawn_attacks, rook_attacks,
-};
+//! Static exchange evaluation.
+//!
+//! Works directly against the board so it can use the O(1) mailbox lookup and
+//! the cached per-color occupancy rather than rebuilding them from bitboards.
+
+use crate::eval::{Score, material};
+use aether_core::{BitBoard, Color, Move, Piece, Square};
+use attacks::{bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks};
+use board::Board;
 
 #[inline]
-pub fn see_ge(
-    mv: &Move,
-    side: Color,
-    threshold: Score,
-    occupied: BitBoard,
-    pieces: &[[BitBoard; 6]; 2],
-) -> bool {
+pub fn see_ge(board: &Board, mv: &Move, threshold: Score) -> bool {
+    let side = board.side_to_move();
+    let pieces = board.pieces();
     let from = mv.from_sq();
     let to = mv.to_sq();
 
     let target_value = if mv.is_en_passant() {
-        Piece::PAWN_VALUE
+        material::PAWN_VALUE
     } else if mv.is_capture() {
-        match piece_on(to, &pieces[side.opponent() as usize]) {
-            Some(piece) => piece.value(),
-            None => return threshold <= 0,
+        match board.piece_at(to) {
+            Some((piece, c)) if c != side => material::value(piece),
+            _ => return threshold <= 0,
         }
     } else {
         return threshold <= 0;
@@ -27,13 +28,12 @@ pub fn see_ge(
 
     let (promotion_gain, attacker_value) = match mv.promotion_piece() {
         Some(promo_piece) => {
-            let promo_value = promo_piece.value();
-            (promo_value - Piece::PAWN_VALUE, promo_value)
+            let promo_value = material::value(promo_piece);
+            (promo_value - material::PAWN_VALUE, promo_value)
         }
         None => {
-            let moving_piece =
-                piece_on(from, &pieces[side as usize]).expect("SEE: no piece at from-square");
-            (0, moving_piece.value())
+            let (moving_piece, _) = board.piece_at(from).expect("SEE: no piece at from-square");
+            (0, material::value(moving_piece))
         }
     };
 
@@ -47,7 +47,7 @@ pub fn see_ge(
         return true;
     }
 
-    let mut occ = occupied ^ from.bitboard() ^ to.bitboard();
+    let mut occ = board.occupied() ^ from.bitboard() ^ to.bitboard();
     let mut attackers = all_attackers_to_square(to, occ, pieces);
     attackers &= occ;
 
@@ -55,7 +55,7 @@ pub fn see_ge(
     let mut result = 1i32;
 
     loop {
-        let stm_attackers = attackers & get_color_pieces(stm, pieces);
+        let stm_attackers = attackers & board.occupied_by(stm);
 
         if stm_attackers.is_empty() {
             break;
@@ -65,7 +65,7 @@ pub fn see_ge(
 
         let pawn_attackers = stm_attackers & pieces[stm as usize][Piece::Pawn as usize];
         if !pawn_attackers.is_empty() {
-            swap = Piece::PAWN_VALUE - swap;
+            swap = material::PAWN_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -78,7 +78,7 @@ pub fn see_ge(
 
         let knight_attackers = stm_attackers & pieces[stm as usize][Piece::Knight as usize];
         if !knight_attackers.is_empty() {
-            swap = Piece::KNIGHT_VALUE - swap;
+            swap = material::KNIGHT_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -90,7 +90,7 @@ pub fn see_ge(
 
         let bishop_attackers = stm_attackers & pieces[stm as usize][Piece::Bishop as usize];
         if !bishop_attackers.is_empty() {
-            swap = Piece::BISHOP_VALUE - swap;
+            swap = material::BISHOP_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -103,7 +103,7 @@ pub fn see_ge(
 
         let rook_attackers = stm_attackers & pieces[stm as usize][Piece::Rook as usize];
         if !rook_attackers.is_empty() {
-            swap = Piece::ROOK_VALUE - swap;
+            swap = material::ROOK_VALUE - swap;
             if swap < result as Score {
                 break;
             }
@@ -116,7 +116,7 @@ pub fn see_ge(
 
         let queen_attackers = stm_attackers & pieces[stm as usize][Piece::Queen as usize];
         if !queen_attackers.is_empty() {
-            swap = Piece::QUEEN_VALUE - swap;
+            swap = material::QUEEN_VALUE - swap;
             occ ^= queen_attackers.lsb().bitboard();
             attackers |= bishop_attacks(to, occ) & get_diagonal_sliders(pieces);
             attackers |= rook_attacks(to, occ) & get_straight_sliders(pieces);
@@ -125,7 +125,7 @@ pub fn see_ge(
             continue;
         }
 
-        let opponent_attackers = attackers & get_color_pieces(stm.opponent(), pieces);
+        let opponent_attackers = attackers & board.occupied_by(stm.opponent());
         return opponent_attackers.is_empty() != (result != 0);
     }
 
@@ -133,30 +133,31 @@ pub fn see_ge(
 }
 
 #[inline]
-pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard; 6]; 2]) -> Score {
+pub fn see_value(board: &Board, mv: &Move) -> Score {
+    let side = board.side_to_move();
+    let pieces = board.pieces();
     let to = mv.to_sq();
     let from = mv.from_sq();
 
     let target_value = if mv.is_en_passant() {
-        Piece::PAWN_VALUE
+        material::PAWN_VALUE
     } else if mv.is_capture() {
-        match piece_on(to, &pieces[side.opponent() as usize]) {
-            Some(piece) => piece.value(),
-            None => return 0,
+        match board.piece_at(to) {
+            Some((piece, c)) if c != side => material::value(piece),
+            _ => return 0,
         }
     } else {
         return 0;
     };
 
-    let moving_piece =
-        piece_on(from, &pieces[side as usize]).expect("SEE: no piece at from-square");
+    let (moving_piece, _) = board.piece_at(from).expect("SEE: no piece at from-square");
 
     let (promotion_gain, attacker_value) = match mv.promotion_piece() {
         Some(promo_piece) => {
-            let promo_value = promo_piece.value();
-            (promo_value - Piece::PAWN_VALUE, promo_value)
+            let promo_value = material::value(promo_piece);
+            (promo_value - material::PAWN_VALUE, promo_value)
         }
-        None => (0, moving_piece.value()),
+        None => (0, material::value(moving_piece)),
     };
 
     let mut gain: [Score; 32] = [0; 32];
@@ -164,7 +165,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
 
     gain[0] = target_value + promotion_gain;
 
-    let mut occ = occupied ^ from.bitboard() ^ to.bitboard();
+    let mut occ = board.occupied() ^ from.bitboard() ^ to.bitboard();
 
     let mut attackers = all_attackers_to_square(to, occ, pieces);
 
@@ -180,7 +181,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     let mut stm = side.opponent();
 
     while let Some((attacker_sq, attacker_piece)) =
-        get_least_valuable_attacker(attackers & get_color_pieces(stm, pieces), pieces, stm)
+        get_least_valuable_attacker(attackers & board.occupied_by(stm), pieces, stm)
     {
         depth += 1;
 
@@ -200,7 +201,7 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
         }
 
         attackers &= occ;
-        current_piece_value = Piece::ALL[attacker_piece as usize].value();
+        current_piece_value = material::value(attacker_piece);
         stm = stm.opponent();
     }
 
@@ -210,14 +211,6 @@ pub fn see_value(mv: &Move, side: Color, occupied: BitBoard, pieces: &[[BitBoard
     }
 
     gain[0]
-}
-
-#[inline]
-pub(crate) fn piece_on(square: Square, color_pieces: &[BitBoard; 6]) -> Option<Piece> {
-    Piece::ALL
-        .iter()
-        .find(|&&p| color_pieces[p as usize].contains(square))
-        .copied()
 }
 
 #[inline]
@@ -266,12 +259,6 @@ fn get_straight_sliders(pieces: &[[BitBoard; 6]; 2]) -> BitBoard {
 }
 
 #[inline]
-fn get_color_pieces(color: Color, pieces: &[[BitBoard; 6]; 2]) -> BitBoard {
-    let p = &pieces[color as usize];
-    p[0] | p[1] | p[2] | p[3] | p[4] | p[5]
-}
-
-#[inline]
 fn get_least_valuable_attacker(
     attackers: BitBoard,
     pieces: &[[BitBoard; 6]; 2],
@@ -300,222 +287,118 @@ fn get_least_valuable_attacker(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::eval::material::{BISHOP_VALUE, KNIGHT_VALUE, PAWN_VALUE, QUEEN_VALUE, ROOK_VALUE};
 
-    fn empty_pieces() -> [[BitBoard; 6]; 2] {
-        [[BitBoard::EMPTY; 6]; 2]
+    /// Positions carry distant kings so they are legal boards; the kings never
+    /// participate in the exchanges under test.
+    fn pos(fen: &str) -> Board {
+        fen.parse().expect("valid FEN")
     }
 
-    fn make_capture(from: Square, to: Square) -> Move {
+    fn capture(from: Square, to: Square) -> Move {
         Move::new(from, to, Move::CAPTURE)
     }
 
-    fn get_occupied(pieces: &[[BitBoard; 6]; 2]) -> BitBoard {
-        let mut occ = BitBoard::EMPTY;
-        for color in 0..2 {
-            for piece in 0..6 {
-                occ |= pieces[color][piece];
-            }
-        }
-        occ
+    #[test]
+    fn test_simple_pawn_takes_pawn() {
+        let b = pos("7k/8/8/3p4/4P3/8/8/K7 w - - 0 1");
+        let mv = capture(Square::E4, Square::D5);
+
+        assert!(see_ge(&b, &mv, 0));
+        assert!(see_ge(&b, &mv, PAWN_VALUE));
+        assert!(!see_ge(&b, &mv, PAWN_VALUE + 1));
+        assert_eq!(see_value(&b, &mv), PAWN_VALUE);
     }
 
     #[test]
-    fn test_see_simple_pawn_takes_pawn() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Pawn as usize] = Square::E4.bitboard();
-        pieces[Color::Black as usize][Piece::Pawn as usize] = Square::D5.bitboard();
+    fn test_pawn_takes_defended_pawn() {
+        let b = pos("7k/8/2p5/3p4/4P3/8/8/K7 w - - 0 1");
+        let mv = capture(Square::E4, Square::D5);
 
-        let mv = make_capture(Square::E4, Square::D5);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(
-            &mv,
-            Color::White,
-            Piece::PAWN_VALUE,
-            occupied,
-            &pieces
-        ));
-        assert!(!see_ge(
-            &mv,
-            Color::White,
-            Piece::PAWN_VALUE + 1,
-            occupied,
-            &pieces
-        ));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::PAWN_VALUE
-        );
+        assert!(see_ge(&b, &mv, 0));
+        assert!(!see_ge(&b, &mv, 1));
+        assert_eq!(see_value(&b, &mv), 0);
     }
 
     #[test]
-    fn test_see_pawn_takes_defended_pawn() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Pawn as usize] = Square::E4.bitboard();
-        pieces[Color::Black as usize][Piece::Pawn as usize] =
-            Square::D5.bitboard() | Square::C6.bitboard();
+    fn test_queen_takes_defended_pawn_loses() {
+        let b = pos("7k/8/4p3/3p4/8/8/8/K2Q4 w - - 0 1");
+        let mv = capture(Square::D1, Square::D5);
 
-        let mv = make_capture(Square::E4, Square::D5);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(!see_ge(&mv, Color::White, 1, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), 0);
+        assert!(!see_ge(&b, &mv, 0));
+        assert!(see_ge(&b, &mv, PAWN_VALUE - QUEEN_VALUE));
+        assert_eq!(see_value(&b, &mv), PAWN_VALUE - QUEEN_VALUE);
     }
 
     #[test]
-    fn test_see_queen_takes_defended_pawn() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Queen as usize] = Square::D1.bitboard();
-        pieces[Color::Black as usize][Piece::Pawn as usize] =
-            Square::D5.bitboard() | Square::E6.bitboard();
+    fn test_knight_takes_defended_rook() {
+        let b = pos("7k/8/5p2/4r3/8/5N2/8/K7 w - - 0 1");
+        let mv = capture(Square::F3, Square::E5);
+        let expected = ROOK_VALUE - KNIGHT_VALUE;
 
-        let mv = make_capture(Square::D1, Square::D5);
-        let occupied = get_occupied(&pieces);
-
-        assert!(!see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(
-            &mv,
-            Color::White,
-            Piece::PAWN_VALUE - Piece::QUEEN_VALUE,
-            occupied,
-            &pieces
-        ));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::PAWN_VALUE - Piece::QUEEN_VALUE
-        );
+        assert!(see_ge(&b, &mv, 0));
+        assert!(see_ge(&b, &mv, expected));
+        assert!(!see_ge(&b, &mv, expected + 1));
+        assert_eq!(see_value(&b, &mv), expected);
     }
 
     #[test]
-    fn test_see_knight_takes_defended_rook() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = Square::F3.bitboard();
-        pieces[Color::Black as usize][Piece::Rook as usize] = Square::E5.bitboard();
-        pieces[Color::Black as usize][Piece::Pawn as usize] = Square::F6.bitboard();
+    fn test_xray_rook_battery_wins_queen() {
+        // Rooks doubled on the d-file: the rear rook re-captures.
+        let b = pos("3q3k/8/8/8/3R4/8/8/K2R4 w - - 0 1");
+        let mv = capture(Square::D4, Square::D8);
 
-        let mv = make_capture(Square::F3, Square::E5);
-        let occupied = get_occupied(&pieces);
-
-        let expected = Piece::ROOK_VALUE - Piece::KNIGHT_VALUE;
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(&mv, Color::White, expected, occupied, &pieces));
-        assert!(!see_ge(&mv, Color::White, expected + 1, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), expected);
+        assert!(see_ge(&b, &mv, 0));
+        assert!(see_ge(&b, &mv, QUEEN_VALUE));
+        assert_eq!(see_value(&b, &mv), QUEEN_VALUE);
     }
 
     #[test]
-    fn test_see_xray_rook_attack() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Rook as usize] =
-            Square::D4.bitboard() | Square::D1.bitboard();
-        pieces[Color::Black as usize][Piece::Queen as usize] = Square::D8.bitboard();
+    fn test_undefended_bishop_capture() {
+        let b = pos("7k/8/8/8/R2Rb3/8/8/K7 w - - 0 1");
+        let mv = capture(Square::D4, Square::E4);
 
-        let mv = make_capture(Square::D4, Square::D8);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(
-            &mv,
-            Color::White,
-            Piece::QUEEN_VALUE,
-            occupied,
-            &pieces
-        ));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::QUEEN_VALUE
-        );
+        assert!(see_ge(&b, &mv, 0));
+        assert_eq!(see_value(&b, &mv), BISHOP_VALUE);
     }
 
     #[test]
-    fn test_see_xray_with_defender() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Rook as usize] =
-            Square::D4.bitboard() | Square::A4.bitboard();
-        pieces[Color::Black as usize][Piece::Bishop as usize] = Square::E4.bitboard();
+    fn test_knight_takes_bishop_defended_by_queen() {
+        let b = pos("7k/4q3/8/8/4b3/2N5/8/K7 w - - 0 1");
+        let mv = capture(Square::C3, Square::E4);
 
-        let mv = make_capture(Square::D4, Square::E4);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::BISHOP_VALUE
-        );
+        // NxB then QxN nets the bishop-knight difference.
+        assert!(see_ge(&b, &mv, 0));
+        assert_eq!(see_value(&b, &mv), BISHOP_VALUE - KNIGHT_VALUE);
     }
 
     #[test]
-    fn test_see_losing_exchange() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Queen as usize] = Square::D1.bitboard();
-        pieces[Color::Black as usize][Piece::Pawn as usize] =
-            Square::D5.bitboard() | Square::E6.bitboard();
+    fn test_equal_exchange() {
+        let b = pos("7k/8/8/8/4n3/2N5/8/K7 w - - 0 1");
+        let mv = capture(Square::C3, Square::E4);
 
-        let mv = make_capture(Square::D1, Square::D5);
-        let occupied = get_occupied(&pieces);
-
-        assert!(!see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::PAWN_VALUE - Piece::QUEEN_VALUE
-        );
+        assert!(see_ge(&b, &mv, 0));
+        assert!(see_ge(&b, &mv, KNIGHT_VALUE));
+        assert_eq!(see_value(&b, &mv), KNIGHT_VALUE);
     }
 
     #[test]
-    fn test_see_knight_takes_bishop_defended_by_queen() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
-        pieces[Color::Black as usize][Piece::Bishop as usize] = Square::E4.bitboard();
-        pieces[Color::Black as usize][Piece::Queen as usize] = Square::E7.bitboard();
+    fn test_defended_equal_exchange() {
+        let b = pos("7k/8/8/6n1/4n3/2N5/8/K7 w - - 0 1");
+        let mv = capture(Square::C3, Square::E4);
 
-        let mv = make_capture(Square::C3, Square::E4);
-        let occupied = get_occupied(&pieces);
-
-        // NxB (+330), QxN (-320) = +10
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::BISHOP_VALUE - Piece::KNIGHT_VALUE
-        );
+        assert!(see_ge(&b, &mv, 0));
+        assert!(!see_ge(&b, &mv, 1));
+        assert_eq!(see_value(&b, &mv), 0);
     }
 
     #[test]
-    fn test_see_equal_exchange() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
-        pieces[Color::Black as usize][Piece::Knight as usize] = Square::E4.bitboard();
+    fn test_quiet_move_has_no_exchange_value() {
+        let b = pos("7k/8/8/8/8/2N5/8/K7 w - - 0 1");
+        let quiet = Move::new(Square::C3, Square::E4, Move::QUIET);
 
-        let mv = make_capture(Square::C3, Square::E4);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(see_ge(
-            &mv,
-            Color::White,
-            Piece::KNIGHT_VALUE,
-            occupied,
-            &pieces
-        ));
-        assert_eq!(
-            see_value(&mv, Color::White, occupied, &pieces),
-            Piece::KNIGHT_VALUE
-        );
-    }
-
-    #[test]
-    fn test_see_defended_equal_exchange() {
-        let mut pieces = empty_pieces();
-        pieces[Color::White as usize][Piece::Knight as usize] = Square::C3.bitboard();
-        pieces[Color::Black as usize][Piece::Knight as usize] =
-            Square::E4.bitboard() | Square::G5.bitboard();
-
-        let mv = make_capture(Square::C3, Square::E4);
-        let occupied = get_occupied(&pieces);
-
-        assert!(see_ge(&mv, Color::White, 0, occupied, &pieces));
-        assert!(!see_ge(&mv, Color::White, 1, occupied, &pieces));
-        assert_eq!(see_value(&mv, Color::White, occupied, &pieces), 0);
+        assert_eq!(see_value(&b, &quiet), 0);
+        assert!(see_ge(&b, &quiet, 0));
+        assert!(!see_ge(&b, &quiet, 1));
     }
 }

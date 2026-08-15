@@ -1,3 +1,4 @@
+use super::material;
 use aether_core::{Color, Piece, Square};
 
 #[rustfmt::skip]
@@ -174,7 +175,7 @@ fn pst_index(square: Square, color: Color) -> usize {
 pub fn piece_value(piece: Piece, square: Square, color: Color) -> (i32, i32) {
     let idx = pst_index(square, color);
     let piece_idx = piece as usize;
-    let material = Piece::ALL[piece_idx].value();
+    let material = material::value(piece);
     let mg = material + PST_MG[piece_idx][idx];
     let eg = material + PST_EG[piece_idx][idx];
 
