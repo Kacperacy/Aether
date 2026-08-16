@@ -270,3 +270,54 @@ mod tests {
         assert!(score(&orderer, &board, &killer) > score(&orderer, &board, &other));
     }
 }
+
+#[cfg(test)]
+mod band_tests {
+    use super::*;
+    use crate::search::test_support::pos;
+
+    /// King captures fall *outside* the nominal capture band, and can collide
+    /// with the quiet bands.
+    ///
+    /// The good-capture formula subtracts the attacker's value, and a king is
+    /// worth `KING_VALUE` (20000), so a king capture scores far below every
+    /// other capture — roughly -9000 to -1000. King-takes-rook lands on exactly
+    /// `REPETITION_PENALTY`.
+    ///
+    /// This matters for lazy generation. It is tempting to argue that captures
+    /// and quiets can never score equal — bad captures sit in (-2900, -1100) and
+    /// ordinary quiets are non-negative — and therefore that generating the two
+    /// groups separately preserves ordering. King captures break that argument,
+    /// and an attempt at staged generation built on it changed the node count.
+    #[test]
+    fn test_king_captures_can_tie_the_repetition_penalty() {
+        let orderer = MoveOrderer::new();
+        // White king on e4 can capture the undefended black rook on e5.
+        let board = pos("7k/8/8/4r3/4K3/8/8/8 w - - 0 1");
+
+        let king_takes_rook = Move::new(Square::E4, Square::E5, Move::CAPTURE);
+        let score = orderer.move_score_with_see(&king_takes_rook, None, 0, &board);
+
+        assert_eq!(
+            score, REPETITION_PENALTY,
+            "king-takes-rook must be shown to collide with the quiet bands"
+        );
+    }
+
+    /// The same effect, stated as the general property: a king capture can score
+    /// below a plain quiet move, so captures do not form a band above quiets.
+    #[test]
+    fn test_king_captures_rank_below_quiet_moves() {
+        let orderer = MoveOrderer::new();
+        let board = pos("7k/8/8/4r3/4K3/8/8/8 w - - 0 1");
+
+        let king_takes_rook = Move::new(Square::E4, Square::E5, Move::CAPTURE);
+        let quiet_king_move = Move::new(Square::E4, Square::D3, Move::QUIET);
+
+        assert!(
+            orderer.move_score_with_see(&king_takes_rook, None, 0, &board)
+                < orderer.move_score_with_see(&quiet_king_move, None, 0, &board),
+            "a king capture outranking a quiet would make the band argument sound"
+        );
+    }
+}
