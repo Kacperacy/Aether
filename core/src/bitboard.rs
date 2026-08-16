@@ -7,6 +7,8 @@ pub struct BitBoard(pub u64);
 
 impl BitBoard {
     pub const EMPTY: Self = Self(0);
+    /// Every square set.
+    pub const FULL: Self = Self(!0);
 
     #[inline(always)]
     pub const fn new(val: u64) -> Self {

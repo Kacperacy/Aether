@@ -7,12 +7,39 @@ use board::Board;
 
 use crate::MoveList;
 
-#[inline]
-fn occupancies(board: &Board, side: Color) -> (BitBoard, BitBoard, BitBoard) {
-    let own = board.occupied_by(side);
-    let opponent = board.occupied_by(side.opponent());
-    let all = own | opponent;
-    (all, own, opponent)
+/// Everything the per-piece generators need that is constant across one call.
+///
+/// Bundled rather than passed loose: the destination mask and the two intent
+/// flags pushed the pawn generator past eight parameters, and these values are
+/// computed once per generation anyway.
+struct GenContext {
+    side: Color,
+    occupied: BitBoard,
+    own: BitBoard,
+    opponent: BitBoard,
+    /// Destination squares generation is restricted to.
+    mask: BitBoard,
+    en_passant: bool,
+    castling: bool,
+}
+
+impl GenContext {
+    #[inline]
+    fn new(board: &Board, mask: BitBoard, en_passant: bool, castling: bool) -> Self {
+        let side = board.side_to_move();
+        let own = board.occupied_by(side);
+        let opponent = board.occupied_by(side.opponent());
+
+        Self {
+            side,
+            occupied: own | opponent,
+            own,
+            opponent,
+            mask,
+            en_passant,
+            castling,
+        }
+    }
 }
 
 #[inline(always)]
@@ -33,15 +60,9 @@ fn generate_piece_moves(from: Square, targets: BitBoard, occupied: BitBoard, mov
     }
 }
 
-fn generate_pawn_moves(
-    board: &Board,
-    from: Square,
-    side: Color,
-    occupied: BitBoard,
-    opponent_pieces: BitBoard,
-    moves: &mut MoveList,
-) {
-    let push_targets = pawn_moves(from, side, occupied);
+fn generate_pawn_moves(board: &Board, from: Square, ctx: &GenContext, moves: &mut MoveList) {
+    let (side, occupied) = (ctx.side, ctx.occupied);
+    let push_targets = pawn_moves(from, side, occupied) & ctx.mask;
     for to in push_targets.iter() {
         let is_promotion = to.is_promotion_rank(side);
         let is_double_push = to.rank().to_index().abs_diff(from.rank().to_index()) == 2;
@@ -60,7 +81,7 @@ fn generate_pawn_moves(
         }
     }
 
-    let capture_targets = pawn_attacks(from, side) & opponent_pieces;
+    let capture_targets = pawn_attacks(from, side) & ctx.opponent & ctx.mask;
     for to in capture_targets.iter() {
         let is_promotion = to.is_promotion_rank(side);
 
@@ -73,51 +94,41 @@ fn generate_pawn_moves(
         }
     }
 
-    if let Some(ep_square) = board.en_passant_square()
+    // En passant is gated on the caller's intent rather than on `mask`: its
+    // destination square is empty, so a quiet-move mask would wrongly admit it
+    // and a capture mask would wrongly reject it.
+    if ctx.en_passant
+        && let Some(ep_square) = board.en_passant_square()
         && pawn_attacks(from, side).contains(ep_square)
     {
         moves.push(Move::new(from, ep_square, Move::EN_PASSANT));
     }
 }
 
-fn generate_knight_moves(
-    from: Square,
-    occupied: BitBoard,
-    own_pieces: BitBoard,
-    moves: &mut MoveList,
-) {
-    let targets = knight_attacks(from) & !own_pieces;
-    generate_piece_moves(from, targets, occupied, moves);
+fn generate_knight_moves(from: Square, ctx: &GenContext, moves: &mut MoveList) {
+    let targets = knight_attacks(from) & !ctx.own & ctx.mask;
+    generate_piece_moves(from, targets, ctx.occupied, moves);
 }
 
-fn generate_slider_moves(
-    from: Square,
-    piece: Piece,
-    occupied: BitBoard,
-    own_pieces: BitBoard,
-    moves: &mut MoveList,
-) {
+fn generate_slider_moves(from: Square, piece: Piece, ctx: &GenContext, moves: &mut MoveList) {
+    let occupied = ctx.occupied;
     let attacks = match piece {
         Piece::Bishop => bishop_attacks(from, occupied),
         Piece::Rook => rook_attacks(from, occupied),
         Piece::Queen => queen_attacks(from, occupied),
         _ => return,
     };
-    let targets = attacks & !own_pieces;
+    let targets = attacks & !ctx.own & ctx.mask;
     generate_piece_moves(from, targets, occupied, moves);
 }
 
-fn generate_king_moves(
-    board: &Board,
-    from: Square,
-    occupied: BitBoard,
-    own_pieces: BitBoard,
-    moves: &mut MoveList,
-) {
-    let targets = king_attacks(from) & !own_pieces;
-    generate_piece_moves(from, targets, occupied, moves);
+fn generate_king_moves(board: &Board, from: Square, ctx: &GenContext, moves: &mut MoveList) {
+    let targets = king_attacks(from) & !ctx.own & ctx.mask;
+    generate_piece_moves(from, targets, ctx.occupied, moves);
 
-    if let Some((_, side)) = board.piece_at(from) {
+    if ctx.castling
+        && let Some((_, side)) = board.piece_at(from)
+    {
         generate_castling_moves(board, from, side, moves);
     }
 }
@@ -171,26 +182,44 @@ fn try_castle(
     }
 }
 
-pub(crate) fn pseudo_legal(board: &Board, moves: &mut MoveList) {
+/// Pseudo-legal moves whose destination lies in `mask`.
+///
+/// The mask is what makes [`captures`] and [`quiets`] cheap: they restrict
+/// generation up front instead of building every move and discarding most of
+/// them. Quiescence generates captures at the large majority of nodes, so
+/// producing the quiet moves there only to filter them out was most of the cost.
+///
+/// `en_passant` and `castling` are separate flags rather than mask bits because
+/// neither is described by its destination square: en passant lands on an empty
+/// square while being a capture, and castling lands on an empty square while
+/// being quiet.
+pub(crate) fn pseudo_legal_masked(
+    board: &Board,
+    mask: BitBoard,
+    en_passant: bool,
+    castling: bool,
+    moves: &mut MoveList,
+) {
     moves.clear();
 
-    let side = board.side_to_move();
-    let (occupied, own_pieces, opponent_pieces) = occupancies(board, side);
+    let ctx = GenContext::new(board, mask, en_passant, castling);
 
-    for square in own_pieces.iter() {
+    for square in ctx.own.iter() {
         if let Some((piece, _)) = board.piece_at(square) {
             match piece {
-                Piece::Pawn => {
-                    generate_pawn_moves(board, square, side, occupied, opponent_pieces, moves)
-                }
-                Piece::Knight => generate_knight_moves(square, occupied, own_pieces, moves),
+                Piece::Pawn => generate_pawn_moves(board, square, &ctx, moves),
+                Piece::Knight => generate_knight_moves(square, &ctx, moves),
                 Piece::Bishop | Piece::Rook | Piece::Queen => {
-                    generate_slider_moves(square, piece, occupied, own_pieces, moves)
+                    generate_slider_moves(square, piece, &ctx, moves)
                 }
-                Piece::King => generate_king_moves(board, square, occupied, own_pieces, moves),
+                Piece::King => generate_king_moves(board, square, &ctx, moves),
             }
         }
     }
+}
+
+pub(crate) fn pseudo_legal(board: &Board, moves: &mut MoveList) {
+    pseudo_legal_masked(board, BitBoard::FULL, true, true, moves);
 }
 
 pub fn legal(board: &Board, moves: &mut MoveList) {
@@ -204,11 +233,9 @@ pub fn legal(board: &Board, moves: &mut MoveList) {
 /// `Board::make_move` does not validate moves, so an unfiltered pseudo-legal
 /// capture would let a pinned piece move — and let the reply capture the king.
 pub fn captures(board: &Board, moves: &mut MoveList) {
-    pseudo_legal(board, moves);
-    moves.retain(|m| {
-        (m.is_capture() || m.is_en_passant())
-            && !crate::legality::would_leave_king_in_check(board, &m)
-    });
+    let enemy = board.occupied_by(board.side_to_move().opponent());
+    pseudo_legal_masked(board, enemy, true, false, moves);
+    moves.retain(|m| !crate::legality::would_leave_king_in_check(board, &m));
 }
 
 /// Legal non-capturing moves — the exact complement of [`captures`].
@@ -218,13 +245,8 @@ pub fn captures(board: &Board, moves: &mut MoveList) {
 /// legal set once each, with no duplicates and nothing missed. Quiet promotions
 /// belong here, since they capture nothing.
 pub fn quiets(board: &Board, moves: &mut MoveList) {
-    pseudo_legal(board, moves);
-    moves.retain(|m| {
-        if m.is_capture() || m.is_en_passant() {
-            return false;
-        }
-        !crate::legality::would_leave_king_in_check(board, &m)
-    });
+    pseudo_legal_masked(board, !board.occupied(), false, true, moves);
+    moves.retain(|m| !crate::legality::would_leave_king_in_check(board, &m));
 }
 
 /// Appends legal *quiet* moves that give direct check.

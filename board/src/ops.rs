@@ -1,6 +1,6 @@
 use crate::state_info::StateInfo;
 use crate::{Board, BoardError, MAX_SEARCH_DEPTH, Result};
-use aether_core::{CastlingPath, CastlingRights, Color, File, Move, Piece, Square};
+use aether_core::{BitBoard, CastlingPath, CastlingRights, Color, File, Move, Piece, Square};
 use attacks::compute_slider_blockers;
 
 impl Board {
@@ -195,8 +195,14 @@ impl Board {
         }
         self.zobrist_toggle_side();
 
-        let new_king_sq = self.state.king_square[opponent as usize];
-        self.state.checkers = self.attackers_to_square(new_king_sq, side);
+        // A null move moves nothing, and the side that was not to move can never
+        // have been in check, so there is nothing to find.
+        debug_assert!(
+            self.attackers_to_square(self.state.king_square[opponent as usize], side)
+                .is_empty(),
+            "opponent king was already attacked before a null move"
+        );
+        self.state.checkers = BitBoard::EMPTY;
     }
 
     pub fn unmake_null_move(&mut self) {
