@@ -67,10 +67,10 @@ impl PerftReport {
     #[must_use]
     pub fn nps(&self) -> u64 {
         let millis = self.elapsed.as_millis();
-        if millis == 0 {
-            0
+        if let Some(millis) = millis.checked_div(1000) {
+            (u128::from(self.nodes) / millis) as u64
         } else {
-            (u128::from(self.nodes) * 1000 / millis) as u64
+            0
         }
     }
 }

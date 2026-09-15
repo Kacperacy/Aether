@@ -434,17 +434,15 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                 0
             };
 
-            let score;
-
-            if is_first_move {
-                score = -self.alpha_beta(
+            let score = if is_first_move {
+                -self.alpha_beta(
                     board,
                     depth - 1 + extension,
                     ply + 1,
                     -beta,
                     -alpha,
                     is_pv_node,
-                );
+                )
             } else {
                 let can_reduce = moves_searched >= lmr_full_depth_moves()
                     && depth >= lmr_min_depth()
@@ -453,28 +451,26 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     && !in_check
                     && !gives_check;
 
-                let mut lmr_score;
-
-                if can_reduce {
+                let mut lmr_score = if can_reduce {
                     let reduction = 1 + (moves_searched / lmr_divisor()) as u8;
-                    lmr_score = -self.alpha_beta(
+                    -self.alpha_beta(
                         board,
                         depth.saturating_sub(reduction + 1) + extension,
                         ply + 1,
                         -alpha - 1,
                         -alpha,
                         false,
-                    );
+                    )
                 } else {
-                    lmr_score = -self.alpha_beta(
+                    -self.alpha_beta(
                         board,
                         depth - 1 + extension,
                         ply + 1,
                         -alpha - 1,
                         -alpha,
                         false,
-                    );
-                }
+                    )
+                };
 
                 if lmr_score > alpha && lmr_score < beta {
                     lmr_score = -self.alpha_beta(
@@ -487,8 +483,8 @@ impl<E: Evaluator> AlphaBetaSearcher<E> {
                     );
                 }
 
-                score = lmr_score;
-            }
+                lmr_score
+            };
 
             self.undo_move(board, &mv);
 
